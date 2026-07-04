@@ -1,0 +1,19 @@
+{
+  "name": "tetromino-block-puzzle",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && node obfuscate.js",
+    "build:clean": "node build_clean.js",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^5.4.3",
+    "phaser": "^4.2.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
