@@ -6,6 +6,9 @@ let zzfxV = 0.3;
 let zzfxX = new (window.AudioContext || (window as any).webkitAudioContext)();
 
 export const zzfx = (...z: any[]) => {
+  if (zzfxX.state === 'suspended') {
+    zzfxX.resume();
+  }
   // @ts-ignore
   let b=[],e=0,f=0,g=0,c=1,d=0,h=0,i=0,j=1,k=0,l=0,m=0,n=0,o=0,p=0,q=0,r=0,s=0,t=0,u=0,v=0,w=0,x=0,y=zzfxX.createBuffer(1,1e5,zzfxR),A=zzfxX.createBufferSource();
   // @ts-ignore
