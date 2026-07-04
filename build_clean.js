@@ -47,18 +47,11 @@ try {
 
   // 4. Move output files to temp location outside dist to avoid Vite emptyOutDir wiping them
   const indexHtml = path.resolve('dist/index.html');
-  const indexOHtml = path.resolve('dist/index_o.html');
-  
   const tempCleanHtml = path.resolve('index_clean.tmp');
-  const tempCleanOHtml = path.resolve('index_clean_o.tmp');
 
   if (fs.existsSync(indexHtml)) {
     fs.copyFileSync(indexHtml, tempCleanHtml);
     console.log('Saved clean HTML to temp backup.');
-  }
-  if (fs.existsSync(indexOHtml)) {
-    fs.copyFileSync(indexOHtml, tempCleanOHtml);
-    console.log('Saved clean Obfuscated HTML to temp backup.');
   }
 
 } catch (err) {
@@ -71,24 +64,17 @@ try {
     console.log('Original GameScene.ts restored.');
   }
   
-  // 6. Re-run normal build to restore normal dist/index.html & dist/index_o.html (wipes dist folder)
+  // 6. Re-run normal build to restore normal dist/index.html (wipes dist folder)
   console.log('Re-building original package with ads...');
   execSync('npm run build', { stdio: 'inherit' });
 
   // 7. Move temp files back to dist/
   const cleanHtml = path.resolve('dist/index_clean.html');
-  const cleanOHtml = path.resolve('dist/index_clean_o.html');
   const tempCleanHtml = path.resolve('index_clean.tmp');
-  const tempCleanOHtml = path.resolve('index_clean_o.tmp');
 
   if (fs.existsSync(tempCleanHtml)) {
     fs.copyFileSync(tempCleanHtml, cleanHtml);
     fs.unlinkSync(tempCleanHtml);
     console.log('Created clean HTML: ' + cleanHtml);
-  }
-  if (fs.existsSync(tempCleanOHtml)) {
-    fs.copyFileSync(tempCleanOHtml, cleanOHtml);
-    fs.unlinkSync(tempCleanOHtml);
-    console.log('Created clean Obfuscated HTML: ' + cleanOHtml);
   }
 }
