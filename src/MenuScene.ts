@@ -136,6 +136,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.handleResize();
     this.scale.on('resize', this.handleResize, this);
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', this.handleResize, this);
+    });
   }
 
   update(time: number, delta: number) {

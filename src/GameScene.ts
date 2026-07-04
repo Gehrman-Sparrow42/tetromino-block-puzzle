@@ -199,16 +199,25 @@ export class GameScene extends Phaser.Scene {
       loop: true
     });
 
-    this.game.events.on(Phaser.Core.Events.BLUR, () => {
+    const onBlur = () => {
       if (!this.isPaused && this.scene.isActive('GameScene')) {
         this.togglePauseMenu();
       }
-    });
+    };
 
-    this.game.events.on(Phaser.Core.Events.HIDDEN, () => {
+    const onHidden = () => {
       if (!this.isPaused && this.scene.isActive('GameScene')) {
         this.togglePauseMenu();
       }
+    };
+
+    this.game.events.on(Phaser.Core.Events.BLUR, onBlur);
+    this.game.events.on(Phaser.Core.Events.HIDDEN, onHidden);
+
+    this.events.once('shutdown', () => {
+      this.game.events.off(Phaser.Core.Events.BLUR, onBlur);
+      this.game.events.off(Phaser.Core.Events.HIDDEN, onHidden);
+      this.scale.off('resize', this.layoutUI, this);
     });
 
     this.spawnPiece();
