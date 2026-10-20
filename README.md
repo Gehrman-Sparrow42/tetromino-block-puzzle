@@ -1,88 +1,55 @@
-# tetromino-block-puzzle
+# Afterblock
 
-High-performance 2D spatial puzzle game engine implemented in TypeScript using Phaser and Vite.
+An offline, ad-free falling-tetromino game for Android and the browser. Built as a remake of Tetromino Block Puzzle; the original version remains on `main`, with this edition on `remake/android`.
 
-## Overview
+## Play
 
-Tetromino Block Puzzle is an interactive browser-based spatial puzzle game. It renders dynamic grid-based polyomino placement mechanics, line-clearing logic, and combo multipliers using the Phaser 4 rendering engine. The project features single-file HTML bundle compilation for zero-dependency local or web distribution.
+- **Marathon:** endless play with increasing gravity every ten lines.
+- **Sprint 40:** clear forty lines as quickly as possible.
+- **Ultra 120:** score as much as possible in two minutes of active play.
 
-## Architecture and Pipeline
+Seven-piece bags, SRS quarter-turn rotation kicks, hold once per piece, five-piece next queue, ghost projection, 500 ms lock delay and a fixed fifteen-reset cap per piece. Scoring includes line clears, drops, consecutive-clear combos, back-to-back four-line clears/T-spins, and perfect clears. Runs pause when the app loses focus or enters the background, and restore paused after reopening.
 
-The application compiles from modular TypeScript sources into an optimized standalone browser bundle.
+Touch buttons support simultaneous two-thumb input and held movement. Optional hybrid controls add swipe movement and tap rotation on the board. Keyboard: arrows to move/soft drop, Z/X to rotate, C or Shift to hold, Space to hard drop, P/Escape to pause. The in-app guide explains controls and goals.
 
-```mermaid
-flowchart LR
-    A[TypeScript Source Modules: src/] --> B[TypeScript Compiler: tsc]
-    B --> C[Vite Bundler]
-    C --> D[Vite SingleFile Plugin]
-    D --> E[Single Distributable HTML File]
-    E --> F[Browser Execution via Phaser Canvas / WebGL]
-```
+Settings include sound and volume, haptics, ghost, reduced motion, hybrid gestures, and repeat speed. Records and one resumable run are stored locally. There are no accounts, ads, analytics, remote assets or online leaderboards. The Android package does not request internet permission; optional haptics use vibration permission. Clearing app data or uninstalling removes saved progress.
 
-- Game Core: Grid logic, piece validation, collision detection, and score evaluation implemented in strongly typed TypeScript.
-- Graphics Engine: High-performance 2D WebGL/Canvas rendering via Phaser.
-- Distribution Pipeline: `vite-plugin-singlefile` inlines CSS, scripts, and base64 audio/graphics assets into a portable single-file build (`build:clean`).
+## Development
 
-## Tech Stack
+Node.js 24 and npm are used for the locked build.
 
-| Component | Technology | Description |
-| :--- | :--- | :--- |
-| Runtime | Node.js 18+, Modern Web Browser | Development and client execution environments |
-| Language | TypeScript 5+ | Strongly-typed gameplay and matrix math |
-| Rendering Engine | Phaser 4.x | WebGL / Canvas 2D scene and input management |
-| Build Tool | Vite 6+, vite-plugin-singlefile | Bundling and single-file HTML compilation |
-
-## Project Structure
-
-```text
-Tetrimono_block_puzzle/
-├── .gitignore            # Git exclusion filters
-├── README.md             # Technical documentation
-├── index.html            # Application HTML shell
-├── package.json          # Node dependency and script definitions
-├── tsconfig.json         # TypeScript compiler options
-├── vite.config.ts        # Vite build and plugin configuration
-├── build_clean.js        # Single-file post-build optimization script
-├── public/               # Static audio, sprites, and fonts
-└── src/                  # Game scenes, managers, and grid logic
-```
-
-## Setup and Prerequisites
-
-### Prerequisites
-- Node.js 18 or higher
-- npm (bundled with Node.js)
-
-### Installation
-
-1. Clone repository:
-   ```bash
-   git clone https://github.com/Gehrman-Sparrow42/Tetrimono_block_puzzle.git
-   cd Tetrimono_block_puzzle
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-## Usage Examples
-
-### Development Server
-Run the local hot-reloading development server:
-```bash
+```sh
+npm ci
 npm run dev
+npm test
+npm run build
+npm run test:e2e
 ```
-Open your browser at the displayed local URL (typically `http://localhost:5173`).
 
-### Production Build
-Compile the single-file distribution bundle:
-```bash
-npm run build:clean
+For browser tests, first run `npx playwright install chromium` (or `--with-deps chromium` on Linux). Playwright starts its own development server. `dist/index.html` is a bundled single-file browser build; the Android package embeds this game locally. `npm run build:clean` is a compatibility alias for the same build, with no source rewriting.
+
+## Android APK
+
+App ID: `com.berkay.afterblock`. Minimum Android API 24 (Android 7.0), compile/target API 36. A recent Android System WebView is needed. Portrait is the preferred orientation; responsive browser layouts also support landscape.
+
+The template at `scripts/android-debug.workflow.yml` defines an **Android debug APK** GitHub Actions workflow. Copy it to `.github/workflows/android-debug.yml` using a GitHub login with workflow scope to enable it. The current CLI login cannot publish workflow files, so APKs are built locally during this task. The workflow runs unit tests, TypeScript/Vite compilation, Capacitor sync, Gradle assembly/lint, and checks the APK's identity and permissions. It uploads the `Afterblock-debug` artifact containing the signed debug APK, package metadata and SHA-256. A second job installs the APK in an Android API 35 emulator with Wi-Fi/mobile data disabled, checks startup and collects screenshots/logs. Debug signing is suitable for personal sideloading, not store publication. CI debug keys may change between builds; uninstalling a differently signed older APK may be required and clears its app data.
+
+For a local build, install JDK 21 and Android SDK platform 36/build tools 36.0.0, set `ANDROID_HOME` and `JAVA_HOME`, then:
+
+```sh
+npm run android:sync
+cd android
+./gradlew assembleDebug lintDebug
 ```
-The output will be placed in `dist/index.html`.
 
-## Notes and Constraints
+On Windows use `gradlew.bat`. The APK is `android/app/build/outputs/apk/debug/app-debug.apk`. `npm run android:open` opens the native project in Android Studio. No keystore or SDK installation is included in the repository.
 
-- Performance: WebGL is enabled by default with automatic Canvas fallback for devices lacking hardware acceleration.
-- Single-File Size: Inlining assets into a single file simplifies distribution but increases initial download payload slightly relative to chunked assets.
+## Code map
+
+- `src/contracts`: shared state, settings and action types.
+- `src/engine`: deterministic seeded rules and snapshot validation, without browser dependencies.
+- `src/ui`: Canvas renderer, responsive screens and cancel-safe keyboard/touch controls.
+- `src/platform`: local persistence/migration, procedural audio, optional haptics and lifecycle adapters.
+- `android`: Capacitor native shell and app resources.
+
+Unit tests cover rules, persistence and platform boundaries; browser tests cover visible flows and mobile controls. Emulator checks establish startup in the tested system image. They do not substitute for checking touch feel, haptics and safe areas on the intended physical phone.

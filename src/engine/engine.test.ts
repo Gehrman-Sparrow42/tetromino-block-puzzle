@@ -1,0 +1,434 @@
+import { describe, expect, it } from "vitest";
+import type {
+  ActivePiece,
+  GameStateSnapshot,
+  RotationState,
+  TetrominoType,
+} from "../contracts/game-contract";
+import { createInitialState, applyCommand, validateSnapshot } from "./engine";
+import { SHAPES } from "./constants";
+
+function setPiece(
+  s: GameStateSnapshot,
+  type: TetrominoType,
+  x: number,
+  y: number,
+  rotation: RotationState = 0,
+): ActivePiece {
+  const a: ActivePiece = {
+    type,
+    x,
+    y,
+    rotation,
+    ghostY: y,
+    lockTimerMs: 0,
+    lockResetsUsed: 0,
+    lastActionWasRotation: false,
+    lastKickIndex: 0,
+  };
+  const fits = (candidateY: number) =>
+    SHAPES[type][rotation].every((row, dy) =>
+      row.every(
+        (cell, dx) =>
+          !cell ||
+          (candidateY + dy < 24 &&
+            x + dx >= 0 &&
+            x + dx < 10 &&
+            !s.board[candidateY + dy][x + dx]),
+      ),
+    );
+  while (fits(a.ghostY + 1)) a.ghostY++;
+  s.active = a;
+  return a;
+}
+
+function fourLine(s: GameStateSnapshot): void {
+  s.board = Array.from({ length: 24 }, () => Array(10).fill(null));
+  for (let y = 20; y < 24; y++)
+    s.board[y] = Array.from({ length: 10 }, (_, x) => (x === 5 ? null : "J"));
+  setPiece(s, "I", 3, 20, 1);
+}
+
+describe("deterministic generator and movement", () => {
+  it("replays the same seed and preserves a complete seven-piece bag", () => {
+    const a = createInitialState("marathon", 42);
+    const b = createInitialState("marathon", 42);
+    const drawn: TetrominoType[] = [];
+    for (let i = 0; i < 28; i++) {
+      drawn.push(a.active!.type);
+      for (const state of [a, b]) {
+        applyCommand(state, { type: "HARD_DROP" });
+        state.board.forEach((row) => row.fill(null));
+        setPiece(state, state.active!.type, state.active!.x, state.active!.y);
+      }
+      expect(a).toEqual(b);
+    }
+    for (let i = 0; i < 28; i += 7)
+      expect(new Set(drawn.slice(i, i + 7)).size).toBe(7);
+    expect(a.nextQueue).toHaveLength(5);
+    expect(createInitialState("marathon", 7).nextQueue).not.toEqual(
+      createInitialState("marathon", 42).nextQueue,
+    );
+  });
+
+  it("uses gravity and awards soft and hard drop distance", () => {
+    const s = createInitialState("marathon", 1);
+    setPiece(s, "O", 4, 2);
+    applyCommand(s, { type: "TICK", dtMs: 999 });
+    expect(s.active!.y).toBe(2);
+    applyCommand(s, { type: "TICK", dtMs: 1 });
+    expect(s.active!.y).toBe(3);
+    applyCommand(s, { type: "SOFT_DROP", active: true });
+    applyCommand(s, { type: "TICK", dtMs: 70 });
+    expect(s.active!.y).toBe(5);
+    expect(s.score).toBe(2);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.score).toBe(36);
+    expect(s.piecesPlaced).toBe(1);
+  });
+
+  it("produces identical frame-partitioned gravity and lock results", () => {
+    const a = createInitialState("marathon", 123);
+    const b = structuredClone(a);
+    applyCommand(a, { type: "TICK", dtMs: 30000 });
+    for (let i = 0; i < 300; i++) applyCommand(b, { type: "TICK", dtMs: 100 });
+    expect(a).toEqual(b);
+  });
+
+  it("holds only once per piece and restores a fresh orientation", () => {
+    const s = createInitialState("marathon", 4);
+    const original = s.active!.type;
+    const next = s.nextQueue[0];
+    applyCommand(s, { type: "HOLD" });
+    expect(s.hold).toBe(original);
+    expect(s.active!.type).toBe(next);
+    const snapshot = structuredClone(s);
+    applyCommand(s, { type: "HOLD" });
+    expect(s).toEqual(snapshot);
+    applyCommand(s, { type: "HARD_DROP" });
+    applyCommand(s, { type: "ROTATE_CW" });
+    applyCommand(s, { type: "HOLD" });
+    expect(s.active!.type).toBe(original);
+    expect(s.active!.rotation).toBe(0);
+    expect(s.active!.lockResetsUsed).toBe(0);
+  });
+
+  it.each(["ROTATE_CW", "ROTATE_CCW"] as const)(
+    "rotates four times back to spawn using %s",
+    (type) => {
+      const s = createInitialState("marathon", 1);
+      setPiece(s, "T", 3, 5);
+      for (let i = 0; i < 4; i++) applyCommand(s, { type });
+      expect(s.active!.rotation).toBe(0);
+      expect(s.active!.x).toBe(3);
+      expect(s.active!.y).toBe(5);
+    },
+  );
+
+  it("uses normal and I SRS wall kicks in both directions", () => {
+    for (const type of ["T", "I"] as const) {
+      for (const command of ["ROTATE_CCW", "ROTATE_CW"] as const) {
+        const s = createInitialState("marathon", 1);
+        setPiece(s, type, type === "I" ? -2 : -1, 5, 1);
+        applyCommand(s, { type: command });
+        expect(s.active!.rotation).toBe(command === "ROTATE_CCW" ? 0 : 2);
+        expect(s.active!.x).toBeGreaterThanOrEqual(0);
+        expect(s.active!.lastKickIndex).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("uses upward floor kicks for both SRS tables", () => {
+    for (const type of ["T", "I"] as const) {
+      const s = createInitialState("marathon", 1);
+      setPiece(s, type, 3, 22);
+      applyCommand(s, { type: "ROTATE_CW" });
+      expect(s.active!.rotation).toBe(1);
+      expect(s.active!.y).toBeLessThan(22);
+      expect(validateSnapshot(s)).not.toBeNull();
+    }
+  });
+});
+
+describe("locking and lifecycle", () => {
+  it("waits 500ms on ground and caps resets at 15 per piece", () => {
+    const s = createInitialState("marathon", 1);
+    setPiece(s, "O", 4, 22);
+    for (let i = 0; i < 15; i++) {
+      applyCommand(s, { type: "TICK", dtMs: 490 });
+      applyCommand(s, { type: i % 2 ? "MOVE_RIGHT" : "MOVE_LEFT" });
+      expect(s.active!.lockTimerMs).toBe(0);
+      expect(s.piecesPlaced).toBe(0);
+    }
+    applyCommand(s, { type: "TICK", dtMs: 490 });
+    applyCommand(s, { type: "MOVE_RIGHT" });
+    expect(s.active!.lockResetsUsed).toBe(15);
+    expect(s.active!.lockTimerMs).toBe(490);
+    applyCommand(s, { type: "TICK", dtMs: 10 });
+    expect(s.piecesPlaced).toBe(1);
+  });
+
+  it("does not renew the reset allowance when a piece reaches a lower ledge", () => {
+    const s = createInitialState("marathon", 1);
+    s.board[21][4] = "J";
+    const a = setPiece(s, "O", 4, 19);
+    a.lockResetsUsed = 15;
+    a.lockTimerMs = 400;
+    applyCommand(s, { type: "MOVE_RIGHT" });
+    applyCommand(s, { type: "MOVE_RIGHT" });
+    applyCommand(s, { type: "TICK", dtMs: 3000 });
+    expect(s.active!.y).toBe(22);
+    expect(s.active!.lockResetsUsed).toBe(15);
+    applyCommand(s, { type: "TICK", dtMs: 100 });
+    expect(s.piecesPlaced).toBe(1);
+  });
+
+  it("pauses elapsed time and clears held soft drop on pause and resume", () => {
+    const s = createInitialState("ultra120", 1);
+    applyCommand(s, { type: "SOFT_DROP", active: true });
+    applyCommand(s, { type: "PAUSE" });
+    expect(s.softDropActive).toBe(false);
+    const paused = structuredClone(s);
+    applyCommand(s, { type: "TICK", dtMs: 1000 });
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s).toEqual(paused);
+    applyCommand(s, { type: "RESUME" });
+    expect(s.status).toBe("playing");
+    expect(s.softDropActive).toBe(false);
+  });
+
+  it("blocks out when the next spawn overlaps the stack", () => {
+    const s = createInitialState("marathon", 1);
+    setPiece(s, "O", 0, 22);
+    s.board[2].fill("J");
+    s.board[3].fill("J");
+    // Keep the spawn rows incomplete so they do not clear away.
+    s.board[2][0] = null;
+    s.board[3][0] = null;
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.status).toBe("gameover");
+    expect(s.active).toBeNull();
+  });
+
+  it("locks out a piece entirely in the hidden spawn area", () => {
+    const s = createInitialState("marathon", 1);
+    s.board[4][4] = "J";
+    s.board[4][5] = "J";
+    setPiece(s, "O", 4, 2);
+    applyCommand(s, { type: "TICK", dtMs: 500 });
+    expect(s.status).toBe("gameover");
+    expect(s.piecesPlaced).toBe(1);
+  });
+
+  it("finishes Sprint at 40 lines and keeps Marathon playing", () => {
+    for (const mode of ["sprint40", "marathon"] as const) {
+      const s = createInitialState(mode, 1);
+      s.lines = 36;
+      s.level = 4;
+      fourLine(s);
+      applyCommand(s, { type: "HARD_DROP" });
+      expect(s.lines).toBe(40);
+      expect(s.level).toBe(5);
+      expect(s.status).toBe(mode === "sprint40" ? "victory" : "playing");
+    }
+  });
+
+  it("finishes Ultra at exactly 120000ms without consuming excess time", () => {
+    const s = createInitialState("ultra120", 1);
+    s.elapsedMs = 119950;
+    applyCommand(s, { type: "TICK", dtMs: 100 });
+    expect(s.status).toBe("victory");
+    expect(s.elapsedMs).toBe(120000);
+    expect(s.active).toBeNull();
+  });
+});
+
+describe("scoring", () => {
+  it.each([
+    [1, 100],
+    [2, 300],
+    [3, 500],
+    [4, 800],
+  ])("scores a %i line clear at %i before perfect clear", (count, score) => {
+    const s = createInitialState("marathon", 1);
+    for (let y = 24 - count; y < 24; y++)
+      s.board[y] = Array.from({ length: 10 }, (_, x) => (x === 5 ? null : "J"));
+    s.board[10][0] = "J";
+    setPiece(s, "I", 3, 20, 1);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.lastEvent!.linesCleared).toBe(count);
+    expect(s.lastEvent!.pointsAwarded).toBe(score);
+  });
+
+  it("awards four-line perfect clears, consecutive B2B, combos, and breaks the chain on ordinary clears", () => {
+    const s = createInitialState("marathon", 1);
+    fourLine(s);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.lastEvent).toMatchObject({
+      pointsAwarded: 2800,
+      perfectClear: true,
+      backToBack: false,
+      combo: 0,
+    });
+    fourLine(s);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.lastEvent).toMatchObject({
+      pointsAwarded: 4450,
+      perfectClear: true,
+      backToBack: true,
+      combo: 1,
+    });
+    s.board[23] = Array.from({ length: 10 }, (_, x) =>
+      x === 4 || x === 5 ? null : "J",
+    );
+    setPiece(s, "O", 4, 22);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.backToBack).toBe(false);
+    expect(s.lastEvent!.combo).toBe(2);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.combo).toBe(-1);
+  });
+
+  it("recognizes full and mini T-spins using occupied corners and rotation history", () => {
+    for (const full of [true, false]) {
+      const s = createInitialState("marathon", 1);
+      s.board[21][3] = "J";
+      s.board[23][3] = "J";
+      s.board[23][5] = "J";
+      if (full) {
+        s.board[21][5] = "J";
+        s.board[23][3] = null;
+      }
+      const a = setPiece(s, "T", 3, 21);
+      a.lastActionWasRotation = true;
+      applyCommand(s, { type: "HARD_DROP" });
+      expect(s.lastEvent!.tSpin).toBe(full ? "full" : "mini");
+      expect(s.lastEvent!.pointsAwarded).toBe(full ? 400 : 100);
+    }
+  });
+
+  it("upgrades a mini on the fifth kick and requires rotation history", () => {
+    const s = createInitialState("marathon", 1);
+    s.board[21][3] = "J";
+    s.board[23][3] = "J";
+    s.board[23][5] = "J";
+    const a = setPiece(s, "T", 3, 21);
+    a.lastActionWasRotation = true;
+    a.lastKickIndex = 4;
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.lastEvent!.tSpin).toBe("full");
+    const noSpin = createInitialState("marathon", 1);
+    noSpin.board[21][3] = "J";
+    noSpin.board[23][3] = "J";
+    noSpin.board[23][5] = "J";
+    setPiece(noSpin, "T", 3, 21);
+    applyCommand(noSpin, { type: "HARD_DROP" });
+    expect(noSpin.lastEvent!.tSpin).toBe("none");
+  });
+});
+
+describe("saved state validation", () => {
+  it("returns a deep independent clone and resumes identical future bags", () => {
+    const original = createInitialState("marathon", 99);
+    const clone = validateSnapshot(JSON.parse(JSON.stringify(original)))!;
+    expect(clone).toEqual(original);
+    expect(clone.board).not.toBe(original.board);
+    applyCommand(original, { type: "HARD_DROP" });
+    applyCommand(clone, { type: "HARD_DROP" });
+    expect(clone).toEqual(original);
+  });
+
+  it.each([
+    (s: GameStateSnapshot) => {
+      s.board.pop();
+    },
+    (s: GameStateSnapshot) => {
+      s.board[0].push(null);
+    },
+    (s: GameStateSnapshot) => {
+      s.board[0] = Array(10);
+    },
+    (s: GameStateSnapshot) => {
+      s.board = Array(24);
+    },
+    (s: GameStateSnapshot) => {
+      s.board[0][0] = "X" as TetrominoType;
+    },
+    (s: GameStateSnapshot) => {
+      s.score = Infinity;
+    },
+    (s: GameStateSnapshot) => {
+      s.elapsedMs = NaN;
+    },
+    (s: GameStateSnapshot) => {
+      s.level = 2;
+    },
+    (s: GameStateSnapshot) => {
+      s.prngState = 0;
+    },
+    (s: GameStateSnapshot) => {
+      s.active!.lockResetsUsed = 16;
+    },
+    (s: GameStateSnapshot) => {
+      s.active!.rotation = 7 as RotationState;
+    },
+    (s: GameStateSnapshot) => {
+      s.active!.x = -20;
+    },
+    (s: GameStateSnapshot) => {
+      s.active!.ghostY = 3;
+    },
+    (s: GameStateSnapshot) => {
+      s.active = null;
+    },
+    (s: GameStateSnapshot) => {
+      s.nextQueue.pop();
+    },
+    (s: GameStateSnapshot) => {
+      s.nextQueue = Array(5);
+    },
+    (s: GameStateSnapshot) => {
+      s.status = "victory";
+    },
+    (s: GameStateSnapshot) => {
+      s.status = "paused";
+      s.softDropActive = true;
+    },
+    (s: GameStateSnapshot) => {
+      s.bag = ["I", "I"];
+    },
+    (s: GameStateSnapshot) => {
+      setPiece(s, "O", 4, 2);
+      s.board[2][4] = "J";
+    },
+  ])("rejects a corrupted save %#", (mutate) => {
+    const s = createInitialState("marathon", 1);
+    mutate(s);
+    expect(validateSnapshot(s)).toBeNull();
+  });
+
+  it("rejects missing fields, invalid types and non-objects without throwing", () => {
+    for (const value of [
+      null,
+      undefined,
+      false,
+      1,
+      {},
+      { version: 2 },
+      [],
+      "save",
+    ])
+      expect(validateSnapshot(value)).toBeNull();
+    const s = createInitialState("marathon", 1);
+    s.lastEvent = {
+      linesCleared: 1,
+      rows: [24],
+      tSpin: "none",
+      backToBack: false,
+      combo: 0,
+      pointsAwarded: 100,
+      perfectClear: false,
+    };
+    expect(validateSnapshot(s)).toBeNull();
+  });
+});

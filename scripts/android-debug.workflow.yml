@@ -1,0 +1,101 @@
+name: Android debug APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [remake/android]
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Rules and persistence tests
+        run: npm test
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+      - name: Mobile and desktop browser flows
+        run: npm run test:e2e
+      - name: Build and sync offline app
+        run: npm run android:sync
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Assemble and lint Android app
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug lintDebug
+      - name: Inspect APK identity and permissions
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > apk-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" >> apk-info.txt
+          if grep -q 'android.permission.INTERNET' apk-info.txt; then
+            echo 'Offline APK unexpectedly requests internet permission'; exit 1
+          fi
+          cat apk-info.txt
+          sha256sum "$APK" > apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Afterblock-debug
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            apk-info.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-lint
+          path: android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Afterblock-debug
+          path: apk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Launch installed APK offline
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/android-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-smoke
+          path: android-smoke/
+          if-no-files-found: ignore

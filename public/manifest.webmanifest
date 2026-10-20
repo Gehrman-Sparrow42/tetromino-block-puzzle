@@ -1,0 +1,11 @@
+{
+  "name": "Afterblock",
+  "short_name": "Afterblock",
+  "description": "A quiet offline falling-block arcade. Marathon, Sprint 40 and Ultra.",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101715",
+  "theme_color": "#101715",
+  "icons": [{ "src": "./afterblock.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
