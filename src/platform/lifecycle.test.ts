@@ -63,14 +63,40 @@ it("handles Android app state and back and cleans native listeners", async () =>
   const onBack = vi.fn();
   const dispose = await setupLifecycle({ onPause, onBack });
   listeners.appStateChange({ isActive: true });
+  listeners.pause({ isActive: true });
+  listeners.appStateChange({ isActive: true });
+  expect(onPause).toHaveBeenCalledTimes(1);
   listeners.appStateChange({ isActive: false });
   listeners.backButton({ isActive: true });
+  expect(onPause).toHaveBeenCalledTimes(2);
+  expect(onBack).toHaveBeenCalledTimes(1);
+  dispose();
+  dispose();
+  listeners.backButton({ isActive: true });
+  listeners.pause({ isActive: true });
+  listeners.appStateChange({ isActive: false });
+  expect(onBack).toHaveBeenCalledTimes(1);
+  expect(onPause).toHaveBeenCalledTimes(2);
+  expect(remove).toHaveBeenCalledTimes(3);
+});
+
+it("retains native pause and back when appStateChange registration fails", async () => {
+  mocks.native = true;
+  const listeners: Record<string, () => void> = {};
+  const remove = vi.fn().mockResolvedValue(undefined);
+  mocks.addListener.mockImplementation(async (kind, listener) => {
+    if (kind === "appStateChange") throw new Error("unsupported");
+    listeners[kind] = listener;
+    return { remove };
+  });
+  const onPause = vi.fn();
+  const onBack = vi.fn();
+  const dispose = await setupLifecycle({ onPause, onBack });
+  listeners.pause();
+  listeners.backButton();
   expect(onPause).toHaveBeenCalledTimes(1);
   expect(onBack).toHaveBeenCalledTimes(1);
   dispose();
-  dispose();
-  listeners.backButton({ isActive: true });
-  expect(onBack).toHaveBeenCalledTimes(1);
   expect(remove).toHaveBeenCalledTimes(2);
 });
 

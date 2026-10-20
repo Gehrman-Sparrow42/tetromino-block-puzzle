@@ -11,6 +11,7 @@ import { COLS, HIDDEN_ROWS, ROWS, SHAPES, WALL_KICKS } from "./constants";
 const TYPES: TetrominoType[] = ["I", "J", "L", "O", "S", "T", "Z"];
 const LOCK_MS = 500;
 const MAX_RESETS = 15;
+const ULTRA_DURATION_MS = 120000;
 
 function random(state: GameStateSnapshot): number {
   // xorshift32: all generator state is serialized, so resumes are deterministic.
@@ -246,8 +247,11 @@ function tick(state: GameStateSnapshot, dt: number): void {
   if (!Number.isFinite(dt) || dt <= 0) return;
   // Event-sized steps make gravity/lock results independent of render-frame boundaries.
   let remaining = Math.min(dt, 60000);
-  if (state.mode === "ultra120")
-    remaining = Math.min(remaining, 120000 - state.elapsedMs);
+  const isUltra = state.mode === "ultra120";
+  const reachesTimeLimit =
+    isUltra && remaining >= ULTRA_DURATION_MS - state.elapsedMs;
+  if (isUltra)
+    remaining = Math.min(remaining, ULTRA_DURATION_MS - state.elapsedMs);
   while (remaining > 0 && state.status === "playing") {
     const interval = gravityInterval(state);
     const onGround = grounded(state);
@@ -257,6 +261,9 @@ function tick(state: GameStateSnapshot, dt: number): void {
       : Infinity;
     const step = Math.min(remaining, toGravity, toLock);
     state.elapsedMs += step;
+    // Fractional gravity events can round the sum a fraction above the deadline,
+    // including on a step that also locks out and leaves the loop immediately.
+    if (isUltra) state.elapsedMs = Math.min(ULTRA_DURATION_MS, state.elapsedMs);
     state.gravityTimerMs += step;
     if (onGround) state.active!.lockTimerMs += step;
     remaining -= step;
@@ -272,12 +279,17 @@ function tick(state: GameStateSnapshot, dt: number): void {
       }
     }
   }
+  // Use the consumed time budget to recognize the deadline instead of comparing
+  // repeated floating-point additions, which can round just below 120000.
+  const boundaryRoundingTolerance = Number.EPSILON * ULTRA_DURATION_MS * 4;
+  if (reachesTimeLimit && remaining <= boundaryRoundingTolerance) {
+    state.elapsedMs = ULTRA_DURATION_MS;
+  }
   if (
-    state.mode === "ultra120" &&
-    state.elapsedMs >= 120000 &&
+    isUltra &&
+    state.elapsedMs >= ULTRA_DURATION_MS &&
     state.status === "playing"
   ) {
-    state.elapsedMs = 120000;
     state.status = "victory";
     state.active = null;
     state.softDropActive = false;
@@ -444,7 +456,9 @@ export function validateSnapshot(value: unknown): GameStateSnapshot | null {
         !type(a.type) ||
         !number(a.rotation, 0, 3) ||
         !number(a.x, -3, 9) ||
-        !number(a.y, 0, 23) ||
+        // Matrix origins may be above the board when their leading rows are
+        // empty (I rotation 2 permits -2); fits still checks every occupied cell.
+        !number(a.y, -2, 23) ||
         !number(a.ghostY, a.y, 23) ||
         !number(a.lockTimerMs, 0, 500, false) ||
         !number(a.lockResetsUsed, 0, 15) ||

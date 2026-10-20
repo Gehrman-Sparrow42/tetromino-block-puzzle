@@ -25,11 +25,19 @@ const MODE_NAMES: Record<GameMode, string> = {
   ultra120: "Ultra 120",
 };
 const num = (value: number) => value.toLocaleString("en-US");
-export function formatTime(ms: number) {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(seconds / 60)
+export function formatTime(ms: number, hundredths = false, countdown = false) {
+  const value = Math.max(0, ms);
+  const seconds = countdown
+    ? Math.ceil(value / 1000)
+    : Math.floor(value / 1000);
+  const clock = `${Math.floor(seconds / 60)
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  return hundredths
+    ? `${clock}.${Math.floor((value % 1000) / 10)
+        .toString()
+        .padStart(2, "0")}`
+    : clock;
 }
 const control = (command: string, icon: string, label: string, cls = "") =>
   `<button class="control ${cls}" data-command="${command}" aria-label="${label}"><span aria-hidden="true">${icon}</span><small>${label}</small></button>`;
@@ -142,7 +150,7 @@ export function startApp(root: HTMLDivElement) {
     persist();
     showModal(
       "pause",
-      `${sheetHead("A LITTLE BREATHING ROOM", "On pause.", false)}<p>Your next move can wait. This run is saved.</p><div class="sheet-stats"><span>SCORE<strong>${num(state.score)}</strong></span><span>LINES<strong>${state.lines}</strong></span><span>TIME<strong>${formatTime(state.elapsedMs)}</strong></span></div><button class="primary-button" data-action="resume">Keep playing <span>→</span></button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart run</button><button data-action="home">Main menu</button></div>`,
+      `${sheetHead("A LITTLE BREATHING ROOM", "On pause.", false)}<p>Your next move can wait. This run is saved.</p><div class="sheet-stats"><span>SCORE<strong>${num(state.score)}</strong></span><span>LINES<strong>${state.lines}</strong></span><span>TIME<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">Keep playing <span>→</span></button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart run</button><button data-action="home">Main menu</button></div>`,
     );
   }
   function resume() {
@@ -198,13 +206,13 @@ export function startApp(root: HTMLDivElement) {
       `<label class="setting-row"><span><strong>${title}</strong><small>${detail}</small></span><input type="checkbox" name="${key}" ${value ? "checked" : ""}/><i class="switch" aria-hidden="true"></i></label>`;
     showModal(
       "settings",
-      `${sheetHead("MAKE IT YOURS", "Your setup.")}<form id="settings-form">${toggle("soundEnabled", "Sound", "Soft, procedural arcade tones", settings.soundEnabled)}<label class="setting-row range-row"><span><strong>Volume</strong><small>Quiet or a little louder</small></span><input name="soundVolume" type="range" min="0" max="1" step=".05" value="${settings.soundVolume}" aria-label="Sound volume"/></label>${toggle("hapticsEnabled", "Haptics", "A little feedback on supported devices", settings.hapticsEnabled)}${toggle("ghostEnabled", "Landing guide", "Preview where your piece will land", settings.ghostEnabled)}${toggle("reducedMotion", "Reduced motion", "Keep visual feedback still", settings.reducedMotion)}<label class="setting-row select-row"><span><strong>Touch controls</strong><small>Buttons always stay available</small></span><select name="controlScheme" aria-label="Touch control scheme"><option value="buttons" ${settings.controlScheme === "buttons" ? "selected" : ""}>Buttons</option><option value="hybrid" ${settings.controlScheme === "hybrid" ? "selected" : ""}>Buttons + swipes</option></select></label><label class="setting-row range-row"><span><strong>Move delay</strong><small>Hold before repeating · milliseconds</small></span><input name="dasMs" type="range" min="80" max="250" step="5" value="${settings.dasMs}" aria-label="Move repeat delay"/></label><label class="setting-row range-row"><span><strong>Repeat speed</strong><small>Lower is faster · milliseconds</small></span><input name="arrMs" type="range" min="16" max="80" step="1" value="${settings.arrMs}" aria-label="Move repeat interval"/></label></form><button class="primary-button" data-action="close">All set <span>✓</span></button>`,
+      `${sheetHead("MAKE IT YOURS", "Your setup.")}<form id="settings-form">${toggle("soundEnabled", "Sound", "Soft, procedural arcade tones", settings.soundEnabled)}<label class="setting-row range-row"><span><strong>Volume</strong><small>Quiet or a little louder</small></span><input name="soundVolume" type="range" min="0" max="1" step=".05" value="${settings.soundVolume}" aria-label="Sound volume"/></label>${toggle("hapticsEnabled", "Haptics", "A little feedback on supported devices", settings.hapticsEnabled)}${toggle("ghostEnabled", "Landing guide", "Preview where your piece will land", settings.ghostEnabled)}${toggle("reducedMotion", "Reduced motion", "Keep visual feedback still", settings.reducedMotion)}<label class="setting-row select-row"><span><strong>Touch controls</strong><small>Buttons always stay available</small></span><select name="controlScheme" aria-label="Touch control scheme"><option value="buttons" ${settings.controlScheme === "buttons" ? "selected" : ""}>Buttons</option><option value="hybrid" ${settings.controlScheme === "hybrid" ? "selected" : ""}>Buttons + swipes</option></select></label><label class="setting-row range-row"><span><strong>Move delay</strong><small>Hold before repeating · milliseconds</small></span><input name="dasMs" type="range" min="80" max="300" step="5" value="${settings.dasMs}" aria-label="Move repeat delay"/></label><label class="setting-row range-row"><span><strong>Repeat speed</strong><small>Lower is faster · milliseconds</small></span><input name="arrMs" type="range" min="16" max="100" step="1" value="${settings.arrMs}" aria-label="Move repeat interval"/></label></form><button class="primary-button" data-action="close">All set <span>✓</span></button>`,
     );
   }
   function showRecords(current: PersonalBestStats) {
     showModal(
       "records",
-      `${sheetHead("YOUR OWN HIGH WATER MARK", "Personal bests.")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} completed runs. Stored on this device.</p><button class="primary-button" data-action="close">Back to it <span>→</span></button>`,
+      `${sheetHead("YOUR OWN HIGH WATER MARK", "Personal bests.")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} completed runs. Stored on this device.</p><button class="primary-button" data-action="close">Back to it <span>→</span></button>`,
     );
   }
   function help() {
@@ -223,7 +231,7 @@ export function startApp(root: HTMLDivElement) {
     const won = state.status === "victory";
     showModal(
       "result",
-      `${sheetHead(won ? "NICELY PLAYED" : "THERE IS ALWAYS ANOTHER PIECE", won ? "You did that." : "A good run.", false)}<p>${MODE_NAMES[state.mode]} ${won ? "complete." : "finished."} Take a breath. Then go again.</p><div class="result-score">${num(state.score)}<span>POINTS</span></div><div class="sheet-stats"><span>LINES<strong>${state.lines}</strong></span><span>LEVEL<strong>${state.level}</strong></span><span>TIME<strong>${formatTime(state.elapsedMs)}</strong></span></div><button class="primary-button" data-action="restart">Play again <span>↻</span></button><button class="secondary-button" data-action="home">Main menu</button>`,
+      `${sheetHead(won ? "NICELY PLAYED" : "THERE IS ALWAYS ANOTHER PIECE", won ? "You did that." : "A good run.", false)}<p>${MODE_NAMES[state.mode]} ${won ? "complete." : "finished."} Take a breath. Then go again.</p><div class="result-score">${num(state.score)}<span>POINTS</span></div><div class="sheet-stats"><span>LINES<strong>${state.lines}</strong></span><span>LEVEL<strong>${state.level}</strong></span><span>TIME<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="restart">Play again <span>↻</span></button><button class="secondary-button" data-action="home">Main menu</button>`,
     );
   }
   function send(command: GameCommand) {
@@ -231,11 +239,32 @@ export function startApp(root: HTMLDivElement) {
     if (state.status !== "playing" && command.type !== "SOFT_DROP") return;
     const locked = state.piecesPlaced,
       level = state.level;
+    const active = state.active;
+    const before = active
+      ? { x: active.x, y: active.y, rotation: active.rotation }
+      : null;
     applyCommand(state, command);
-    if (command.type === "ROTATE_CW" || command.type === "ROTATE_CCW")
+    const changed =
+      !!before &&
+      !!state.active &&
+      (before.x !== state.active.x ||
+        before.y !== state.active.y ||
+        before.rotation !== state.active.rotation);
+    if (
+      changed &&
+      (command.type === "ROTATE_CW" || command.type === "ROTATE_CCW")
+    )
       playSound("rotate", settings);
-    if (command.type === "MOVE_LEFT" || command.type === "MOVE_RIGHT")
+    if (
+      changed &&
+      (command.type === "MOVE_LEFT" || command.type === "MOVE_RIGHT")
+    )
       playSound("move", settings);
+    if (
+      state.piecesPlaced !== locked ||
+      (command.type === "HOLD" && state.active !== active)
+    )
+      controls.pieceChanged();
     if (command.type === "HARD_DROP") {
       playSound("drop", settings);
       pulseHaptic("light", settings);
@@ -261,9 +290,10 @@ export function startApp(root: HTMLDivElement) {
     send,
     () => settings,
     () => screen === "game" && modal === "" && state?.status === "playing",
-    () => {
-      if (modal) back();
-      else pause();
+    (key) => {
+      if (key === "back") back();
+      else if (screen === "game" && modal === "pause") resume();
+      else if (screen === "game" && !modal) pause();
     },
   );
   function draw() {
@@ -277,6 +307,8 @@ export function startApp(root: HTMLDivElement) {
     el("time-label").textContent = state.mode === "ultra120" ? "LEFT" : "TIME";
     el("time").textContent = formatTime(
       state.mode === "ultra120" ? 120000 - state.elapsedMs : state.elapsedMs,
+      state.mode === "sprint40",
+      state.mode === "ultra120",
     );
     el("goal").innerHTML =
       state.mode === "marathon"

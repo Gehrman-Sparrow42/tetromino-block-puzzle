@@ -34,3 +34,4 @@ playwright-report/
 test-results/
 *.jks
 *.keystore
+/android-smoke/

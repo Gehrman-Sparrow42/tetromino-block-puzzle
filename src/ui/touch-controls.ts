@@ -12,7 +12,7 @@ export class TouchControls {
   private command: (command: GameCommand) => void;
   private settings: () => UserSettings;
   private enabled: () => boolean;
-  private pause: () => void;
+  private pause: (key: "pause" | "back") => void;
   private held = new Map<string, Held>();
   private soft = new Set<string>();
   private disposers: (() => void)[] = [];
@@ -23,7 +23,7 @@ export class TouchControls {
     command: (command: GameCommand) => void,
     settings: () => UserSettings,
     enabled: () => boolean,
-    pause: () => void,
+    pause: (key: "pause" | "back") => void,
   ) {
     this.root = root;
     this.command = command;
@@ -91,6 +91,9 @@ export class TouchControls {
     this.listen(canvas, "pointercancel", () => {
       this.gesture = null;
     });
+    this.listen(canvas, "lostpointercapture", () => {
+      this.gesture = null;
+    });
   }
   private listen(target: EventTarget, type: string, handler: EventListener) {
     target.addEventListener(type, handler);
@@ -98,12 +101,15 @@ export class TouchControls {
   }
   private keydown = (event: KeyboardEvent) => {
     if (
-      (event.target as HTMLElement)?.matches("input,select,textarea,button") &&
-      event.code !== "Escape"
+      (event.target as HTMLElement)?.matches?.(
+        "input,select,textarea,button",
+      ) &&
+      event.code !== "Escape" &&
+      event.code !== "KeyP"
     )
       return;
     if (["Escape", "KeyP"].includes(event.code)) {
-      if (!event.repeat) this.pause();
+      if (!event.repeat) this.pause(event.code === "KeyP" ? "pause" : "back");
       event.preventDefault();
       return;
     }
@@ -129,10 +135,15 @@ export class TouchControls {
   };
   private press(id: string, action: string) {
     if (action === "MOVE_LEFT" || action === "MOVE_RIGHT") {
-      this.command({ type: action });
+      if (this.held.has(id)) return;
+      const previous = this.winner();
+      if (previous?.direction !== action) this.command({ type: action });
       this.held.set(id, {
         direction: action,
-        until: performance.now() + this.settings().dasMs,
+        until:
+          previous?.direction === action
+            ? previous.until
+            : performance.now() + this.settings().dasMs,
       });
     } else if (action === "SOFT_DROP") {
       this.soft.add(id);
@@ -152,11 +163,21 @@ export class TouchControls {
       this.releaseAll();
       return;
     }
-    for (const held of this.held.values())
-      if (now >= held.until) {
-        this.command({ type: held.direction });
-        held.until = now + Math.max(16, this.settings().arrMs);
-      }
+    const held = this.winner();
+    if (held && now >= held.until) {
+      this.command({ type: held.direction });
+      const until = now + Math.max(16, this.settings().arrMs);
+      // Sources holding the same direction share one repeat clock.
+      for (const source of this.held.values())
+        if (source.direction === held.direction) source.until = until;
+    }
+  }
+  private winner() {
+    return Array.from(this.held.values()).at(-1);
+  }
+  /** A swipe belongs to the piece that was on screen when it began. Physical holds persist. */
+  pieceChanged() {
+    this.gesture = null;
   }
   releaseAll() {
     this.held.clear();

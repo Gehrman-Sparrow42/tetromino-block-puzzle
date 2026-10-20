@@ -328,6 +328,124 @@ describe("scoring", () => {
 });
 
 describe("saved state validation", () => {
+  it.each([
+    ["T", -1, 2],
+    ["I", -2, 2],
+  ] as const)(
+    "accepts a legal %s matrix origin at y=%i",
+    (type, y, rotation) => {
+      const s = createInitialState("marathon", 1);
+      setPiece(s, type, 3, y, rotation);
+      expect(validateSnapshot(s)).toEqual(s);
+      s.active!.y--;
+      expect(validateSnapshot(s)).toBeNull();
+    },
+  );
+
+  it("can save an actual upward SRS kick above the matrix origin boundary", () => {
+    const s = createInitialState("marathon", 1);
+    // Block the first three 1->2 kick candidates while leaving [0,-2] open.
+    s.board[2][3] = "J";
+    s.board[2][6] = "J";
+    s.board[3][5] = "J";
+    setPiece(s, "T", 3, 1, 1);
+    expect(validateSnapshot(s)).not.toBeNull();
+    applyCommand(s, { type: "ROTATE_CW" });
+    expect(s.active).toMatchObject({ y: -1, rotation: 2, lastKickIndex: 3 });
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it.each([false, true])(
+    "finishes Ultra exactly across fractional gravity events (soft=%s)",
+    (soft) => {
+      for (const fraction of [
+        0.01337, 0.1, 0.123456789, 0.333333333, 0.999999,
+      ]) {
+        const s = createInitialState("ultra120", 1);
+        s.elapsedMs = 119950 + fraction;
+        s.lines = 20;
+        s.level = 3;
+        s.gravityTimerMs = soft ? 12.987654321 : 610.987654321;
+        s.softDropActive = soft;
+        applyCommand(s, { type: "TICK", dtMs: 100.123456789 });
+        expect(s.status).toBe("victory");
+        expect(s.elapsedMs).toBe(120000);
+        expect(validateSnapshot(s)).toEqual(s);
+      }
+    },
+  );
+
+  it("keeps simultaneous Ultra lockout and deadline snapshots valid", () => {
+    const s = createInitialState("ultra120", 1);
+    s.board[4][4] = "J";
+    s.board[4][5] = "J";
+    const piece = setPiece(s, "O", 4, 2);
+    piece.lockTimerMs = 450.25;
+    s.elapsedMs = 119950.25;
+    s.gravityTimerMs = 15.123;
+    s.softDropActive = true;
+    applyCommand(s, { type: "TICK", dtMs: 100 });
+    // A lockout at the exact deadline retains its gameover result.
+    expect(s.status).toBe("gameover");
+    expect(s.elapsedMs).toBe(120000);
+    expect(s.piecesPlaced).toBe(1);
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it("finishes at the deadline when level-nine event additions would round below it", () => {
+    const s = createInitialState("ultra120", 1);
+    s.lines = 80;
+    s.level = 9;
+    s.elapsedMs = 119900.0071099289;
+    s.gravityTimerMs = 87.777776979;
+    applyCommand(s, { type: "TICK", dtMs: 100 });
+    expect(s.elapsedMs).toBe(120000);
+    expect(s.status).toBe("victory");
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it("normalizes fractional simultaneous lockout events to the exact deadline", () => {
+    const s = createInitialState("ultra120", 1);
+    s.lines = 80;
+    s.level = 9;
+    s.board[4][4] = "J";
+    s.board[4][5] = "J";
+    s.elapsedMs = 119900.0071099289;
+    setPiece(s, "O", 4, 2).lockTimerMs = s.elapsedMs - 119500;
+    s.gravityTimerMs = 87.777776979;
+    applyCommand(s, { type: "TICK", dtMs: 100 });
+    expect(s.elapsedMs).toBe(120000);
+    expect(s.status).toBe("gameover");
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it("records an earlier Ultra lockout at its actual time", () => {
+    const s = createInitialState("ultra120", 1);
+    s.board[4][4] = "J";
+    s.board[4][5] = "J";
+    setPiece(s, "O", 4, 2).lockTimerMs = 490;
+    s.elapsedMs = 119950;
+    applyCommand(s, { type: "TICK", dtMs: 100 });
+    expect(s.status).toBe("gameover");
+    expect(s.elapsedMs).toBe(119960);
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it("preserves physically held soft drop through locks, holds, and remaining frame time", () => {
+    const s = createInitialState("marathon", 1);
+    setPiece(s, "O", 4, 22).lockTimerMs = 490;
+    applyCommand(s, { type: "SOFT_DROP", active: true });
+    applyCommand(s, { type: "TICK", dtMs: 60 });
+    expect(s.piecesPlaced).toBe(1);
+    expect(s.softDropActive).toBe(true);
+    expect(s.active!.y).toBe(3);
+    applyCommand(s, { type: "HOLD" });
+    expect(s.softDropActive).toBe(true);
+    applyCommand(s, { type: "TICK", dtMs: 35 });
+    expect(s.active!.y).toBe(3);
+    expect(validateSnapshot(s)).not.toBeNull();
+  });
+
   it("returns a deep independent clone and resumes identical future bags", () => {
     const original = createInitialState("marathon", 99);
     const clone = validateSnapshot(JSON.parse(JSON.stringify(original)))!;

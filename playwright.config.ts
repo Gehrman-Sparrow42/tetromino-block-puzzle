@@ -12,7 +12,7 @@ export default defineConfig({
     },
     {
       name: "small-phone",
-      use: { ...devices["Pixel 7"], viewport: { width: 360, height: 640 } },
+      use: { ...devices["Pixel 7"], viewport: { width: 360, height: 600 } },
     },
     { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },
   ],

@@ -16,6 +16,4 @@ adb logcat -d > android-smoke/logcat.txt
 if grep -q 'FATAL EXCEPTION' android-smoke/logcat.txt; then
   echo 'Android runtime crashed'; exit 1
 fi
-if ! grep -iq 'afterblock' android-smoke/home.xml; then
-  echo 'Game home screen was not exposed by the WebView'; exit 1
-fi
+node scripts/android-smoke.cjs

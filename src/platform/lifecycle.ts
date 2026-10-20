@@ -26,6 +26,16 @@ export async function setupLifecycle(callbacks: {
   try {
     if (Capacitor.isNativePlatform()) {
       try {
+        // Android can pause then resume without reaching onStop, which is
+        // where appStateChange reports inactivity. Pause gameplay immediately.
+        const listener = await App.addListener("pause", pause);
+        removers.push(() => {
+          void listener.remove().catch(() => {});
+        });
+      } catch {
+        /* Other lifecycle listeners remain available if this event is unsupported. */
+      }
+      try {
         const listener = await App.addListener(
           "appStateChange",
           ({ isActive }) => {

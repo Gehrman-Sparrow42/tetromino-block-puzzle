@@ -292,7 +292,7 @@ button:active {
       max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)) -
       max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px))
   );
-  min-height: 540px;
+  min-height: 0;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1006,7 +1006,7 @@ button:active {
 }
 @media (max-height: 580px) and (orientation: landscape) {
   .game-screen {
-    min-height: 540px;
+    min-height: 0;
   }
   .home-screen {
     max-width: 600px;
@@ -1039,5 +1039,26 @@ button:active {
 @media (max-width: 370px) {
   .board-wrap {
     height: min(100cqh, calc((100cqw - 110px) * 2));
+  }
+}
+
+@media (pointer: coarse) {
+  .keyboard-hint {
+    display: none;
+  }
+}
+@media (max-height: 650px) {
+  .rail-bottom .vertical-rule {
+    height: 12px;
+    margin: 8px auto;
+  }
+  .scoreboard strong {
+    font-size: 17px;
+  }
+  .next-piece {
+    flex-basis: 36px;
+  }
+  .game-screen {
+    gap: 6px;
   }
 }
