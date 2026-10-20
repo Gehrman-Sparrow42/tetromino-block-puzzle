@@ -1,5 +1,22 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.project.name === "small-phone") {
+    await page.addInitScript(() => {
+      document.addEventListener("DOMContentLoaded", () => {
+        document.documentElement.style.setProperty(
+          "--safe-area-inset-top",
+          "24px",
+        );
+        document.documentElement.style.setProperty(
+          "--safe-area-inset-bottom",
+          "48px",
+        );
+      });
+    });
+  }
+});
+
 test("play, hold, pause, save, resume, and settings survive reload", async ({
   page,
 }) => {
@@ -52,8 +69,16 @@ test("game board and controls fit screen without overlap", async ({ page }) => {
   expect(board!.width).toBeGreaterThan(120);
   expect(board!.height / board!.width).toBeCloseTo(2, 1);
   expect(board!.y + board!.height).toBeLessThanOrEqual(controls!.y);
+  const bottomInset = await page.evaluate(
+    () =>
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--safe-area-inset-bottom",
+        ),
+      ) || 0,
+  );
   expect(controls!.y + controls!.height).toBeLessThanOrEqual(
-    viewport.height + 1,
+    viewport.height - bottomInset + 1,
   );
   const buttons = await page.locator(".control-deck .control").all();
   for (const button of buttons) {
@@ -138,4 +163,20 @@ test("Ultra completion displays result, records it once, clears saved run", asyn
       () => JSON.parse(localStorage.getItem("tetromino_v2_stats")!).gamesPlayed,
     ),
   ).toBe(1);
+});
+
+test("P toggles pause without navigating out and leaves settings alone", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('[data-mode="marathon"]').click();
+  await page.keyboard.press("p");
+  await expect(page.getByRole("dialog")).toContainText("On pause.");
+  await page.keyboard.press("p");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.locator("#game")).toBeVisible();
+  await page.keyboard.press("p");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.keyboard.press("p");
+  await expect(page.getByRole("dialog")).toContainText("Your setup.");
 });
