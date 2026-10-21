@@ -84,10 +84,13 @@ export class TouchControls {
                 : movement.map((a) => this.buttons.get(a)!),
             actions: movement,
           },
-          ...["HARD_DROP", "HOLD", "ROTATE_CW", "ROTATE_CCW"].map((a) => ({
-            nodes: [this.buttons.get(a)!],
-            actions: [a],
-          })),
+          ...["HARD_DROP", "HOLD", "ROTATE_CW", "ROTATE_CCW"]
+            .map((a) => this.buttons.get(a))
+            .filter((n): n is HTMLButtonElement => !!n)
+            .map((n) => ({
+              nodes: [n],
+              actions: [n.dataset.command!],
+            })),
         ];
         const bounds = (nodes: HTMLElement[]) => {
           const rs = nodes.map((n) => n.getBoundingClientRect());

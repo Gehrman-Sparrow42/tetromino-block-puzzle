@@ -12,6 +12,7 @@ class ButtonStub extends EventTarget {
     contains: (name: string) => this.classes.has(name),
   };
   setPointerCapture = vi.fn();
+  closest = () => null;
   style = { left: "0px", top: "0px" };
   hidden = false;
   parentElement = { getBoundingClientRect: () => ({ left: 0, top: 0 }) };
@@ -54,7 +55,8 @@ function setup(gamepad = false) {
         ? canvas
         : gamepad && selector === "[data-movement-pad]"
           ? pad
-          : gamepad && selector === "[data-dynamic-pad-zone]"
+          : selector === ".play-area" ||
+              (gamepad && selector === "[data-dynamic-pad-zone]")
             ? zone
             : null,
   } as unknown as HTMLElement;
