@@ -66,71 +66,117 @@ export class TouchControls {
           }
         }) as EventListener);
       });
-    const movementPad = root.querySelector<HTMLElement>("[data-movement-pad]");
-    const dynamicZone = root.querySelector<HTMLElement>(
-      "[data-dynamic-pad-zone]",
-    );
-    if (movementPad && dynamicZone) {
-      const positionPad = ((event: PointerEvent) => {
+    const area = root.querySelector<HTMLElement>(".play-area");
+    const homes = new Map<HTMLElement, { left: string; top: string }>();
+    if (area)
+      this.listen(area, "pointerdown", ((event: PointerEvent) => {
+        if (!this.enabled() || this.settings().padMode !== "dynamic") return;
+        const target = event.target as Element;
+        if (target.closest("button, #board, .left-rail, .next-rail")) return;
+        const movement = ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"];
+        const pad = root.querySelector<HTMLElement>("[data-movement-pad]");
+        const connected = this.settings().controlLayout === "gamepad";
+        const groups: { nodes: HTMLElement[]; actions: string[] }[] = [
+          {
+            nodes:
+              connected && pad
+                ? [pad]
+                : movement.map((a) => this.buttons.get(a)!),
+            actions: movement,
+          },
+          ...["HARD_DROP", "HOLD", "ROTATE_CW", "ROTATE_CCW"].map((a) => ({
+            nodes: [this.buttons.get(a)!],
+            actions: [a],
+          })),
+        ];
+        const bounds = (nodes: HTMLElement[]) => {
+          const rs = nodes.map((n) => n.getBoundingClientRect());
+          const left = Math.min(...rs.map((r) => r.left)),
+            top = Math.min(...rs.map((r) => r.top));
+          return {
+            left,
+            top,
+            width: Math.max(...rs.map((r) => r.right)) - left,
+            height: Math.max(...rs.map((r) => r.bottom)) - top,
+          };
+        };
+        groups.sort((a, b) => {
+          const distance = (g: typeof a) => {
+            const r = bounds(g.nodes);
+            return Math.hypot(
+              event.clientX - r.left - r.width / 2,
+              event.clientY - r.top - r.height / 2,
+            );
+          };
+          return distance(a) - distance(b);
+        });
+        const group = groups[0]!;
         if (
-          ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"].some((action) => {
-            const button = this.buttons.get(action);
-            return button && event.composedPath().includes(button);
+          [...this.activeActions.values()].some((a) =>
+            group.actions.includes(a),
+          )
+        )
+          return;
+        const r = bounds(group.nodes),
+          viewport = area.getBoundingClientRect();
+        if (r.width > viewport.width || r.height > viewport.height) return;
+        const left = Math.max(
+          viewport.left,
+          Math.min(viewport.right - r.width, event.clientX - r.width / 2),
+        );
+        const top = Math.max(
+          viewport.top,
+          Math.min(viewport.bottom - r.height, event.clientY - r.height / 4),
+        );
+        const dx = left - r.left,
+          dy = top - r.top;
+        const members = group.actions.map((a) => this.buttons.get(a)!);
+        const obstacles = [
+          ...root.querySelectorAll<HTMLElement>(
+            "#board, .left-rail, .next-rail, .control-deck [data-command]",
+          ),
+        ].filter((n) => !members.includes(n as HTMLButtonElement));
+        const proposed = group.nodes.map((n) => {
+          const q = n.getBoundingClientRect();
+          return {
+            left: q.left + dx,
+            top: q.top + dy,
+            right: q.right + dx,
+            bottom: q.bottom + dy,
+          };
+        });
+        if (
+          obstacles.some((n) => {
+            const q = n.getBoundingClientRect();
+            return (
+              q.width &&
+              q.height &&
+              proposed.some(
+                (p) =>
+                  p.left < q.right + 8 &&
+                  p.right + 8 > q.left &&
+                  p.top < q.bottom + 8 &&
+                  p.bottom + 8 > q.top,
+              )
+            );
           })
         )
           return;
-        if (
-          !this.enabled() ||
-          this.settings().controlLayout !== "gamepad" ||
-          this.settings().padMode !== "dynamic"
-        )
-          return;
-        const pad = movementPad.getBoundingClientRect();
-        const zone = dynamicZone.getBoundingClientRect();
-        if (zone.width < pad.width || zone.height < pad.height) return;
         event.preventDefault();
-        const deck = movementPad.parentElement!.getBoundingClientRect();
-        const clamp = (n: number, min: number, max: number) =>
-          Math.max(min, Math.min(max, n));
-        const left = clamp(
-          event.clientX - pad.width / 2,
-          zone.left,
-          zone.right - pad.width,
-        );
-        const top = clamp(
-          event.clientY - pad.height / 4,
-          zone.top,
-          zone.bottom - pad.height,
-        );
-        const obstacles = root.querySelectorAll<HTMLElement>(
-          "#board, .left-rail, .next-rail, .control-deck > [data-command]",
-        );
-        for (const obstacle of obstacles) {
-          const r = obstacle.getBoundingClientRect();
-          if (
-            r.width &&
-            r.height &&
-            left < r.right + 8 &&
-            left + pad.width + 8 > r.left &&
-            top < r.bottom + 8 &&
-            top + pad.height + 8 > r.top
-          )
-            return;
+        for (const node of group.nodes) {
+          if (!homes.has(node))
+            homes.set(node, { left: node.style.left, top: node.style.top });
+          node.style.left = `${parseFloat(node.style.left) + dx}px`;
+          node.style.top = `${parseFloat(node.style.top) + dy}px`;
         }
-        if (!this.restorePad) {
-          const homeLeft = movementPad.style.left,
-            homeTop = movementPad.style.top;
-          this.restorePad = () => {
-            movementPad.style.left = homeLeft;
-            movementPad.style.top = homeTop;
-          };
-        }
-        movementPad.style.left = `${left - deck.left}px`;
-        movementPad.style.top = `${top - deck.top}px`;
-      }) as EventListener;
-      this.listen(dynamicZone, "pointerdown", positionPad);
-      this.listen(movementPad, "pointerdown", positionPad);
-    }
+        this.restorePad = () => {
+          for (const [node, home] of homes) {
+            node.style.left = home.left;
+            node.style.top = home.top;
+          }
+          homes.clear();
+        };
+      }) as EventListener);
     const canvas = root.querySelector<HTMLCanvasElement>("#board")!;
     this.listen(canvas, "pointerdown", ((event: PointerEvent) => {
       if (!this.enabled() || this.settings().controlScheme !== "hybrid") return;

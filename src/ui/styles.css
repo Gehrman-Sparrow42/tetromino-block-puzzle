@@ -1368,3 +1368,8 @@ html[data-theme="classic"] {
     height: 36px;
   }
 }
+
+/* Let board and button hits reach their own handlers. */
+.dynamic-pad-zone {
+  pointer-events: none;
+}

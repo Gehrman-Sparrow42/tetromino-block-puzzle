@@ -331,14 +331,12 @@ export function startApp(root: HTMLDivElement) {
       '[data-action="edit-controls"]',
     );
     if (edit) edit.hidden = settings.controlLayout !== "gamepad";
-    for (const name of ["gamepadPreset", "padMode"]) {
+    for (const name of ["gamepadPreset"]) {
       const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
       if (row) row.hidden = settings.controlLayout !== "gamepad";
     }
     const note = dialog.querySelector<HTMLElement>("[data-dynamic-note]");
-    if (note)
-      note.hidden =
-        settings.controlLayout !== "gamepad" || settings.padMode !== "dynamic";
+    if (note) note.hidden = settings.padMode !== "dynamic";
     for (const name of ["controlSpread"]) {
       const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
       if (row) row.hidden = settings.controlLayout === "gamepad";
@@ -541,9 +539,9 @@ export function startApp(root: HTMLDivElement) {
           ["fixed", "Fixed"],
           ["dynamic", "Dynamic"],
         ],
-        "Movement button placement",
+        "Control placement",
       )}
-      <p class="control-mode-note" data-dynamic-note>Touch an empty part of the movement area to position the buttons.</p>
+      <p class="control-mode-note" data-dynamic-note>Tap empty space near a control group to move it.</p>
       <div class="control-preview" aria-hidden="true"></div>
       <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
       ${range("controlScale", "Size", 0.85, 2, 0.01, "Control size")}

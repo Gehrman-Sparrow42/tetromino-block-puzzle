@@ -1,5 +1,11 @@
 # Remake verification - 2026-10-21
 
+## Dynamic placement across layouts — 2.8.0
+
+Fixed/Dynamic placement is available in Connected buttons, Thumb, Left-handed and Floating. Empty-space taps move the nearest control group; movement buttons keep their arrangement, while action buttons can move individually. Actual button taps/holds remain direct. Active groups cannot relocate, unsafe overlap is rejected, board gestures remain reachable, and temporary positions reset on pause/blur/resize without overwriting saved homes.
+
+Reduced verification at the user's request to conserve remaining usage: four focused phone-browser scenarios pass (all layouts, actual relocation, subsequent rotation/hard drop and reset on pause), TypeScript/Vite and Capacitor sync pass, and Android debug assembly passes. The full suites, fresh lint review and installed native smoke were not rerun for 2.8.0. Argon investigation was canceled to accelerate completion; it supplied no implementation changes.
+
 ## Larger board and connected movement buttons — 2.7.0
 
 - At 384 × 853, the centered board grows from 256 × 512 to 284 × 568: 56 px more height, 23.07% more area, and approximately 28% of the previously estimated 200 px gap below the board. Cells remain square. Shared 48 px rails now use 2 px gutters; tall rails show larger 11 px labels, 18 px values and 48 × 36 px Next previews. Compact and landscape rails adapt to their available height.
