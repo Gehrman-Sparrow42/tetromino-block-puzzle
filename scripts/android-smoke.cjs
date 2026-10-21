@@ -49,6 +49,7 @@ async function attach() {
     );
     await page.screenshot({ path: `${output}/home.png` });
     await page.locator('[data-mode="marathon"]').click();
+    await page.locator('[data-action="start-marathon"]').click();
     if (await page.locator("#dialog").isVisible())
       await page.locator('[data-action="confirm-new"]').click();
     await page.getByRole("button", { name: "Hard drop", exact: true }).click();

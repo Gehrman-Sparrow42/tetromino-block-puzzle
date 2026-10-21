@@ -1,6 +1,10 @@
 export type TetrominoType = "I" | "O" | "T" | "S" | "Z" | "J" | "L";
 export type RotationState = 0 | 1 | 2 | 3;
 export type GameMode = "marathon" | "sprint40" | "ultra120";
+export interface MarathonOptions {
+  startingLevel: number;
+  speedMode: "progressive" | "fixed";
+}
 export type RunStatus = "playing" | "paused" | "gameover" | "victory";
 export type GameCommand =
   | {
@@ -39,6 +43,8 @@ export interface ClearEvent {
 export interface GameStateSnapshot {
   version: 2;
   mode: GameMode;
+  /** Absent in legacy saves, which progress normally from level one. */
+  marathonOptions?: MarathonOptions;
   status: RunStatus;
   seed: number;
   prngState: number;
@@ -116,6 +122,8 @@ export interface UserSettings {
 export interface PersonalBestStats {
   marathonHighScore: number;
   marathonMaxLines: number;
+  marathonFixedHighScore?: number;
+  marathonFixedMaxLines?: number;
   sprint40BestTimeMs: number | null;
   ultra120HighScore: number;
   gamesPlayed: number;

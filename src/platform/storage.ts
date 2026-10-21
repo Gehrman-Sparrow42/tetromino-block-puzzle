@@ -174,6 +174,8 @@ export function loadStats(): PersonalBestStats {
   const stats: PersonalBestStats = {
     marathonHighScore: counter(value.marathonHighScore),
     marathonMaxLines: counter(value.marathonMaxLines),
+    marathonFixedHighScore: counter(value.marathonFixedHighScore),
+    marathonFixedMaxLines: counter(value.marathonFixedMaxLines),
     sprint40BestTimeMs:
       typeof value.sprint40BestTimeMs === "number" &&
       Number.isFinite(value.sprint40BestTimeMs) &&
@@ -205,8 +207,19 @@ export function recordResult(state: GameStateSnapshot): PersonalBestStats {
     return stats;
   stats.gamesPlayed = Math.min(Number.MAX_SAFE_INTEGER, stats.gamesPlayed + 1);
   if (valid.mode === "marathon") {
-    stats.marathonHighScore = Math.max(stats.marathonHighScore, valid.score);
-    stats.marathonMaxLines = Math.max(stats.marathonMaxLines, valid.lines);
+    if (valid.marathonOptions?.speedMode === "fixed") {
+      stats.marathonFixedHighScore = Math.max(
+        stats.marathonFixedHighScore ?? 0,
+        valid.score,
+      );
+      stats.marathonFixedMaxLines = Math.max(
+        stats.marathonFixedMaxLines ?? 0,
+        valid.lines,
+      );
+    } else {
+      stats.marathonHighScore = Math.max(stats.marathonHighScore, valid.score);
+      stats.marathonMaxLines = Math.max(stats.marathonMaxLines, valid.lines);
+    }
   } else if (valid.mode === "ultra120") {
     stats.ultra120HighScore = Math.max(stats.ultra120HighScore, valid.score);
   } else if (valid.status === "victory" && valid.elapsedMs > 0) {

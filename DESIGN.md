@@ -251,3 +251,7 @@ The renderer shares one tile function across the board and previews. Data Field 
 - **Don't** make theme selection reposition gameplay controls.
 - **Don't** replace static piece patterns with color alone in the monochrome worlds.
 - **Don't** impose one corner radius or one display face across all thirteen themes.
+
+## Marathon setup
+
+Marathon opens a compact setup sheet with Speed (Progressive or Fixed), Starting level (1–15), one short explanatory sentence and Start. Progression remains one level per ten cleared lines up to level 30; Fixed keeps the selected level. The setup stays separate from an existing paused run until Start and any replacement confirmation are accepted. The run stores its own options; legacy runs retain their previous behavior. Fixed results have separate score and line records.

@@ -3,6 +3,7 @@ import type {
   GameCommand,
   GameMode,
   GameStateSnapshot,
+  MarathonOptions,
   RotationState,
   TetrominoType,
 } from "../contracts/game-contract";
@@ -12,6 +13,25 @@ const TYPES: TetrominoType[] = ["I", "J", "L", "O", "S", "T", "Z"];
 const LOCK_MS = 500;
 const MAX_RESETS = 15;
 const ULTRA_DURATION_MS = 120000;
+
+function validMarathonOptions(value: unknown): value is MarathonOptions {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const options = value as MarathonOptions;
+  return (
+    Number.isInteger(options.startingLevel) &&
+    options.startingLevel >= 1 &&
+    options.startingLevel <= 15 &&
+    (options.speedMode === "progressive" || options.speedMode === "fixed")
+  );
+}
+
+function levelForLines(state: GameStateSnapshot): number {
+  const options = state.mode === "marathon" ? state.marathonOptions : undefined;
+  const startingLevel = options?.startingLevel ?? 1;
+  return options?.speedMode === "fixed"
+    ? startingLevel
+    : Math.min(30, startingLevel + Math.floor(state.lines / 10));
+}
 
 function random(state: GameStateSnapshot): number {
   // xorshift32: all generator state is serialized, so resumes are deterministic.
@@ -88,11 +108,30 @@ function spawn(state: GameStateSnapshot, type?: TetrominoType): void {
 export function createInitialState(
   mode: GameMode,
   seed: number,
+  options?: MarathonOptions,
 ): GameStateSnapshot {
+  if (
+    mode === "marathon" &&
+    options !== undefined &&
+    !validMarathonOptions(options)
+  )
+    throw new RangeError(
+      "Marathon requires a starting level from 1 to 15 and a fixed or progressive speed mode.",
+    );
   const normalized = seed >>> 0 || 0x6d2b79f5;
   const state: GameStateSnapshot = {
     version: 2,
     mode,
+    ...(mode === "marathon"
+      ? {
+          marathonOptions: {
+            ...(options ?? {
+              startingLevel: 1,
+              speedMode: "progressive" as const,
+            }),
+          },
+        }
+      : {}),
     status: "playing",
     seed: normalized,
     prngState: normalized,
@@ -106,7 +145,7 @@ export function createInitialState(
     nextQueue: [],
     score: 0,
     lines: 0,
-    level: 1,
+    level: mode === "marathon" ? (options?.startingLevel ?? 1) : 1,
     combo: -1,
     backToBack: false,
     elapsedMs: 0,
@@ -175,7 +214,7 @@ function lock(state: GameStateSnapshot): void {
   points *= state.level;
   state.score += points;
   state.lines += count;
-  state.level = Math.min(30, Math.floor(state.lines / 10) + 1);
+  state.level = levelForLines(state);
   if (count) state.backToBack = difficult;
   state.lastEvent = {
     linesCleared: count,
@@ -380,6 +419,11 @@ export function validateSnapshot(value: unknown): GameStateSnapshot | null {
       return null;
     if (!number(s.seed, 1, 0xffffffff) || !number(s.prngState, 1, 0xffffffff))
       return null;
+    if (
+      "marathonOptions" in s &&
+      (s.mode !== "marathon" || !validMarathonOptions(s.marathonOptions))
+    )
+      return null;
     // Array.from also checks holes in sparse arrays; Array.every alone skips them.
     if (
       !Array.isArray(s.board) ||
@@ -417,7 +461,7 @@ export function validateSnapshot(value: unknown): GameStateSnapshot | null {
       !number(s.lines, 0, 1e8) ||
       !number(s.piecesPlaced, 0, 1e9) ||
       !number(s.level, 1, 30) ||
-      s.level !== Math.min(30, Math.floor(s.lines / 10) + 1) ||
+      s.level !== levelForLines(s) ||
       !number(s.combo, -1, 1e8)
     )
       return null;

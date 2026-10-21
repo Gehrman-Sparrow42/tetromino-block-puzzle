@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   ActivePiece,
   GameStateSnapshot,
+  MarathonOptions,
   RotationState,
   TetrominoType,
 } from "../contracts/game-contract";
@@ -241,6 +242,135 @@ describe("locking and lifecycle", () => {
     expect(s.elapsedMs).toBe(120000);
     expect(s.active).toBeNull();
   });
+});
+
+describe("Marathon speed options", () => {
+  it("starts at the selected level using the existing gravity curve", () => {
+    const options: MarathonOptions = {
+      startingLevel: 5,
+      speedMode: "progressive",
+    };
+    const s = createInitialState("marathon", 1, options);
+    options.startingLevel = 1;
+    expect(s.level).toBe(5);
+    expect(s.marathonOptions?.startingLevel).toBe(5);
+    setPiece(s, "O", 4, 2);
+    const interval = 1000 * Math.pow(0.8 - 4 * 0.007, 4);
+    applyCommand(s, { type: "TICK", dtMs: interval - 1 });
+    expect(s.active!.y).toBe(2);
+    applyCommand(s, { type: "TICK", dtMs: 1 });
+    expect(s.active!.y).toBe(3);
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it.each(["progressive", "fixed"] as const)(
+    "%s applies its selected speed after crossing ten lines",
+    (speedMode) => {
+      const s = createInitialState("marathon", 1, {
+        startingLevel: 5,
+        speedMode,
+      });
+      s.lines = 8;
+      fourLine(s);
+      applyCommand(s, { type: "HARD_DROP" });
+      expect(s.lines).toBe(12);
+      const expectedLevel = speedMode === "fixed" ? 5 : 6;
+      expect(s.level).toBe(expectedLevel);
+      setPiece(s, "O", 4, 2);
+      const interval =
+        1000 * Math.pow(0.8 - (expectedLevel - 1) * 0.007, expectedLevel - 1);
+      applyCommand(s, { type: "TICK", dtMs: interval - 1 });
+      expect(s.active!.y).toBe(2);
+      applyCommand(s, { type: "TICK", dtMs: 1 });
+      expect(s.active!.y).toBe(3);
+      expect(validateSnapshot(s)).toEqual(s);
+    },
+  );
+
+  it("caps progressive Marathon at level thirty", () => {
+    const s = createInitialState("marathon", 1, {
+      startingLevel: 15,
+      speedMode: "progressive",
+    });
+    s.lines = 158;
+    s.level = 30;
+    fourLine(s);
+    applyCommand(s, { type: "HARD_DROP" });
+    expect(s.level).toBe(30);
+    expect(validateSnapshot(s)).toEqual(s);
+  });
+
+  it("preserves legacy saves and their normal progression", () => {
+    const s = createInitialState("marathon", 1);
+    delete s.marathonOptions;
+    s.lines = 8;
+    const restored = validateSnapshot(s)!;
+    expect(restored).toEqual(s);
+    fourLine(restored);
+    applyCommand(restored, { type: "HARD_DROP" });
+    expect(restored.level).toBe(2);
+    expect(validateSnapshot(restored)).toEqual(restored);
+    restored.level = 5;
+    expect(validateSnapshot(restored)).toBeNull();
+  });
+
+  it.each([
+    null,
+    {},
+    [],
+    { startingLevel: 0, speedMode: "fixed" },
+    { startingLevel: 16, speedMode: "progressive" },
+    { startingLevel: 1.5, speedMode: "fixed" },
+    { startingLevel: "5", speedMode: "fixed" },
+    { startingLevel: 5, speedMode: "fast" },
+    { startingLevel: Infinity, speedMode: "fixed" },
+  ])("rejects malformed Marathon options %#", (options) => {
+    expect(() =>
+      createInitialState("marathon", 1, options as MarathonOptions),
+    ).toThrow(RangeError);
+    const s = {
+      ...createInitialState("marathon", 1),
+      marathonOptions: options,
+    };
+    expect(validateSnapshot(s)).toBeNull();
+  });
+
+  it("rejects inconsistent configured levels and explicitly missing configuration", () => {
+    for (const speedMode of ["fixed", "progressive"] as const) {
+      const s = createInitialState("marathon", 1, {
+        startingLevel: 5,
+        speedMode,
+      });
+      s.lines = 10;
+      s.level = speedMode === "fixed" ? 6 : 5;
+      expect(validateSnapshot(s)).toBeNull();
+    }
+    expect(
+      validateSnapshot({
+        ...createInitialState("marathon", 1),
+        marathonOptions: undefined,
+      }),
+    ).toBeNull();
+  });
+
+  it.each(["sprint40", "ultra120"] as const)(
+    "keeps %s progression unchanged",
+    (mode) => {
+      const s = createInitialState(mode, 1, {
+        startingLevel: 15,
+        speedMode: "fixed",
+      });
+      expect(s.level).toBe(1);
+      expect(s.marathonOptions).toBeUndefined();
+      s.lines = 8;
+      fourLine(s);
+      applyCommand(s, { type: "HARD_DROP" });
+      expect(s.level).toBe(2);
+      expect(validateSnapshot(s)).toEqual(s);
+      s.marathonOptions = { startingLevel: 1, speedMode: "progressive" };
+      expect(validateSnapshot(s)).toBeNull();
+    },
+  );
 });
 
 describe("scoring", () => {

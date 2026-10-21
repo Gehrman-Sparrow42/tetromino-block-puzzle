@@ -3,6 +3,7 @@ import type {
   GameMode,
   PersonalBestStats,
   UserSettings,
+  MarathonOptions,
 } from "../contracts/game-contract";
 import { createInitialState, applyCommand } from "../engine/engine";
 import {
@@ -69,6 +70,10 @@ export function startApp(root: HTMLDivElement) {
   let feedbackUntil = 0,
     flashRows: number[] = [],
     pendingMode: GameMode = "marathon";
+  let pendingMarathon: MarathonOptions = {
+    startingLevel: 1,
+    speedMode: "progressive",
+  };
   root.innerHTML = `
     <main class="shell">
       <section id="home" class="home-screen" aria-label="Main menu">
@@ -340,6 +345,7 @@ export function startApp(root: HTMLDivElement) {
     state = createInitialState(
       mode,
       crypto.getRandomValues(new Uint32Array(1))[0],
+      mode === "marathon" ? pendingMarathon : undefined,
     );
     recorded = false;
     feedbackUntil = 0;
@@ -348,8 +354,25 @@ export function startApp(root: HTMLDivElement) {
     persist();
     resume();
   }
-  function requestRun(mode: GameMode) {
+  function requestRun(mode: GameMode, configured = false) {
     pendingMode = mode;
+    if (mode === "marathon" && !configured) {
+      if (state?.status === "playing") {
+        controls.releaseAll();
+        applyCommand(state, { type: "PAUSE" });
+        persist();
+      }
+      pendingMarathon = {
+        ...(state?.mode === "marathon" && state.marathonOptions
+          ? state.marathonOptions
+          : pendingMarathon),
+      };
+      showModal(
+        "marathon-setup",
+        `${sheetHead("Marathon")}<label class="setting-row"><span>Speed</span><select name="marathonSpeed" aria-label="Speed"><option value="progressive" ${pendingMarathon.speedMode === "progressive" ? "selected" : ""}>Progressive</option><option value="fixed" ${pendingMarathon.speedMode === "fixed" ? "selected" : ""}>Fixed</option></select></label><label class="setting-row"><span>Starting level</span><select name="marathonLevel" aria-label="Starting level">${Array.from({ length: 15 }, (_, i) => `<option value="${i + 1}" ${pendingMarathon.startingLevel === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label><p id="speed-note">${pendingMarathon.speedMode === "fixed" ? "Speed stays constant." : "Faster every 10 lines."}</p><button class="primary-button" data-action="start-marathon">Start</button>`,
+      );
+      return;
+    }
     if (state && ["playing", "paused"].includes(state.status)) {
       if (state.status === "playing") {
         controls.releaseAll();
@@ -437,7 +460,7 @@ export function startApp(root: HTMLDivElement) {
   function showRecords(current: PersonalBestStats) {
     showModal(
       "records",
-      `${sheetHead("Records")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} games</p><button class="primary-button" data-action="close">Close</button>`,
+      `${sheetHead("Records")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Fixed / score</span><strong>${num(current.marathonFixedHighScore ?? 0)}</strong></div><div class="record"><span>Fixed / lines</span><strong>${num(current.marathonFixedMaxLines ?? 0)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} games</p><button class="primary-button" data-action="close">Close</button>`,
     );
   }
   function help() {
@@ -577,7 +600,8 @@ export function startApp(root: HTMLDivElement) {
       modal === "settings" ||
       modal === "help" ||
       modal === "records" ||
-      modal === "confirm"
+      modal === "confirm" ||
+      modal === "marathon-setup"
     ) {
       closeModal();
       if (screen === "game" && state?.status === "paused") pause();
@@ -651,10 +675,32 @@ export function startApp(root: HTMLDivElement) {
       case "confirm-new":
         newRun(pendingMode);
         break;
+      case "start-marathon": {
+        const speed = dialog.querySelector<HTMLSelectElement>(
+          '[name="marathonSpeed"]',
+        )!.value;
+        const level = Number(
+          dialog.querySelector<HTMLSelectElement>('[name="marathonLevel"]')!
+            .value,
+        );
+        pendingMarathon = {
+          speedMode: speed === "fixed" ? "fixed" : "progressive",
+          startingLevel: Math.max(1, Math.min(15, Math.round(level) || 1)),
+        };
+        requestRun("marathon", true);
+        break;
+      }
     }
   });
   function changeSettings(event: Event) {
     const input = event.target as HTMLInputElement | HTMLSelectElement;
+    if (input.name === "marathonSpeed") {
+      el("speed-note").textContent =
+        input.value === "fixed"
+          ? "Speed stays constant."
+          : "Faster every 10 lines.";
+      return;
+    }
     if (!input.closest("#settings-form")) return;
     if (input instanceof HTMLInputElement && input.type === "checkbox")
       settings = { ...settings, [input.name]: input.checked };

@@ -60,3 +60,9 @@ Verified: 110 unit tests, 39 browser scenarios, TypeScript/Vite build, Capacitor
 ## Centered board correction — 2.3.2
 
 Board fitting now requires horizontal centering, including custom control layouts. Verified 110 unit tests, 39 browser scenarios with a centerline assertion, TypeScript/Vite build and standalone LCD rendering at 384 × 853: the board center is exactly 192 px. Android assembly/lint and signature verification also pass.
+
+## Marathon speed selection — 2.4.0
+
+Added a Marathon setup sheet with Progressive / Fixed and starting levels 1–15. Progressive adds one level every ten lines, capped at 30. Fixed keeps its selected gravity and level after line clears. Existing snapshots without options retain their original level-one progression. Saved configuration is validated and resumes with the run; fixed Marathon records are stored separately.
+
+Verified: 128 unit tests; 42 browser scenarios covering setup, save/resume, restart defaults and cancellation across phone/compact/desktop; TypeScript/Vite and Capacitor sync; Android assembly/lint; APK signature verification. Offline HTML at 360 × 600 starts and saves Fixed level 5 without page errors. Impeccable's detector returned no findings on the changed app UI. The updated APK was built but not installed on a physical phone or emulator during this change.

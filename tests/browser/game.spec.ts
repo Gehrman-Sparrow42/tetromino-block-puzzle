@@ -17,6 +17,10 @@ test.beforeEach(async ({ page }, info) => {
     });
 });
 
+async function startMarathon(page: Page) {
+  await page.locator('[data-mode="marathon"]').click();
+  await page.locator('[data-action="start-marathon"]').click();
+}
 async function pausedRun(page: Page) {
   await page.locator(".pause-button").click();
   await expect(page.getByRole("dialog")).toContainText("Paused");
@@ -27,6 +31,39 @@ async function pausedRun(page: Page) {
 async function closeSettings(page: Page) {
   await page.locator('#dialog [data-action="close"]').last().click();
 }
+
+test("Marathon speed setup persists with the run and can be cancelled", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('[data-mode="marathon"]').click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Faster every 10 lines.",
+  );
+  await page.getByLabel("Speed", { exact: true }).selectOption("fixed");
+  await page.getByLabel("Starting level").selectOption("7");
+  await expect(page.getByRole("dialog")).toContainText("Speed stays constant.");
+  await page.locator('[data-action="start-marathon"]').click();
+  expect((await pausedRun(page)).marathonOptions).toEqual({
+    startingLevel: 7,
+    speedMode: "fixed",
+  });
+  await page.reload();
+  await page.locator("#resume-card").click();
+  await expect(page.locator("#level")).toHaveText("7");
+  await pausedRun(page);
+  await page.locator('[data-action="restart"]').click();
+  await expect(page.getByLabel("Speed", { exact: true })).toHaveValue("fixed");
+  await page.getByLabel("Starting level").selectOption("2");
+  await closeSettings(page);
+  expect(
+    (
+      await page.evaluate(() =>
+        JSON.parse(localStorage.getItem("tetromino_v2_run")!),
+      )
+    ).marathonOptions.startingLevel,
+  ).toBe(7);
+});
 async function setRange(page: Page, name: string, value: number) {
   await page.locator('input[name="' + name + '"]').evaluate((node, value) => {
     const input = node as HTMLInputElement;
@@ -43,7 +80,7 @@ test("play, hold, pause, resume and settings persist", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Afterblock",
   );
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   await page.getByRole("button", { name: "Hold", exact: true }).click();
   await page.getByRole("button", { name: "Hard drop", exact: true }).click();
   const saved = await pausedRun(page);
@@ -141,7 +178,7 @@ test("background and pointer cancellation stop held movement", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   const left = page.getByRole("button", { name: "Left", exact: true });
   const r = (await left.boundingBox())!;
   await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
@@ -164,7 +201,7 @@ test("replacement confirmation preserves current run on cancel", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   await pausedRun(page);
   await page.getByRole("dialog").locator('[data-action="home"]').click();
   await page.locator('[data-mode="ultra120"]').click();
@@ -208,7 +245,7 @@ test("Ultra completion records once and clears the saved run", async ({
 
 test("pause key toggles without closing Settings", async ({ page }) => {
   await page.goto("/");
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   await page.keyboard.press("p");
   await expect(page.getByRole("dialog")).toContainText("Paused");
   await page.keyboard.press("p");
@@ -226,7 +263,7 @@ test("themes change chrome and canvas immediately and persist", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   await pausedRun(page);
   await page
     .getByRole("dialog")
@@ -263,7 +300,7 @@ test("control presets, sliders and reset are live and safe", async ({
   await page.locator('#home [data-action="settings"]').click();
   await page.locator('select[name="controlLayout"]').selectOption("thumbs");
   await closeSettings(page);
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   const initial = (await page.locator("#board").boundingBox())!;
   await pausedRun(page);
   await page
@@ -354,7 +391,7 @@ test("home and dialogs contain plain concise copy", async ({ page }) => {
   expect(text).not.toMatch(
     /find your flow|one more piece|pure play|your pace|no distractions|offline arcade|just blocks/i,
   );
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   await pausedRun(page);
   expect(await page.getByRole("dialog").innerText()).not.toMatch(
     /breathing room|take a breath|your next move can wait/i,
@@ -424,7 +461,7 @@ test("gamepad has three movement zones and saves edited controls without changin
 }) => {
   await page.setViewportSize({ width: 393, height: 851 });
   await page.goto("/");
-  await page.locator('[data-mode="marathon"]').click();
+  await startMarathon(page);
   await expect(page.locator("#game")).toHaveAttribute("data-layout", "gamepad");
   const commands = await page
     .locator("[data-movement-pad] [data-command]")

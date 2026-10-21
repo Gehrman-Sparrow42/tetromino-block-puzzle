@@ -75,3 +75,7 @@ Impeccable is initialized for design work on this project. See [the usage guide]
 - `android`: Capacitor native shell and app resources.
 
 Unit tests cover rules, persistence and platform boundaries; browser tests cover visible flows and mobile controls. Emulator checks exercise the installed APK through its real WebView and Android lifecycle in the tested system image. They do not substitute for checking touch feel, haptics and safe areas on the intended physical phone.
+
+### Marathon speed
+
+Opening Marathon shows a speed setup before the run starts. Choose Progressive (faster every ten cleared lines) or Fixed (constant speed), then a starting level from 1–15. Progressive levels cap at 30. The choice is stored with the run and restored on resume; existing saves keep their original progression. Fixed-speed scores and line records are separate from progressive Marathon records.

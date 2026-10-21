@@ -232,6 +232,28 @@ describe("settings and scores", () => {
 });
 
 describe("resume and unavailable storage", () => {
+  it("saves fixed Marathon speed and keeps its records separate", () => {
+    const state = createInitialState("marathon", 42, {
+      startingLevel: 7,
+      speedMode: "fixed",
+    });
+    expect(storage.saveRun(state)).toBe(true);
+    expect(storage.loadRun()?.marathonOptions).toEqual({
+      startingLevel: 7,
+      speedMode: "fixed",
+    });
+    state.status = "gameover";
+    state.active = null;
+    state.score = 5000;
+    state.lines = 25;
+    expect(storage.recordResult(state)).toMatchObject({
+      marathonFixedHighScore: 5000,
+      marathonFixedMaxLines: 25,
+      marathonHighScore: 0,
+      marathonMaxLines: 0,
+    });
+    expect(storage.loadStats().marathonFixedHighScore).toBe(5000);
+  });
   it("roundtrips a deeply copied paused run and rejects terminal saves", () => {
     const state = createInitialState("marathon", 42);
     state.softDropActive = true;
