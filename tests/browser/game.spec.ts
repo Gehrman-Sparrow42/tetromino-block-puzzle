@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { THEME_IDS } from "../../src/contracts/game-contract";
 
 test.beforeEach(async ({ page }, info) => {
   if (info.project.name === "small-phone")
@@ -223,7 +224,10 @@ test("themes change chrome and canvas immediately and persist", async ({
     .getByRole("button", { name: "Settings", exact: true })
     .click();
   const pixels: string[] = [];
-  for (const theme of ["ink", "lcd", "neon", "paper"]) {
+  await expect(page.locator('select[name="theme"] option')).toHaveCount(
+    THEME_IDS.length,
+  );
+  for (const theme of THEME_IDS) {
     await page.locator('select[name="theme"]').selectOption(theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.waitForTimeout(60);
@@ -236,11 +240,11 @@ test("themes change chrome and canvas immediately and persist", async ({
       }),
     );
   }
-  expect(new Set(pixels).size).toBe(4);
+  expect(new Set(pixels).size).toBe(THEME_IDS.length);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "classic");
   await page.locator('#home [data-action="settings"]').click();
-  await expect(page.locator('select[name="theme"]')).toHaveValue("paper");
+  await expect(page.locator('select[name="theme"]')).toHaveValue("classic");
 });
 
 test("control presets, sliders and reset are live and safe", async ({

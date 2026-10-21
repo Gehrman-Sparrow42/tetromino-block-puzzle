@@ -84,10 +84,25 @@ async function attach() {
       .getByRole("dialog")
       .getByRole("button", { name: "Settings", exact: true })
       .click();
-    for (const theme of ["ink", "lcd", "neon", "paper"]) {
+    for (const theme of [
+      "ink",
+      "lcd",
+      "neon",
+      "paper",
+      "basalt",
+      "workshop",
+      "sleeve",
+      "score",
+      "folio",
+      "gate",
+      "annual",
+      "data",
+      "classic",
+    ]) {
       await page.locator('select[name="theme"]').selectOption(theme);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     }
+    await page.locator('select[name="theme"]').selectOption("basalt");
     await page.locator('select[name="controlLayout"]').selectOption("floating");
     await page.locator('input[name="controlScale"]').press("End");
     await page.locator('input[name="controlOpacity"]').press("Home");
@@ -104,7 +119,32 @@ async function attach() {
       );
     for (const b of buttons)
       if (b.w < 48 || b.h < 48) throw new Error("Native control below 48px.");
-    await page.screenshot({ path: `${output}/floating-paper.png` });
+    // Theme selection updates DOM immediately; Canvas paints on the next frame.
+    await expect
+      .poll(() =>
+        page
+          .locator("#board")
+          .evaluate((node) =>
+            Array.from(node.getContext("2d").getImageData(10, 10, 1, 1).data),
+          ),
+      )
+      .toEqual([32, 52, 59, 255]);
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    // Android's compositor can trail WebView Canvas readback after native resume.
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: `${output}/floating-basalt.png` });
+    // Keep an OS-level capture too: WebView CDP captures may omit GPU layers.
+    writeFileSync(
+      `${output}/android-display.png`,
+      execFileSync(adb, ["-e", "exec-out", "screencap", "-p"], {
+        timeout: 30000,
+      }),
+    );
     await page.locator(".pause-button").click();
     await page.screenshot({ path: `${output}/paused.png` });
     if (errors.length) throw new Error(`WebView errors: ${errors.join("; ")}`);
@@ -122,7 +162,7 @@ async function attach() {
             "hardware Back pause",
             "rapid background pause",
             "native process restart resume",
-            "all four themes",
+            "all thirteen themes",
             "floating controls and size/opacity settings",
           ],
           browser: await browser.version(),

@@ -72,6 +72,148 @@ function lcdPattern(
   ctx.stroke();
 }
 
+/** Deliberately sparse marks stay readable in next/hold previews as well as the board. */
+function printPattern(
+  ctx: CanvasRenderingContext2D,
+  type: TetrominoType,
+  size: number,
+) {
+  const lo = size * 0.27,
+    hi = size * 0.73,
+    mid = size / 2;
+  ctx.lineWidth = Math.max(0.7, size * 0.055);
+  ctx.beginPath();
+  const line = (x: number, y: number, a: number, b: number) => {
+    ctx.moveTo(x, y);
+    ctx.lineTo(a, b);
+  };
+  switch (type) {
+    case "I":
+      line(lo, lo, hi, lo);
+      line(lo, mid, hi, mid);
+      line(lo, hi, hi, hi);
+      break;
+    case "O":
+      for (const x of [lo, hi])
+        for (const y of [lo, hi]) {
+          ctx.moveTo(x + size * 0.055, y);
+          ctx.arc(x, y, size * 0.055, 0, Math.PI * 2);
+        }
+      break;
+    case "T":
+      line(mid, lo, mid, hi);
+      line(lo, mid, hi, mid);
+      break;
+    case "S":
+      line(lo, mid, mid, lo);
+      line(lo, hi, hi, lo);
+      line(mid, hi, hi, mid);
+      break;
+    case "Z":
+      line(lo, lo, hi, hi);
+      line(lo, mid, mid, hi);
+      line(mid, lo, hi, mid);
+      break;
+    case "J":
+      line(lo, lo, lo, hi);
+      line(mid, lo, mid, hi);
+      line(hi, lo, hi, hi);
+      break;
+    case "L":
+      ctx.rect(lo, lo, hi - lo, hi - lo);
+      ctx.rect(
+        mid - size * 0.055,
+        mid - size * 0.055,
+        size * 0.11,
+        size * 0.11,
+      );
+      break;
+  }
+  ctx.stroke();
+}
+
+function designedBlock(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  type: TetrominoType,
+  theme: ThemePalette,
+  opacity: number,
+) {
+  const a = size * 0.16,
+    edge = size * 0.68;
+  ctx.lineWidth = Math.max(0.6, size * 0.04);
+  switch (theme.blockStyle) {
+    case "facet":
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = opacity * 0.19;
+      ctx.beginPath();
+      ctx.moveTo(0, size * 0.3);
+      ctx.lineTo(size * 0.3, 0);
+      ctx.lineTo(size, 0);
+      ctx.lineTo(size * 0.68, size * 0.24);
+      ctx.lineTo(size * 0.24, size * 0.3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = opacity * 0.17;
+      ctx.fillStyle = theme.board.background;
+      ctx.beginPath();
+      ctx.moveTo(0, size);
+      ctx.lineTo(size * 0.25, size * 0.78);
+      ctx.lineTo(size * 0.78, size * 0.73);
+      ctx.lineTo(size, size * 0.5);
+      ctx.lineTo(size, size);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case "enamel":
+      ctx.strokeStyle = theme.board.text;
+      ctx.globalAlpha = opacity * 0.55;
+      ctx.strokeRect(a, a, edge, edge);
+      ctx.globalAlpha = opacity * 0.45;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(a * 1.3, a * 1.3, edge * 0.8, Math.max(0.6, size * 0.045));
+      break;
+    case "outline":
+      ctx.strokeStyle = "#f0eee8";
+      ctx.globalAlpha = opacity * 0.8;
+      ctx.strokeRect(a * 0.65, a * 0.65, size - a * 1.3, size - a * 1.3);
+      break;
+    case "notation":
+    case "data":
+      ctx.strokeStyle = theme.board.background;
+      printPattern(ctx, type, size);
+      break;
+    case "botanical":
+      ctx.strokeStyle = theme.board.background;
+      ctx.globalAlpha = opacity * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(a, a);
+      ctx.lineTo(size - a, a);
+      ctx.lineTo(size - a, size - a);
+      ctx.stroke();
+      ctx.fillStyle = theme.board.background;
+      ctx.fillRect(a, size - a * 1.5, size * 0.11, size * 0.11);
+      break;
+    case "segment":
+      ctx.fillStyle = theme.board.background;
+      ctx.globalAlpha = opacity * 0.65;
+      ctx.fillRect(0, size * 0.47, size, Math.max(0.7, size * 0.055));
+      ctx.strokeStyle = theme.board.background;
+      ctx.strokeRect(a * 0.65, a * 0.65, size - a * 1.3, size - a * 1.3);
+      break;
+    case "plate":
+      ctx.strokeStyle = theme.board.text;
+      ctx.globalAlpha = opacity * 0.62;
+      ctx.strokeRect(a, a, edge, edge);
+      ctx.fillStyle = theme.board.text;
+      ctx.fillRect(size * 0.64, size * 0.64, size * 0.1, size * 0.1);
+      break;
+    // Classic uses uninterrupted, bright solid tiles.
+    case "solid":
+      break;
+  }
+}
+
 function block(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -108,7 +250,12 @@ function block(
   } else {
     ctx.fillStyle = theme.pieces[type];
     ctx.fillRect(x + gap, y + gap, side, side);
-    if (theme.blockStyle === "lcd" && size >= 4) {
+    if (!["lcd", "flat", "neon", "bevel"].includes(theme.blockStyle)) {
+      if (size >= 4) {
+        ctx.translate(x, y);
+        designedBlock(ctx, size, type, theme, opacity);
+      }
+    } else if (theme.blockStyle === "lcd" && size >= 4) {
       ctx.translate(x, y);
       ctx.strokeStyle = theme.board.background;
       lcdPattern(ctx, type, size);

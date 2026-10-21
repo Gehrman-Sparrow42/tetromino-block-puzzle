@@ -26,6 +26,7 @@ For a new project, give the agent the project path, describe its purpose and ask
 - `.impeccable/config.json` sets code-first as the project default. It is a project preference, not a global aesthetic rule.
 - `.impeccable/live/config.json` identifies the Vite `index.html` shell. No CSP was found, so no security policy was changed. Live mode has not been started or injected into the shipped game.
 - `.impeccable/critique/setup-audit.md` records the first audit, its small settings-target fix and remaining limits.
+- `DESIGN.md` and `.impeccable/design.json` record the completed thirteen-theme system. `.impeccable/surfaces/theme-pack.md` records the user's approval of all nine proposals and the shared gameplay constraints.
 - Automatic edit hooks are not installed or active. Commands work through the skill and the detector can be run explicitly. If hooks are installed later, Codex may require approval through its hooks UI; do not treat installation as proof that hooks are running.
 
 ## Terminal tools on Windows

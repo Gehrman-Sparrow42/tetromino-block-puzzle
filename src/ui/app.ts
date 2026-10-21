@@ -20,7 +20,7 @@ import { pulseHaptic } from "../platform/haptics";
 import { setupLifecycle, exitApp } from "../platform/lifecycle";
 import { drawBoard, drawPreview } from "./canvas-renderer";
 import { TouchControls } from "./touch-controls";
-import { applyTheme, getTheme } from "./themes";
+import { THEMES, applyTheme, getTheme } from "./themes";
 import { computeControlGeometry } from "./control-layout";
 
 const MODE_NAMES: Record<GameMode, string> = {
@@ -292,12 +292,11 @@ export function startApp(root: HTMLDivElement) {
     showModal(
       "settings",
       `${sheetHead("Settings")}<form id="settings-form">
-      ${select("theme", "Theme", [
-        ["ink", "Ink"],
-        ["lcd", "LCD"],
-        ["neon", "Neon"],
-        ["paper", "Paper"],
-      ])}
+      ${select(
+        "theme",
+        "Theme",
+        Object.values(THEMES).map((theme) => [theme.id, theme.name]),
+      )}
       <h3>Controls</h3>
       ${select(
         "controlLayout",

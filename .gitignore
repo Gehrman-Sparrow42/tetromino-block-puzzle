@@ -59,3 +59,6 @@ test-results/
 **/.impeccable/live/deferred-svelte-component-accepts.json
 **/.impeccable/live/*.png
 # impeccable-ignore-end
+
+# Local visual-direction sketches; committed briefs record the accepted scope.
+.impeccable/mocks/decision/

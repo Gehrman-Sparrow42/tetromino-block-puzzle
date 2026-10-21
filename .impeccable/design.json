@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T10:19:46.906022+00:00",
+  "title": "Design System: Afterblock",
+  "extensions": {
+    "colorMeta": {
+      "basalt-bg": {
+        "displayName": "Basalt bg",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0233 230.47)",
+          "oklch(26% 0.0233 230.47)",
+          "oklch(38% 0.0233 230.47)",
+          "oklch(49% 0.0233 230.47)",
+          "oklch(61% 0.0233 230.47)",
+          "oklch(72% 0.0233 230.47)",
+          "oklch(84% 0.0233 230.47)",
+          "oklch(95% 0.0233 230.47)"
+        ]
+      },
+      "basalt-surface": {
+        "displayName": "Basalt surface",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0302 223.87)",
+          "oklch(26% 0.0302 223.87)",
+          "oklch(38% 0.0302 223.87)",
+          "oklch(49% 0.0302 223.87)",
+          "oklch(61% 0.0302 223.87)",
+          "oklch(72% 0.0302 223.87)",
+          "oklch(84% 0.0302 223.87)",
+          "oklch(95% 0.0302 223.87)"
+        ]
+      },
+      "basalt-panel": {
+        "displayName": "Basalt panel",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0310 218.83)",
+          "oklch(26% 0.0310 218.83)",
+          "oklch(38% 0.0310 218.83)",
+          "oklch(49% 0.0310 218.83)",
+          "oklch(61% 0.0310 218.83)",
+          "oklch(72% 0.0310 218.83)",
+          "oklch(84% 0.0310 218.83)",
+          "oklch(95% 0.0310 218.83)"
+        ]
+      },
+      "basalt-text": {
+        "displayName": "Basalt text",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0141 155.58)",
+          "oklch(26% 0.0141 155.58)",
+          "oklch(38% 0.0141 155.58)",
+          "oklch(49% 0.0141 155.58)",
+          "oklch(61% 0.0141 155.58)",
+          "oklch(72% 0.0141 155.58)",
+          "oklch(84% 0.0141 155.58)",
+          "oklch(95% 0.0141 155.58)"
+        ]
+      },
+      "basalt-muted": {
+        "displayName": "Basalt muted",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0230 189.77)",
+          "oklch(26% 0.0230 189.77)",
+          "oklch(38% 0.0230 189.77)",
+          "oklch(49% 0.0230 189.77)",
+          "oklch(61% 0.0230 189.77)",
+          "oklch(72% 0.0230 189.77)",
+          "oklch(84% 0.0230 189.77)",
+          "oklch(95% 0.0230 189.77)"
+        ]
+      },
+      "basalt-border": {
+        "displayName": "Basalt border",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0321 210.13)",
+          "oklch(26% 0.0321 210.13)",
+          "oklch(38% 0.0321 210.13)",
+          "oklch(49% 0.0321 210.13)",
+          "oklch(61% 0.0321 210.13)",
+          "oklch(72% 0.0321 210.13)",
+          "oklch(84% 0.0321 210.13)",
+          "oklch(95% 0.0321 210.13)"
+        ]
+      },
+      "basalt-accent": {
+        "displayName": "Basalt accent",
+        "role": "primary",
+        "tonalRamp": [
+          "oklch(15% 0.0925 146.55)",
+          "oklch(26% 0.0925 146.55)",
+          "oklch(38% 0.0925 146.55)",
+          "oklch(49% 0.0925 146.55)",
+          "oklch(61% 0.0925 146.55)",
+          "oklch(72% 0.0925 146.55)",
+          "oklch(84% 0.0925 146.55)",
+          "oklch(95% 0.0925 146.55)"
+        ]
+      },
+      "basalt-accent-ink": {
+        "displayName": "Basalt accent ink",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0342 160.11)",
+          "oklch(26% 0.0342 160.11)",
+          "oklch(38% 0.0342 160.11)",
+          "oklch(49% 0.0342 160.11)",
+          "oklch(61% 0.0342 160.11)",
+          "oklch(72% 0.0342 160.11)",
+          "oklch(84% 0.0342 160.11)",
+          "oklch(95% 0.0342 160.11)"
+        ]
+      },
+      "basalt-control-rgb": {
+        "displayName": "Basalt control rgb",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0925 146.55)",
+          "oklch(26% 0.0925 146.55)",
+          "oklch(38% 0.0925 146.55)",
+          "oklch(49% 0.0925 146.55)",
+          "oklch(61% 0.0925 146.55)",
+          "oklch(72% 0.0925 146.55)",
+          "oklch(84% 0.0925 146.55)",
+          "oklch(95% 0.0925 146.55)"
+        ]
+      },
+      "basalt-board-border": {
+        "displayName": "Basalt board border",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0332 186.08)",
+          "oklch(26% 0.0332 186.08)",
+          "oklch(38% 0.0332 186.08)",
+          "oklch(49% 0.0332 186.08)",
+          "oklch(61% 0.0332 186.08)",
+          "oklch(72% 0.0332 186.08)",
+          "oklch(84% 0.0332 186.08)",
+          "oklch(95% 0.0332 186.08)"
+        ]
+      },
+      "basalt-board-bg": {
+        "displayName": "Basalt board bg",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0285 221.94)",
+          "oklch(26% 0.0285 221.94)",
+          "oklch(38% 0.0285 221.94)",
+          "oklch(49% 0.0285 221.94)",
+          "oklch(61% 0.0285 221.94)",
+          "oklch(72% 0.0285 221.94)",
+          "oklch(84% 0.0285 221.94)",
+          "oklch(95% 0.0285 221.94)"
+        ]
+      },
+      "basalt-board-grid": {
+        "displayName": "Basalt board grid",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0327 220.87)",
+          "oklch(26% 0.0327 220.87)",
+          "oklch(38% 0.0327 220.87)",
+          "oklch(49% 0.0327 220.87)",
+          "oklch(61% 0.0327 220.87)",
+          "oklch(72% 0.0327 220.87)",
+          "oklch(84% 0.0327 220.87)",
+          "oklch(95% 0.0327 220.87)"
+        ]
+      },
+      "basalt-board-ghost": {
+        "displayName": "Basalt board ghost",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0310 170.44)",
+          "oklch(26% 0.0310 170.44)",
+          "oklch(38% 0.0310 170.44)",
+          "oklch(49% 0.0310 170.44)",
+          "oklch(61% 0.0310 170.44)",
+          "oklch(72% 0.0310 170.44)",
+          "oklch(84% 0.0310 170.44)",
+          "oklch(95% 0.0310 170.44)"
+        ]
+      },
+      "basalt-board-flash": {
+        "displayName": "Basalt board flash",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0925 146.55)",
+          "oklch(26% 0.0925 146.55)",
+          "oklch(38% 0.0925 146.55)",
+          "oklch(49% 0.0925 146.55)",
+          "oklch(61% 0.0925 146.55)",
+          "oklch(72% 0.0925 146.55)",
+          "oklch(84% 0.0925 146.55)",
+          "oklch(95% 0.0925 146.55)"
+        ]
+      },
+      "basalt-piece-I": {
+        "displayName": "Basalt piece I",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0595 178.01)",
+          "oklch(26% 0.0595 178.01)",
+          "oklch(38% 0.0595 178.01)",
+          "oklch(49% 0.0595 178.01)",
+          "oklch(61% 0.0595 178.01)",
+          "oklch(72% 0.0595 178.01)",
+          "oklch(84% 0.0595 178.01)",
+          "oklch(95% 0.0595 178.01)"
+        ]
+      },
+      "basalt-piece-O": {
+        "displayName": "Basalt piece O",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0949 95.28)",
+          "oklch(26% 0.0949 95.28)",
+          "oklch(38% 0.0949 95.28)",
+          "oklch(49% 0.0949 95.28)",
+          "oklch(61% 0.0949 95.28)",
+          "oklch(72% 0.0949 95.28)",
+          "oklch(84% 0.0949 95.28)",
+          "oklch(95% 0.0949 95.28)"
+        ]
+      },
+      "basalt-piece-T": {
+        "displayName": "Basalt piece T",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0652 314.44)",
+          "oklch(26% 0.0652 314.44)",
+          "oklch(38% 0.0652 314.44)",
+          "oklch(49% 0.0652 314.44)",
+          "oklch(61% 0.0652 314.44)",
+          "oklch(72% 0.0652 314.44)",
+          "oklch(84% 0.0652 314.44)",
+          "oklch(95% 0.0652 314.44)"
+        ]
+      },
+      "basalt-piece-S": {
+        "displayName": "Basalt piece S",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0925 146.55)",
+          "oklch(26% 0.0925 146.55)",
+          "oklch(38% 0.0925 146.55)",
+          "oklch(49% 0.0925 146.55)",
+          "oklch(61% 0.0925 146.55)",
+          "oklch(72% 0.0925 146.55)",
+          "oklch(84% 0.0925 146.55)",
+          "oklch(95% 0.0925 146.55)"
+        ]
+      },
+      "basalt-piece-Z": {
+        "displayName": "Basalt piece Z",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0829 23.01)",
+          "oklch(26% 0.0829 23.01)",
+          "oklch(38% 0.0829 23.01)",
+          "oklch(49% 0.0829 23.01)",
+          "oklch(61% 0.0829 23.01)",
+          "oklch(72% 0.0829 23.01)",
+          "oklch(84% 0.0829 23.01)",
+          "oklch(95% 0.0829 23.01)"
+        ]
+      },
+      "basalt-piece-J": {
+        "displayName": "Basalt piece J",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0440 222.85)",
+          "oklch(26% 0.0440 222.85)",
+          "oklch(38% 0.0440 222.85)",
+          "oklch(49% 0.0440 222.85)",
+          "oklch(61% 0.0440 222.85)",
+          "oklch(72% 0.0440 222.85)",
+          "oklch(84% 0.0440 222.85)",
+          "oklch(95% 0.0440 222.85)"
+        ]
+      },
+      "basalt-piece-L": {
+        "displayName": "Basalt piece L",
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.1044 56.50)",
+          "oklch(26% 0.1044 56.50)",
+          "oklch(38% 0.1044 56.50)",
+          "oklch(49% 0.1044 56.50)",
+          "oklch(61% 0.1044 56.50)",
+          "oklch(72% 0.1044 56.50)",
+          "oklch(84% 0.1044 56.50)",
+          "oklch(95% 0.1044 56.50)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "body-new": {
+        "displayName": "body new",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "body-legacy": {
+        "displayName": "body legacy",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "display-new": {
+        "displayName": "display new",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "display-score": {
+        "displayName": "display score",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "display-folio": {
+        "displayName": "display folio",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "headline-new": {
+        "displayName": "headline new",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "title-mode": {
+        "displayName": "title mode",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "body-setting": {
+        "displayName": "body setting",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "label-hud": {
+        "displayName": "label hud",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "value-hud": {
+        "displayName": "value hud",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      },
+      "value-result": {
+        "displayName": "value result",
+        "purpose": "Observed source role; see DESIGN.md for per-theme inheritance and overrides."
+      }
+    },
+    "shadows": [
+      {
+        "name": "legacy-sheet",
+        "value": "0 16px 80px rgb(0 0 0 / 0.25)",
+        "purpose": "Legacy theme sheets only."
+      },
+      {
+        "name": "new-sheet",
+        "value": "none",
+        "purpose": "All nine new worlds."
+      },
+      {
+        "name": "pressed-control",
+        "value": "inset 0 0 0 2px var(--accent)",
+        "purpose": "Pressed thumb control."
+      }
+    ],
+    "motion": [
+      {
+        "name": "feedback",
+        "value": "opacity 0.15s",
+        "purpose": "Shared feedback visibility; disabled by reduced-motion rules."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-height",
+        "value": "(max-height: 650px)"
+      },
+      {
+        "name": "compact-width",
+        "value": "(max-width: 370px)"
+      }
+    ],
+    "themeVariants": {
+      "basalt": {
+        "displayName": "Basalt",
+        "canvasStyle": "facet",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.basalt"
+      },
+      "workshop": {
+        "displayName": "Workshop",
+        "canvasStyle": "enamel",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.workshop"
+      },
+      "sleeve": {
+        "displayName": "Night Sleeve",
+        "canvasStyle": "outline",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.sleeve"
+      },
+      "score": {
+        "displayName": "Movement Score",
+        "canvasStyle": "notation",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.score"
+      },
+      "folio": {
+        "displayName": "Botanical Folio",
+        "canvasStyle": "botanical",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.folio"
+      },
+      "gate": {
+        "displayName": "Gate Board",
+        "canvasStyle": "segment",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.gate"
+      },
+      "annual": {
+        "displayName": "Design Annual",
+        "canvasStyle": "plate",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.annual"
+      },
+      "data": {
+        "displayName": "Data Field",
+        "canvasStyle": "data",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.data"
+      },
+      "classic": {
+        "displayName": "Classic Arcade",
+        "canvasStyle": "solid",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.classic"
+      },
+      "ink": {
+        "displayName": "Ink",
+        "canvasStyle": "bevel",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.ink"
+      },
+      "lcd": {
+        "displayName": "LCD",
+        "canvasStyle": "lcd",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.lcd"
+      },
+      "neon": {
+        "displayName": "Neon",
+        "canvasStyle": "neon",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.neon"
+      },
+      "paper": {
+        "displayName": "Paper",
+        "canvasStyle": "flat",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.paper"
+      }
+    },
+    "provenance": {
+      "mode": "post-build source extraction",
+      "sources": [
+        "src/ui/themes.ts",
+        "src/ui/styles.css",
+        "src/ui/canvas-renderer.ts",
+        "src/ui/control-layout.ts",
+        "PRODUCT.md",
+        ".impeccable/surfaces/theme-pack.md"
+      ],
+      "ramps": "Synthesized OKLCH metadata for swatch exploration only; never applied to gameplay. Alpha colors use their opaque RGB hue for the exploratory ramp.",
+      "validationScope": "Documentation and source consistency; does not claim a new visual, runtime, physical-device or accessibility audit.",
+      "snippets": "Five Basalt reference primitives. Live root variables inherit when available; literal fallbacks allow isolated rendering. Other worlds are represented by tokens and narrative, not falsely homogenized previews."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary action â€” Basalt reference",
+      "kind": "button",
+      "refersTo": "button-primary-basalt",
+      "description": "Accent action in the Basalt world; other worlds apply their documented overrides.",
+      "html": "<button class=\"ds-primary\">Resume</button>",
+      "css": ".ds-primary{font-family:var(--title-face,\"Familjen Grotesk\",sans-serif);color:var(--text,#e6f0e9);background:var(--accent,#b4edb8);color:var(--accent-ink,#172c21);min-height:48px;padding:12px 16px;border:0;border-radius:var(--chrome-radius,12px 5px 12px 5px);font-size:14px;font-weight:600;cursor:pointer}.ds-primary:focus-visible{outline:2px solid var(--accent,#b4edb8);outline-offset:3px}.ds-primary:disabled{opacity:.5}"
+    },
+    {
+      "name": "Secondary action â€” Basalt reference",
+      "kind": "button",
+      "refersTo": "button-secondary-basalt",
+      "description": "Panel-filled secondary action.",
+      "html": "<button class=\"ds-secondary\">Settings</button>",
+      "css": ".ds-secondary{font-family:var(--title-face,\"Familjen Grotesk\",sans-serif);color:var(--text,#e6f0e9);background:var(--panel,#2b4249);min-height:48px;padding:12px 16px;border:1px solid var(--border,#607b80);border-radius:var(--chrome-radius,12px 5px 12px 5px);font-size:14px;font-weight:600;cursor:pointer}.ds-secondary:focus-visible{outline:2px solid var(--accent,#b4edb8);outline-offset:3px}"
+    },
+    {
+      "name": "Theme select â€” Basalt reference",
+      "kind": "input",
+      "refersTo": "select-basalt",
+      "description": "Native theme selection with a full-height touch area.",
+      "html": "<select class=\"ds-select\" aria-label=\"Theme\"><option>Basalt</option><option>Workshop</option></select>",
+      "css": ".ds-select{font-family:var(--title-face,\"Familjen Grotesk\",sans-serif);color:var(--text,#e6f0e9);background:var(--panel,#2b4249);min-height:48px;padding:8px;border:1px solid var(--border,#607b80);border-radius:var(--chrome-radius,12px 5px 12px 5px);font-size:13px}.ds-select:focus-visible{outline:2px solid var(--accent,#b4edb8);outline-offset:3px}"
+    },
+    {
+      "name": "Mode card â€” Basalt reference",
+      "kind": "card",
+      "refersTo": "mode-basalt",
+      "description": "Compact mode choice with name, description and directional control.",
+      "html": "<button class=\"ds-mode\"><span><strong>Marathon</strong><small>Play for score</small></span><span aria-hidden=\"true\">â†’</span></button>",
+      "css": ".ds-mode{font-family:var(--title-face,\"Familjen Grotesk\",sans-serif);color:var(--text,#e6f0e9);display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:96px;padding:20px;border:1px solid var(--menu-rule,#607b80);border-radius:var(--chrome-radius,12px 5px 12px 5px);background:var(--menu-fill,#233840);text-align:left;cursor:pointer}.ds-mode strong{display:block;font-size:23px;font-weight:600;letter-spacing:-.025em}.ds-mode small{display:block;font-size:13px;margin-top:4px;color:var(--muted,#b4c9c7)}.ds-mode:hover{border-color:var(--accent,#b4edb8)}.ds-mode:focus-visible{outline:2px solid var(--accent,#b4edb8);outline-offset:3px}"
+    },
+    {
+      "name": "Sheet â€” Basalt reference",
+      "kind": "custom",
+      "refersTo": "sheet-basalt",
+      "description": "Bordered flat surface; sample copies the Basalt material, not an interactive application dialog.",
+      "html": "<section class=\"ds-sheet\"><h2>Settings</h2><p>Theme and controls</p></section>",
+      "css": ".ds-sheet{font-family:var(--title-face,\"Familjen Grotesk\",sans-serif);color:var(--text,#e6f0e9);max-width:440px;border:1px solid var(--border,#607b80);border-radius:var(--chrome-radius,12px 5px 12px 5px);background:var(--surface,#233840);padding:20px;box-shadow:var(--sheet-depth,none)}.ds-sheet h2{font-size:29px;font-weight:500;letter-spacing:-.035em;margin:0}.ds-sheet p{font-size:13px;line-height:1.65;color:var(--muted,#b4c9c7)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "One game, thirteen complete worlds",
+    "overview": "Afterblock keeps the board and thumb controls dominant while each selectable theme carries a complete material treatment through menus, sheets, the board and piece previews. The user approved all nine new worlds alongside the four existing themes. This is a family of visual systems rather than a single palette with interchangeable accent colors.\n\nThe theme registry and stylesheet are the authority for exact appearance; the Canvas renderer is the authority for tiles and ghosts. Short functional English labels, locally bundled typefaces for the new worlds and a shared phone-first geometry keep the experience coherent. Theme changes alter appearance without moving gameplay controls.",
+    "keyCharacteristics": [
+      "Thirteen complete shell and board palettes.",
+      "Nine new worlds with local type, distinct corners and Canvas materials.",
+      "Shared safe areas, compact status rows and configurable translucent controls.",
+      "Static pattern identities in Movement Score, Data Field and LCD."
+    ],
+    "rules": [
+      {
+        "name": "The Complete World Rule",
+        "body": "Switch the full shell and Canvas palette together; do not leave tokens from the previous theme behind.",
+        "section": "colors"
+      },
+      {
+        "name": "The Shared Geometry Rule",
+        "body": "Theme styling must not change the board sizing, safe areas, control placement or control geometry calculations.",
+        "section": "layout"
+      },
+      {
+        "name": "The Same Tile Rule",
+        "body": "Use the same block renderer for board, hold and next previews; keep ghost marks subordinate to solid pieces.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do preserve all thirteen selectable themes and their persisted identifiers.",
+      "Do use the selected theme palette for the shell, board, hold, next, ghost and clear feedback.",
+      "Do preserve the shared control geometry and visible keyboard focus.",
+      "Do bundle new font assets locally with their licenses and preserve offline use.",
+      "Do retain seven static piece patterns in Movement Score, Data Field and LCD."
+    ],
+    "donts": [
+      "Don't introduce themed slogans or decorative overlays into play.",
+      "Don't make theme selection reposition gameplay controls.",
+      "Don't replace static piece patterns with color alone in the monochrome worlds.",
+      "Don't impose one corner radius or one display face across all thirteen themes."
+    ]
+  }
+}

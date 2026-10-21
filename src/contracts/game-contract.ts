@@ -59,7 +59,22 @@ export interface GameStateSnapshot {
   piecesPlaced: number;
   lastEvent: ClearEvent | null;
 }
-export type ThemeId = "ink" | "lcd" | "neon" | "paper";
+export const THEME_IDS = [
+  "ink",
+  "lcd",
+  "neon",
+  "paper",
+  "basalt",
+  "workshop",
+  "sleeve",
+  "score",
+  "folio",
+  "gate",
+  "annual",
+  "data",
+  "classic",
+] as const;
+export type ThemeId = (typeof THEME_IDS)[number];
 export type ControlLayoutId = "thumbs" | "mirror" | "floating";
 export interface UserSettings {
   soundEnabled: boolean;

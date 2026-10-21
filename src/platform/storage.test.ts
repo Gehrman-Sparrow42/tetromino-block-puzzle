@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "../engine/engine";
+import { THEME_IDS } from "../contracts/game-contract";
 
 let data: Map<string, string>;
 let storage: typeof import("./storage");
@@ -75,7 +76,7 @@ describe("settings and scores", () => {
   });
 
   it("round-trips all themes and control presets", () => {
-    for (const theme of ["ink", "lcd", "neon", "paper"] as const) {
+    for (const theme of THEME_IDS) {
       for (const controlLayout of ["thumbs", "mirror", "floating"] as const) {
         const settings = {
           ...storage.DEFAULT_SETTINGS,

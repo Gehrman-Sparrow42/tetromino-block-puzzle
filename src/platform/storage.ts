@@ -4,6 +4,7 @@ import type {
   UserSettings,
 } from "../contracts/game-contract";
 import { validateSnapshot } from "../engine/engine";
+import { THEME_IDS } from "../contracts/game-contract";
 
 export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   soundEnabled: true,
@@ -93,10 +94,7 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
     controlScheme: value.controlScheme === "hybrid" ? "hybrid" : "buttons",
     dasMs: bounded(value.dasMs, defaults.dasMs, 80, 300),
     arrMs: bounded(value.arrMs, defaults.arrMs, 16, 100),
-    theme:
-      value.theme === "lcd" || value.theme === "neon" || value.theme === "paper"
-        ? value.theme
-        : "ink",
+    theme: THEME_IDS.find((id) => id === value.theme) ?? defaults.theme,
     controlLayout:
       value.controlLayout === "mirror" || value.controlLayout === "floating"
         ? value.controlLayout
