@@ -2,9 +2,10 @@ import type {
   GameStateSnapshot,
   PersonalBestStats,
   UserSettings,
+  GamepadLayouts,
 } from "../contracts/game-contract";
 import { validateSnapshot } from "../engine/engine";
-import { THEME_IDS } from "../contracts/game-contract";
+import { THEME_IDS, GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 
 export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   soundEnabled: true,
@@ -16,11 +17,15 @@ export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   dasMs: 150,
   arrMs: 40,
   theme: "ink",
-  controlLayout: "thumbs",
+  controlLayout: "gamepad",
   controlScale: 1,
   controlOpacity: 0.18,
   controlSpread: 0.65,
   controlHeight: 0.3,
+  gamepadLayouts: Object.freeze({
+    portrait: Object.freeze({}),
+    landscape: Object.freeze({}),
+  }),
 });
 
 const KEYS = {
@@ -79,6 +84,38 @@ function bounded(
     : fallback;
 }
 
+/** Reject malformed placements as a whole; clamp finite edited values safely. */
+export function normalizeGamepadLayouts(value: unknown): GamepadLayouts {
+  const result: GamepadLayouts = { portrait: {}, landscape: {} };
+  if (!value || typeof value !== "object") return result;
+  for (const orientation of ["portrait", "landscape"] as const) {
+    const entries = (value as Record<string, unknown>)[orientation];
+    if (!entries || typeof entries !== "object" || Array.isArray(entries))
+      continue;
+    for (const id of GAMEPAD_CONTROL_IDS) {
+      if (!Object.prototype.hasOwnProperty.call(entries, id)) continue;
+      const entry = (entries as Record<string, unknown>)[id];
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+      const placement = entry as Record<string, unknown>;
+      if (
+        !["x", "y", "size", "opacity"].every(
+          (key) =>
+            typeof placement[key] === "number" &&
+            Number.isFinite(placement[key]),
+        )
+      )
+        continue;
+      result[orientation][id] = {
+        x: bounded(placement.x, 0.5, 0, 1),
+        y: bounded(placement.y, 0.5, 0, 1),
+        size: bounded(placement.size, 1, 0.75, 1.4),
+        opacity: bounded(placement.opacity, 0.18, 0.08, 0.6),
+      };
+    }
+  }
+  return result;
+}
+
 function settingsFrom(value: Record<string, unknown>): UserSettings {
   const defaults = DEFAULT_SETTINGS;
   const bool = (key: keyof UserSettings): boolean =>
@@ -96,9 +133,11 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
     arrMs: bounded(value.arrMs, defaults.arrMs, 16, 100),
     theme: THEME_IDS.find((id) => id === value.theme) ?? defaults.theme,
     controlLayout:
-      value.controlLayout === "mirror" || value.controlLayout === "floating"
+      value.controlLayout === "thumbs" ||
+      value.controlLayout === "mirror" ||
+      value.controlLayout === "floating"
         ? value.controlLayout
-        : "thumbs",
+        : "gamepad",
     controlScale: bounded(value.controlScale, defaults.controlScale, 0.85, 1.3),
     controlOpacity: bounded(
       value.controlOpacity,
@@ -108,6 +147,7 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
     ),
     controlSpread: bounded(value.controlSpread, defaults.controlSpread, 0, 1),
     controlHeight: bounded(value.controlHeight, defaults.controlHeight, 0, 1),
+    gamepadLayouts: normalizeGamepadLayouts(value.gamepadLayouts),
   };
 }
 

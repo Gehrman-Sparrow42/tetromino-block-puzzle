@@ -485,6 +485,21 @@
       "ramps": "Synthesized OKLCH metadata for swatch exploration only; never applied to gameplay. Alpha colors use their opaque RGB hue for the exploratory ramp.",
       "validationScope": "Documentation and source consistency; does not claim a new visual, runtime, physical-device or accessibility audit.",
       "snippets": "Five Basalt reference primitives. Live root variables inherit when available; literal fallbacks allow isolated rendering. Other worlds are represented by tokens and narrative, not falsely homogenized previews."
+    },
+    "gamepadControls": {
+      "layoutId": "gamepad",
+      "movementActions": ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"],
+      "neutral": "upper center",
+      "hasUpButton": false,
+      "groups": ["pad", "hardDrop", "rotateCW", "rotateCCW", "hold"],
+      "minimumTargetPx": 48,
+      "minimumGroupGapPx": 8,
+      "placement": "normalized center within play area",
+      "separateOrientations": ["portrait", "landscape"],
+      "editable": ["position", "size", "background opacity"],
+      "commit": "Done",
+      "cancel": ["Cancel", "Escape", "Android Back"],
+      "legacyPresetsPreserved": true
     }
   },
   "components": [
@@ -531,7 +546,7 @@
   ],
   "narrative": {
     "northStar": "One game, thirteen complete worlds",
-    "overview": "Afterblock keeps the board and thumb controls dominant while each selectable theme carries a complete material treatment through menus, sheets, the board and piece previews. The user approved all nine new worlds alongside the four existing themes. This is a family of visual systems rather than a single palette with interchangeable accent colors.\n\nThe theme registry and stylesheet are the authority for exact appearance; the Canvas renderer is the authority for tiles and ghosts. Short functional English labels, locally bundled typefaces for the new worlds and a shared phone-first geometry keep the experience coherent. Theme changes alter appearance without moving gameplay controls.",
+    "overview": "Afterblock keeps the board and thumb controls dominant while each selectable theme carries a complete material treatment through menus, sheets, the board and piece previews. The user approved all nine new worlds alongside the four existing themes. This is a family of visual systems rather than a single palette with interchangeable accent colors.\n\nThe theme registry and stylesheet are the authority for exact appearance; the Canvas renderer is the authority for tiles and ghosts. Short functional English labels, locally bundled typefaces for the new worlds and a shared phone-first geometry keep the experience coherent. Theme changes alter appearance without moving gameplay controls.\n\nGamepad adds a shared three-way T-pad and separate circular action controls. Its editor stores staged per-group placement, size and background opacity independently for portrait and landscape. This functional arrangement is consistent across themes; legacy presets retain their themed key shapes.",
     "keyCharacteristics": [
       "Thirteen complete shell and board palettes.",
       "Nine new worlds with local type, distinct corners and Canvas materials.",

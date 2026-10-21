@@ -221,6 +221,14 @@ Sheets are bordered surface panels with 20px padding and theme corners. Header r
 
 Controls use the theme's RGB channel token and saved opacity (the stylesheet fallback is 0.18), with a 0.4-alpha border. Hover/pressed fill uses 0.38 alpha; pressed state adds a 2px inset accent line. New-world hard drop symbols take accent color. Control previews mirror the same material and corner vocabulary. Theme styling changes the skin while geometry remains calculated by `control-layout.ts`.
 
+### Gamepad controls and editor
+
+The default Gamepad is a shared functional control system across all themes: a translucent outlined T-shaped pad on the left with left/right across the upper row, a neutral center and soft drop beneath it. There is no up arm or up action. Separate circular actions place hold above the right-hand rotation pair, with hard drop separated from the movement pad. Legacy presets retain the theme-specific key shapes described above.
+
+The pad is one editable group; hard drop, clockwise rotation, counterclockwise rotation and hold are four separate groups. Each stores normalized center position, relative size and background opacity in independent portrait/landscape maps. Geometry clamps targets to at least 48 px and separates groups by at least 8 px. Screen changes may resolve collisions or fall back to a safe arrangement; theme changes never move controls.
+
+The editor uses the selected palette and a full-screen dialog with Cancel/Done, a bounded stage, selection feedback, Size/Opacity ranges and Reset layout. All edits stay in a draft until Done. Cancel/Escape/Android Back discard the draft; interrupted drags roll back. Reset layout affects only the visible orientation. The upper-center pad area is a neutral rest zone; sliding out of an active direction releases that pointer's action. Keyboard and other touch owners remain independent.
+
 ### Board, hold and next
 
 The renderer shares one tile function across the board and previews. Data Field and Movement Score map I to horizontal marks, O to four dots, T to a cross, S and Z to opposing diagonal patterns, J to vertical lines, and L to nested squares. LCD uses its separate seven cutout identities. The preview centers the piece bounds and caps cells at 19px; dimmed hold pieces use 0.4 opacity. Ghost marks use a faint 0.07 fill and dashed outline. Canvas backing resolution follows device pixel ratio capped at 3.

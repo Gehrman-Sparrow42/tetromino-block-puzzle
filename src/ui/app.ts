@@ -22,6 +22,7 @@ import { drawBoard, drawPreview } from "./canvas-renderer";
 import { TouchControls } from "./touch-controls";
 import { THEMES, applyTheme, getTheme } from "./themes";
 import { computeControlGeometry } from "./control-layout";
+import { ControlEditor } from "./control-editor";
 
 const MODE_NAMES: Record<GameMode, string> = {
   marathon: "Marathon",
@@ -54,6 +55,7 @@ const CONTROL_ICONS: Record<string, string> = {
 };
 const control = (command: string, label: string) =>
   `<button class="control" data-command="${command}" aria-label="${label}"><span aria-hidden="true">${CONTROL_ICONS[command]}</span></button>`;
+const padOutline = `<svg class="pad-outline" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2H298V98H198V198H102V98H2Z"/><circle cx="150" cy="50" r="4"/></svg>`;
 
 export function startApp(root: HTMLDivElement) {
   let settings = loadSettings(),
@@ -94,7 +96,7 @@ export function startApp(root: HTMLDivElement) {
         <div class="play-area">
           <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
           <div class="control-deck" aria-label="Game controls">
-            ${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
+            <div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
           </div>
         </div>
       </section>
@@ -107,28 +109,73 @@ export function startApp(root: HTMLDivElement) {
     layer = el("modal-layer"),
     canvas = el<HTMLCanvasElement>("board");
   let lastFocus: HTMLElement | null = null;
+  let controlEditor: ControlEditor | null = null;
+  const orientation = () =>
+    window.innerWidth > window.innerHeight
+      ? ("landscape" as const)
+      : ("portrait" as const);
   function layoutControls() {
     const area = root.querySelector<HTMLElement>(".play-area")!;
     const width = area.clientWidth,
       height = area.clientHeight;
     if (!width || !height) return;
-    const geometry = computeControlGeometry(width, height, settings);
+    const geometry = computeControlGeometry(
+      width,
+      height,
+      settings,
+      orientation(),
+    );
     const deck = root.querySelector<HTMLElement>(".control-deck")!;
     deck.style.height = `${geometry.height}px`;
+    const pad = deck.querySelector<HTMLElement>(".movement-pad")!;
+    if (geometry.pad) {
+      Object.assign(pad.style, {
+        left: `${geometry.pad.x}px`,
+        top: `${geometry.pad.y}px`,
+        width: `${geometry.pad.width}px`,
+        height: `${geometry.pad.height}px`,
+      });
+      pad.style.setProperty(
+        "--control-opacity",
+        String(geometry.groupOpacity?.pad ?? settings.controlOpacity),
+      );
+    } else pad.removeAttribute("style");
+    const groupForAction = {
+      MOVE_LEFT: "pad",
+      MOVE_RIGHT: "pad",
+      SOFT_DROP: "pad",
+      HARD_DROP: "hardDrop",
+      HOLD: "hold",
+      ROTATE_CW: "rotateCW",
+      ROTATE_CCW: "rotateCCW",
+    } as const;
     for (const [action, rect] of Object.entries(geometry.buttons)) {
       const button = deck.querySelector<HTMLElement>(
         `[data-command="${action}"]`,
       )!;
+      const inPad =
+        geometry.pad &&
+        ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"].includes(action);
       Object.assign(button.style, {
-        left: `${rect.x}px`,
-        top: `${rect.y}px`,
+        left: `${rect.x - (inPad ? geometry.pad!.x : 0)}px`,
+        top: `${rect.y - (inPad ? geometry.pad!.y : 0)}px`,
         width: `${rect.width}px`,
         height: `${rect.height}px`,
       });
+      const group = groupForAction[action as keyof typeof groupForAction];
+      if (geometry.groupOpacity)
+        button.style.setProperty(
+          "--control-opacity",
+          String(geometry.groupOpacity[group]),
+        );
+      else button.style.removeProperty("--control-opacity");
     }
     const boardHeight = Math.max(
       0,
-      height - (settings.controlLayout === "floating" ? 0 : geometry.height),
+      height -
+        (geometry.overlay || settings.controlLayout === "floating"
+          ? 0
+          : geometry.height),
     );
     const board = root.querySelector<HTMLElement>(".board-wrap")!;
     const boardWidth = Math.min(width, boardHeight / 2);
@@ -145,16 +192,29 @@ export function startApp(root: HTMLDivElement) {
       Math.max(280, actualWidth),
       420,
       settings,
+      orientation(),
     );
     // The miniature may shrink below playable touch-target sizes inside a narrow sheet.
     const scale = Math.min(1, actualWidth / geometry.width);
-    preview.style.height = `${geometry.height * scale}px`;
-    preview.innerHTML = Object.entries(geometry.buttons)
-      .map(
-        ([action, rect]) =>
-          `<i style="left:${rect.x * scale}px;top:${rect.y * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px"><span style="display:grid;place-items:center;transform:scale(${scale})">${CONTROL_ICONS[action]}</span></i>`,
-      )
-      .join("");
+    const top = geometry.pad
+      ? Math.min(...Object.values(geometry.buttons).map((r) => r.y))
+      : 0;
+    const bottom = geometry.pad
+      ? Math.max(...Object.values(geometry.buttons).map((r) => r.y + r.height))
+      : geometry.height;
+    preview.dataset.layout = settings.controlLayout;
+    preview.style.height = `${(bottom - top) * scale}px`;
+    const padPreview = geometry.pad
+      ? `<b class="movement-preview" style="left:${geometry.pad.x * scale}px;top:${(geometry.pad.y - top) * scale}px;width:${geometry.pad.width * scale}px;height:${geometry.pad.height * scale}px">${padOutline}</b>`
+      : "";
+    preview.innerHTML =
+      padPreview +
+      Object.entries(geometry.buttons)
+        .map(
+          ([action, rect]) =>
+            `<i data-preview-command="${action}" style="left:${rect.x * scale}px;top:${(rect.y - top) * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px"><span style="display:grid;place-items:center;transform:scale(${scale})">${CONTROL_ICONS[action]}</span></i>`,
+        )
+        .join("");
   }
   const applySettings = () => {
     controls.releaseAll();
@@ -165,10 +225,21 @@ export function startApp(root: HTMLDivElement) {
       String(settings.controlOpacity),
     );
     applyTheme(settings.theme);
+    syncControlFields();
     layoutControls();
     drawControlPreview();
     draw();
   };
+  function syncControlFields() {
+    const edit = dialog.querySelector<HTMLButtonElement>(
+      '[data-action="edit-controls"]',
+    );
+    if (edit) edit.hidden = settings.controlLayout !== "gamepad";
+    for (const name of ["controlSpread", "controlHeight"]) {
+      const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
+      if (row) row.hidden = settings.controlLayout === "gamepad";
+    }
+  }
   function persist() {
     if (
       state &&
@@ -208,6 +279,28 @@ export function startApp(root: HTMLDivElement) {
     root.querySelector<HTMLElement>(".shell")!.inert = false;
     dialog.innerHTML = "";
     if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
+  }
+  function editControls() {
+    closeModal();
+    controls.releaseAll();
+    modal = "controls";
+    root.querySelector<HTMLElement>(".shell")!.inert = true;
+    const finish = () => {
+      controlEditor?.destroy();
+      controlEditor = null;
+      modal = "";
+      root.querySelector<HTMLElement>(".shell")!.inert = false;
+      showSettings();
+    };
+    controlEditor = new ControlEditor(root, settings, {
+      onSave: (edited) => {
+        settings = edited;
+        if (!saveSettings(settings)) el("storage-notice").hidden = false;
+        applySettings();
+        finish();
+      },
+      onCancel: finish,
+    });
   }
   const sheetHead = (title: string, close = true) =>
     `<div class="sheet-top"><h2 id="dialog-title">${title}</h2>${close ? '<button class="icon-button" data-action="close" aria-label="Close dialog">×</button>' : ""}</div>`;
@@ -302,6 +395,7 @@ export function startApp(root: HTMLDivElement) {
         "controlLayout",
         "Layout",
         [
+          ["gamepad", "Gamepad"],
           ["thumbs", "Thumb"],
           ["mirror", "Left-handed"],
           ["floating", "Floating"],
@@ -309,6 +403,7 @@ export function startApp(root: HTMLDivElement) {
         "Control layout",
       )}
       <div class="control-preview" aria-hidden="true"></div>
+      <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
       ${range("controlScale", "Size", 0.85, 1.3, 0.01, "Control size")}
       ${range("controlOpacity", "Opacity", 0.08, 0.6, 0.01, "Control opacity")}
       ${range("controlSpread", "Spacing", 0, 1, 0.01, "Control spacing")}
@@ -333,6 +428,7 @@ export function startApp(root: HTMLDivElement) {
       ${toggle("reducedMotion", "Reduced motion", settings.reducedMotion)}
       </form><button class="primary-button" data-action="close">Done</button>`,
     );
+    syncControlFields();
     drawControlPreview();
   }
   function showRecords(current: PersonalBestStats) {
@@ -470,6 +566,10 @@ export function startApp(root: HTMLDivElement) {
       );
   }
   function back() {
+    if (modal === "controls") {
+      controlEditor?.cancel();
+      return;
+    }
     if (
       modal === "settings" ||
       modal === "help" ||
@@ -512,6 +612,7 @@ export function startApp(root: HTMLDivElement) {
           controlOpacity: DEFAULT_SETTINGS.controlOpacity,
           controlSpread: DEFAULT_SETTINGS.controlSpread,
           controlHeight: DEFAULT_SETTINGS.controlHeight,
+          gamepadLayouts: { portrait: {}, landscape: {} },
         };
         saveSettings(settings);
         applySettings();
@@ -527,6 +628,9 @@ export function startApp(root: HTMLDivElement) {
           >(`[name="${key}"]`);
           if (input) input.value = String(settings[key]);
         }
+        break;
+      case "edit-controls":
+        editControls();
         break;
       case "records":
         showRecords(stats);

@@ -21,6 +21,52 @@ beforeEach(async () => {
 });
 
 describe("settings and scores", () => {
+  it("keeps existing presets, defaults fresh installs to gamepad, and isolates nested settings", () => {
+    expect(storage.loadSettings().controlLayout).toBe("gamepad");
+    const first = storage.loadSettings();
+    first.gamepadLayouts.portrait.pad = {
+      x: 0.2,
+      y: 0.8,
+      size: 1.2,
+      opacity: 0.3,
+    };
+    expect(storage.loadSettings().gamepadLayouts.portrait).toEqual({});
+    expect(storage.DEFAULT_SETTINGS.gamepadLayouts.portrait).toEqual({});
+    for (const controlLayout of ["thumbs", "mirror", "floating"]) {
+      data.set("tetromino_v2_settings", JSON.stringify({ controlLayout }));
+      expect(storage.loadSettings().controlLayout).toBe(controlLayout);
+    }
+  });
+
+  it("round-trips independent orientation edits and sanitizes malformed placements", () => {
+    const settings = storage.loadSettings();
+    settings.gamepadLayouts.portrait.pad = {
+      x: 0.2,
+      y: 0.8,
+      size: 1.2,
+      opacity: 0.3,
+    };
+    settings.gamepadLayouts.landscape.hold = {
+      x: 0.9,
+      y: 0.4,
+      size: 0.8,
+      opacity: 0.1,
+    };
+    storage.saveSettings(settings);
+    expect(storage.loadSettings()).toEqual(settings);
+    const normalized = storage.normalizeGamepadLayouts({
+      portrait: {
+        pad: { x: -1, y: 8, size: 50, opacity: 0 },
+        hold: { x: 0.2, y: 0.2, size: NaN, opacity: 0.2 },
+        rotateCW: { x: 0.2, y: 0.3, size: 1 },
+      },
+      landscape: [],
+    });
+    expect(normalized).toEqual({
+      portrait: { pad: { x: 0, y: 1, size: 1.4, opacity: 0.08 } },
+      landscape: {},
+    });
+  });
   it("adds appearance defaults to old settings without changing saved runs or audio", () => {
     const run = JSON.stringify(createInitialState("marathon", 123));
     data.set("tetromino_v2_run", run);
@@ -59,7 +105,7 @@ describe("settings and scores", () => {
     );
     expect(storage.loadSettings()).toMatchObject({
       theme: "ink",
-      controlLayout: "thumbs",
+      controlLayout: "gamepad",
       controlScale: 1.3,
       controlOpacity: 0.08,
       controlSpread: 1,
@@ -77,7 +123,12 @@ describe("settings and scores", () => {
 
   it("round-trips all themes and control presets", () => {
     for (const theme of THEME_IDS) {
-      for (const controlLayout of ["thumbs", "mirror", "floating"] as const) {
+      for (const controlLayout of [
+        "gamepad",
+        "thumbs",
+        "mirror",
+        "floating",
+      ] as const) {
         const settings = {
           ...storage.DEFAULT_SETTINGS,
           theme,

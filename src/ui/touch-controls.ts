@@ -15,6 +15,9 @@ export class TouchControls {
   private pause: (key: "pause" | "back") => void;
   private held = new Map<string, Held>();
   private soft = new Set<string>();
+  private activeActions = new Map<string, string>();
+  private buttons = new Map<string, HTMLButtonElement>();
+  private padPointers = new Map<number, string | null>();
   private disposers: (() => void)[] = [];
   private gesture: { id: number; x: number; y: number; at: number } | null =
     null;
@@ -33,19 +36,26 @@ export class TouchControls {
     this.listen(window, "keydown", this.keydown as EventListener);
     this.listen(window, "keyup", this.keyup as EventListener);
     this.listen(window, "blur", () => this.releaseAll());
+    if (typeof document !== "undefined")
+      this.listen(document, "visibilitychange", () => {
+        if (document.hidden) this.releaseAll();
+      });
+    const movementPad = root.querySelector<HTMLElement>("[data-movement-pad]");
+    const usesPad = () =>
+      this.settings().controlLayout === "gamepad" && movementPad !== null;
     root
       .querySelectorAll<HTMLButtonElement>("[data-command]")
       .forEach((button) => {
+        this.buttons.set(button.dataset.command!, button);
         this.listen(button, "pointerdown", ((event: PointerEvent) => {
+          if (usesPad() && movementPad!.contains(button)) return;
           if (!this.enabled()) return;
           event.preventDefault();
           button.setPointerCapture(event.pointerId);
-          button.classList.add("pressed");
           this.press(`pointer-${event.pointerId}`, button.dataset.command!);
         }) as EventListener);
         const release = ((event: PointerEvent) => {
           this.release(`pointer-${event.pointerId}`);
-          button.classList.remove("pressed");
         }) as EventListener;
         ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) =>
           this.listen(button, type, release),
@@ -59,6 +69,51 @@ export class TouchControls {
           }
         }) as EventListener);
       });
+    if (movementPad) {
+      const updatePad = (event: PointerEvent) => {
+        const id = `pointer-${event.pointerId}`;
+        let action: string | null = null;
+        if (this.enabled() && usesPad()) {
+          for (const direction of ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"]) {
+            const button = this.buttons.get(direction);
+            if (!button || !movementPad.contains(button)) continue;
+            const bounds = button.getBoundingClientRect();
+            if (
+              event.clientX >= bounds.left &&
+              event.clientX < bounds.right &&
+              event.clientY >= bounds.top &&
+              event.clientY < bounds.bottom
+            ) {
+              action = direction;
+              break;
+            }
+          }
+        }
+        if (this.padPointers.get(event.pointerId) === action) return;
+        this.release(id);
+        this.padPointers.set(event.pointerId, action);
+        if (action) this.press(id, action);
+      };
+      this.listen(movementPad, "pointerdown", ((event: PointerEvent) => {
+        if (!usesPad() || !this.enabled()) return;
+        event.preventDefault();
+        movementPad.setPointerCapture(event.pointerId);
+        this.padPointers.set(event.pointerId, null);
+        updatePad(event);
+      }) as EventListener);
+      this.listen(movementPad, "pointermove", ((event: PointerEvent) => {
+        if (!this.padPointers.has(event.pointerId)) return;
+        event.preventDefault();
+        updatePad(event);
+      }) as EventListener);
+      const releasePad = ((event: PointerEvent) => {
+        if (!this.padPointers.delete(event.pointerId)) return;
+        this.release(`pointer-${event.pointerId}`);
+      }) as EventListener;
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) =>
+        this.listen(movementPad, type, releasePad),
+      );
+    }
     const canvas = root.querySelector<HTMLCanvasElement>("#board")!;
     this.listen(canvas, "pointerdown", ((event: PointerEvent) => {
       if (!this.enabled() || this.settings().controlScheme !== "hybrid") return;
@@ -134,6 +189,8 @@ export class TouchControls {
     this.release(event.code);
   };
   private press(id: string, action: string) {
+    this.activeActions.set(id, action);
+    this.refreshPressed(action);
     if (action === "MOVE_LEFT" || action === "MOVE_RIGHT") {
       if (this.held.has(id)) return;
       const previous = this.winner();
@@ -154,9 +211,18 @@ export class TouchControls {
       this.command({ type: action } as GameCommand);
   }
   private release(id: string) {
+    const action = this.activeActions.get(id);
+    this.activeActions.delete(id);
+    if (action) this.refreshPressed(action);
     this.held.delete(id);
     if (this.soft.delete(id) && this.soft.size === 0)
       this.command({ type: "SOFT_DROP", active: false });
+  }
+  private refreshPressed(action: string) {
+    const button = this.buttons.get(action);
+    if (Array.from(this.activeActions.values()).includes(action))
+      button?.classList.add("pressed");
+    else button?.classList.remove("pressed");
   }
   update(now: number) {
     if (!this.enabled()) {
@@ -181,6 +247,8 @@ export class TouchControls {
   }
   releaseAll() {
     this.held.clear();
+    this.padPointers.clear();
+    this.activeActions.clear();
     this.gesture = null;
     if (this.soft.size) {
       this.soft.clear();

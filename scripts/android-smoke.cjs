@@ -103,6 +103,132 @@ async function attach() {
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     }
     await page.locator('select[name="theme"]').selectOption("basalt");
+    await page.locator('select[name="controlLayout"]').selectOption("gamepad");
+    await page.locator('[data-action="edit-controls"]').click();
+    await expect(page.locator(".control-editor")).toBeVisible();
+    const touch = await page.context().newCDPSession(page);
+    const touchDrag = async (locator, dx, dy) => {
+      const r = await locator.boundingBox();
+      const x = r.x + r.width / 2,
+        y = r.y + r.height / 2;
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x, y, id: 1 }],
+      });
+      for (let step = 1; step <= 6; step++)
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [
+            { x: x + (dx * step) / 6, y: y + (dy * step) / 6, id: 1 },
+          ],
+        });
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    };
+    await touchDrag(page.locator('[data-editor-control="pad"]'), 0, -45);
+    await page.locator('[data-editor-control="hold"]').click();
+    await page.locator('[name="editorControlOpacity"]').press("End");
+    await page.screenshot({ path: `${output}/editor-portrait.png` });
+    await page.locator('[data-editor-action="done"]').click();
+    const portrait = await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("tetromino_v2_settings")).gamepadLayouts
+          .portrait,
+    );
+    if (!portrait.pad || portrait.hold?.opacity !== 0.6)
+      throw new Error("Native editor did not save touch drag/opacity.");
+    await page.locator('[data-action="edit-controls"]').click();
+    command("shell", "input", "keyevent", "4");
+    await expect(page.locator(".control-editor")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toContainText("Settings");
+    command(
+      "shell",
+      "settings",
+      "put",
+      "system",
+      "accelerometer_rotation",
+      "0",
+    );
+    command("shell", "settings", "put", "system", "user_rotation", "1");
+    await expect
+      .poll(() => page.evaluate(() => innerWidth > innerHeight), {
+        timeout: 10000,
+      })
+      .toBe(true);
+    await page.locator('[data-action="edit-controls"]').click();
+    await expect(page.locator("[data-editor-orientation]")).toHaveText(
+      "Landscape",
+    );
+    await touchDrag(page.locator('[data-editor-control="hardDrop"]'), -40, -10);
+    await page.screenshot({ path: `${output}/editor-landscape.png` });
+    await page.locator('[data-editor-action="done"]').click();
+    const layouts = await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("tetromino_v2_settings"))
+          .gamepadLayouts,
+    );
+    if (
+      !layouts.landscape.hardDrop ||
+      JSON.stringify(layouts.portrait) !== JSON.stringify(portrait)
+    )
+      throw new Error("Native orientation layouts were not isolated.");
+    command("shell", "settings", "put", "system", "user_rotation", "0");
+    await expect
+      .poll(() => page.evaluate(() => innerWidth < innerHeight), {
+        timeout: 10000,
+      })
+      .toBe(true);
+    await page.locator('#dialog [data-action="close"]').last().click();
+    await page.getByRole("dialog").locator('[data-action="resume"]').click();
+    const left = await page
+      .locator('[data-movement-pad] [data-command="MOVE_LEFT"]')
+      .boundingBox();
+    const right = await page
+      .locator('[data-movement-pad] [data-command="MOVE_RIGHT"]')
+      .boundingBox();
+    const down = await page
+      .locator('[data-movement-pad] [data-command="SOFT_DROP"]')
+      .boundingBox();
+    const pad = await page.locator("[data-movement-pad]").boundingBox();
+    const point = (r) => ({
+      x: r.x + r.width / 2,
+      y: r.y + r.height / 2,
+      id: 1,
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [point(left)],
+    });
+    for (const r of [right, down])
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [point(r)],
+      });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: pad.x + pad.width / 2, y: pad.y + pad.height / 4, id: 1 },
+      ],
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await page.screenshot({ path: `${output}/gamepad.png` });
+    await page.locator(".pause-button").click();
+    const released = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("tetromino_v2_run")),
+    );
+    if (released.softDropActive || released.piecesPlaced !== 1)
+      throw new Error(
+        "Sliding pad left a held drop or triggered a discrete action.",
+      );
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click();
     await page.locator('select[name="controlLayout"]').selectOption("floating");
     await page.locator('input[name="controlScale"]').press("End");
     await page.locator('input[name="controlOpacity"]').press("Home");
@@ -163,6 +289,8 @@ async function attach() {
             "rapid background pause",
             "native process restart resume",
             "all thirteen themes",
+            "three-way sliding gamepad touch input",
+            "editable controls, Back cancellation and separate native orientation layouts",
             "floating controls and size/opacity settings",
           ],
           browser: await browser.version(),
@@ -174,6 +302,19 @@ async function attach() {
     );
     console.log("Android WebView smoke checks passed.");
   } finally {
+    try {
+      command("shell", "settings", "put", "system", "user_rotation", "0");
+      command(
+        "shell",
+        "settings",
+        "put",
+        "system",
+        "accelerometer_rotation",
+        "1",
+      );
+    } catch {
+      /* The test owns this emulator; restore its rotation settings when reachable. */
+    }
     if (browser) await browser.close();
     try {
       command("forward", "--remove", `tcp:${port}`);

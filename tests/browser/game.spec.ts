@@ -78,7 +78,8 @@ test("larger board, seven spacious controls and no overlap", async ({
   const deck = (await page.locator(".control-deck").boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(board.height / board.width).toBeCloseTo(2, 1);
-  expect(board.y + board.height).toBeLessThanOrEqual(deck.y + 1);
+  // Gamepad controls overlay the board; both fit inside the same play area.
+  expect(board.y + board.height).toBeLessThanOrEqual(deck.y + deck.height + 1);
   if (info.project.name === "phone")
     expect(board.width).toBeGreaterThanOrEqual(280);
   if (info.project.name === "small-phone")
@@ -251,6 +252,9 @@ test("control presets, sliders and reset are live and safe", async ({
   page,
 }, info) => {
   await page.goto("/");
+  await page.locator('#home [data-action="settings"]').click();
+  await page.locator('select[name="controlLayout"]').selectOption("thumbs");
+  await closeSettings(page);
   await page.locator('[data-mode="marathon"]').click();
   const initial = (await page.locator("#board").boundingBox())!;
   await pausedRun(page);
@@ -260,7 +264,9 @@ test("control presets, sliders and reset are live and safe", async ({
     .click();
   await expect(page.locator(".control-preview i")).toHaveCount(7);
   const settingsTargets = await page
-    .locator('#settings-form select, #settings-form input[type="range"]')
+    .locator(
+      '#settings-form select:visible, #settings-form input[type="range"]:visible',
+    )
     .evaluateAll((nodes) =>
       nodes.map((node) => node.getBoundingClientRect().height),
     );
@@ -269,7 +275,7 @@ test("control presets, sliders and reset are live and safe", async ({
   const runBefore = await page.evaluate(() =>
     localStorage.getItem("tetromino_v2_run"),
   );
-  for (const preset of ["thumbs", "mirror", "floating"]) {
+  for (const preset of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('select[name="controlLayout"]').selectOption(preset);
     await setRange(page, "controlScale", 1.3);
     await setRange(page, "controlSpread", 1);
@@ -317,7 +323,7 @@ test("control presets, sliders and reset are live and safe", async ({
     .getByRole("button", { name: "Reset controls", exact: true })
     .click();
   await expect(page.locator('select[name="controlLayout"]')).toHaveValue(
-    "thumbs",
+    "gamepad",
   );
   expect(await page.locator('input[name="controlScale"]').inputValue()).toBe(
     "1",
@@ -326,11 +332,11 @@ test("control presets, sliders and reset are live and safe", async ({
     JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
   );
   expect(saved.controlOpacity).toBe(0.18);
-  expect(saved.controlLayout).toBe("thumbs");
+  expect(saved.controlLayout).toBe("gamepad");
   await page.reload();
   await page.locator('#home [data-action="settings"]').click();
   await expect(page.locator('select[name="controlLayout"]')).toHaveValue(
-    "thumbs",
+    "gamepad",
   );
 });
 
@@ -358,7 +364,7 @@ test("settings preview fits a 320px screen at maximum size", async ({
   await page.locator('#home [data-action="settings"]').click();
   await setRange(page, "controlScale", 1.3);
   await setRange(page, "controlSpread", 1);
-  for (const layout of ["thumbs", "mirror", "floating"]) {
+  for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('select[name="controlLayout"]').selectOption(layout);
     const preview = (await page.locator(".control-preview").boundingBox())!;
     const indicators = await page.locator(".control-preview i").all();
@@ -380,4 +386,166 @@ test("settings preview fits a 320px screen at maximum size", async ({
       () => document.documentElement.scrollWidth > innerWidth,
     ),
   ).toBe(false);
+});
+
+async function openControlEditor(page: Page) {
+  await page.locator('[data-action="edit-controls"]').click();
+  await expect(page.locator(".control-editor")).toBeVisible();
+}
+async function dragEditorControl(
+  page: Page,
+  id: string,
+  dx: number,
+  dy: number,
+) {
+  const box = (await page
+    .locator(`[data-editor-control="${id}"]`)
+    .boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + dx,
+    box.y + box.height / 2 + dy,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+}
+
+test("gamepad has three movement zones and saves edited controls without changing the run", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 851 });
+  await page.goto("/");
+  await page.locator('[data-mode="marathon"]').click();
+  await expect(page.locator("#game")).toHaveAttribute("data-layout", "gamepad");
+  const commands = await page
+    .locator("[data-movement-pad] [data-command]")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => (n as HTMLElement).dataset.command),
+    );
+  expect(commands.sort()).toEqual(["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"]);
+  const savedRun = await pausedRun(page);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  await openControlEditor(page);
+  await expect(page.locator(".shell")).toHaveAttribute("inert", "");
+  await dragEditorControl(page, "pad", 0, -70);
+  await page.locator('[data-editor-control="rotateCW"]').click();
+  await page.locator('[name="editorControlOpacity"]').press("Home");
+  await expect(page.locator('[name="editorControlOpacity"]')).toHaveValue(
+    "0.08",
+  );
+  await setRange(page, "editorControlSize", 1.2);
+  await setRange(page, "editorControlOpacity", 0.1);
+  await page.locator('[data-editor-action="done"]').click();
+  await expect(page.locator("#dialog")).toContainText("Settings");
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
+  );
+  expect(saved.controlLayout).toBe("gamepad");
+  expect(saved.gamepadLayouts.portrait.pad).toBeDefined();
+  expect(saved.gamepadLayouts.portrait.rotateCW).toMatchObject({
+    size: 1.2,
+    opacity: 0.1,
+  });
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("tetromino_v2_run")!),
+    ),
+  ).toEqual(savedRun);
+  await closeSettings(page);
+  await page.getByRole("dialog").locator('[data-action="resume"]').click();
+  expect(
+    await page
+      .locator('.control-deck [data-command="ROTATE_CW"]')
+      .evaluate((n) =>
+        (n as HTMLElement).style.getPropertyValue("--control-opacity"),
+      ),
+  ).toBe("0.1");
+  await page.reload();
+  await page.locator('#home [data-action="settings"]').click();
+  await openControlEditor(page);
+  await page.locator('[data-editor-control="rotateCW"]').click();
+  await expect(page.locator('[name="editorControlOpacity"]')).toHaveValue(
+    "0.1",
+  );
+});
+
+test("control editor cancel, escape and pointer cancellation preserve saved settings", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('#home [data-action="settings"]').click();
+  const before = await page.evaluate(() =>
+    localStorage.getItem("tetromino_v2_settings"),
+  );
+  await openControlEditor(page);
+  await dragEditorControl(page, "pad", 0, -60);
+  await setRange(page, "editorControlOpacity", 0.5);
+  await page.keyboard.press("KeyP");
+  await expect(page.locator(".control-editor")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".control-editor")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => localStorage.getItem("tetromino_v2_settings")),
+  ).toBe(before);
+  await openControlEditor(page);
+  const pad = page.locator('[data-editor-control="pad"]');
+  const box = (await pad.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 55, {
+    steps: 4,
+  });
+  await pad.dispatchEvent("pointercancel", { pointerId: 1 });
+  await page.mouse.up();
+  await page.locator('[data-editor-action="done"]').click();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("tetromino_v2_settings")!)
+          .gamepadLayouts.portrait,
+    ),
+  ).toEqual({});
+});
+
+test("control editor keeps portrait and landscape layouts separate and resets only the current orientation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 851 });
+  await page.goto("/");
+  await page.locator('#home [data-action="settings"]').click();
+  await openControlEditor(page);
+  await dragEditorControl(page, "pad", 0, -55);
+  await page.locator('[data-editor-action="done"]').click();
+  const portrait = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("tetromino_v2_settings")!).gamepadLayouts
+        .portrait,
+  );
+  await openControlEditor(page);
+  await page.setViewportSize({ width: 851, height: 393 });
+  await expect(page.locator("[data-editor-orientation]")).toHaveText(
+    "Landscape",
+  );
+  await expect(page.locator('[data-editor-action="done"]')).toBeInViewport();
+  await dragEditorControl(page, "hardDrop", -50, -20);
+  await page.locator('[data-editor-action="done"]').click();
+  const edited = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("tetromino_v2_settings")!).gamepadLayouts,
+  );
+  expect(edited.portrait).toEqual(portrait);
+  expect(edited.landscape.hardDrop).toBeDefined();
+  await openControlEditor(page);
+  await page.locator('[data-editor-action="reset"]').click();
+  await page.locator('[data-editor-action="done"]').click();
+  const reset = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("tetromino_v2_settings")!).gamepadLayouts,
+  );
+  expect(reset.portrait).toEqual(portrait);
+  expect(reset.landscape).toEqual({});
 });

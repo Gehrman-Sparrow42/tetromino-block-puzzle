@@ -9,14 +9,14 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- Thumb controls prefer portrait on phones; large-screen overrides use the responsive layout. -->
+        <!-- Responsive controls keep independent portrait and landscape placements. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:launchMode="singleTask" android:screenOrientation="portrait" android:windowSoftInputMode="adjustNothing"
-            tools:ignore="LockedOrientationActivity,DiscouragedApi"
+            android:launchMode="singleTask" android:windowSoftInputMode="adjustNothing"
+            tools:ignore="DiscouragedApi"
             android:exported="true">
 
             <intent-filter>

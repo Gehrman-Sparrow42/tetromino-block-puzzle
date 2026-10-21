@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { UserSettings } from "../contracts/game-contract";
 import { DEFAULT_SETTINGS } from "../platform/storage";
 import { computeControlGeometry } from "./control-layout";
+import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 
 function settings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
@@ -16,6 +17,88 @@ function settings(overrides: Partial<UserSettings> = {}): UserSettings {
 }
 
 describe("ergonomic touch geometry", () => {
+  it("makes a three-direction pad with neutral center and no up command", () => {
+    const g = computeControlGeometry(
+      375,
+      700,
+      settings({ controlLayout: "gamepad" }),
+    );
+    expect(g.overlay).toBe(true);
+    expect(g.height).toBe(700);
+    expect(g.pad).toEqual(g.groups!.pad);
+    expect(g.buttons.MOVE_LEFT.y).toBe(g.buttons.MOVE_RIGHT.y);
+    expect(g.buttons.SOFT_DROP.y).toBe(g.buttons.MOVE_LEFT.y + g.buttonSize);
+    expect(g.buttons.SOFT_DROP.x).toBe(g.buttons.MOVE_LEFT.x + g.buttonSize);
+    expect(Object.keys(g.buttons)).toHaveLength(7);
+  });
+
+  it("bounds custom groups and prevents collisions across portrait and landscape resizes", () => {
+    for (const [width, height] of [
+      [302, 440],
+      [375, 700],
+      [740, 230],
+      [850, 300],
+      [276, 104],
+    ]) {
+      for (const size of [0.75, 1, 1.4]) {
+        for (const coordinate of [0, 0.5, 1]) {
+          const edits = Object.fromEntries(
+            GAMEPAD_CONTROL_IDS.map((id) => [
+              id,
+              { x: coordinate, y: coordinate, size, opacity: 0.6 },
+            ]),
+          );
+          const g = computeControlGeometry(
+            width!,
+            height!,
+            settings({
+              controlLayout: "gamepad",
+              gamepadLayouts: { portrait: edits, landscape: edits },
+            }),
+          );
+          const groups = Object.values(g.groups!);
+          for (const r of groups) {
+            expect(r.x).toBeGreaterThanOrEqual(0);
+            expect(r.y).toBeGreaterThanOrEqual(0);
+            expect(r.x + r.width).toBeLessThanOrEqual(width!);
+            expect(r.y + r.height).toBeLessThanOrEqual(height!);
+          }
+          for (const b of Object.values(g.buttons)) {
+            expect(b.width).toBeGreaterThanOrEqual(48);
+            expect(b.height).toBeGreaterThanOrEqual(48);
+          }
+          for (let i = 0; i < groups.length; i++)
+            for (let j = i + 1; j < groups.length; j++) {
+              const a = groups[i]!,
+                b = groups[j]!;
+              expect(
+                Math.max(
+                  b.x - a.x - a.width,
+                  a.x - b.x - b.width,
+                  b.y - a.y - a.height,
+                  a.y - b.y - b.height,
+                ),
+              ).toBeGreaterThanOrEqual(8);
+            }
+        }
+      }
+    }
+  });
+
+  it("uses separate orientation edits and allows explicit viewport orientation", () => {
+    const s = settings({
+      controlLayout: "gamepad",
+      gamepadLayouts: {
+        portrait: { pad: { x: 0.25, y: 0.2, size: 1, opacity: 0.15 } },
+        landscape: { pad: { x: 0.25, y: 0.8, size: 1, opacity: 0.5 } },
+      },
+    });
+    const portrait = computeControlGeometry(740, 400, s, "portrait");
+    const landscape = computeControlGeometry(740, 400, s, "landscape");
+    expect(portrait.groups!.pad.y).toBeLessThan(landscape.groups!.pad.y);
+    expect(portrait.groupOpacity!.pad).toBe(0.15);
+    expect(landscape.groupOpacity!.pad).toBe(0.5);
+  });
   it("keeps seven separated, reachable targets inside every supported viewport", () => {
     let layoutsChecked = 0;
     for (const width of [320, 344, 377, 414, 752]) {

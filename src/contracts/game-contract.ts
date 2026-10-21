@@ -75,7 +75,27 @@ export const THEME_IDS = [
   "classic",
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
-export type ControlLayoutId = "thumbs" | "mirror" | "floating";
+export type ControlLayoutId = "gamepad" | "thumbs" | "mirror" | "floating";
+export const GAMEPAD_CONTROL_IDS = [
+  "pad",
+  "hardDrop",
+  "rotateCW",
+  "rotateCCW",
+  "hold",
+] as const;
+export type GamepadControlId = (typeof GAMEPAD_CONTROL_IDS)[number];
+export type ControlOrientation = "portrait" | "landscape";
+export interface GamepadControlPlacement {
+  /** Center relative to the full playable area, independent of screen pixels. */
+  x: number;
+  y: number;
+  size: number;
+  opacity: number;
+}
+export type GamepadLayouts = Record<
+  ControlOrientation,
+  Partial<Record<GamepadControlId, GamepadControlPlacement>>
+>;
 export interface UserSettings {
   soundEnabled: boolean;
   soundVolume: number;
@@ -91,6 +111,7 @@ export interface UserSettings {
   controlOpacity: number;
   controlSpread: number;
   controlHeight: number;
+  gamepadLayouts: GamepadLayouts;
 }
 export interface PersonalBestStats {
   marathonHighScore: number;

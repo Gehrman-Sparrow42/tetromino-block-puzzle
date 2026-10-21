@@ -1039,3 +1039,82 @@ html[data-theme="classic"] {
     color: var(--accent);
   }
 }
+
+/* Three-way gamepad: the middle is a neutral thumb rest; there is no up zone. */
+.movement-pad {
+  display: contents;
+}
+.pad-outline {
+  display: none;
+}
+.game-screen[data-layout="gamepad"] .control-deck {
+  position: absolute;
+  inset: 0;
+}
+.game-screen[data-layout="gamepad"] .movement-pad {
+  display: block;
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 50%,
+    66.6667% 50%,
+    66.6667% 100%,
+    33.3333% 100%,
+    33.3333% 50%,
+    0 50%
+  );
+}
+.game-screen[data-layout="gamepad"] .pad-outline,
+.movement-preview .pad-outline {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.pad-outline path {
+  fill: rgb(var(--control-rgb) / var(--control-opacity));
+  stroke: currentColor;
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+.pad-outline circle {
+  fill: currentColor;
+  opacity: 0.55;
+}
+.game-screen[data-layout="gamepad"] .movement-pad .control {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text);
+}
+.game-screen[data-layout="gamepad"] .movement-pad .control.pressed {
+  background: rgb(var(--control-rgb) / 0.35);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.game-screen[data-layout="gamepad"] .control-deck > .control {
+  border-radius: 50%;
+  border-color: color-mix(in srgb, var(--text) 60%, transparent);
+}
+.control-preview[data-layout="gamepad"] .movement-preview {
+  position: absolute;
+  display: block;
+}
+.control-preview[data-layout="gamepad"] i {
+  border-radius: 50%;
+}
+.control-preview[data-layout="gamepad"] i[data-preview-command="MOVE_LEFT"],
+.control-preview[data-layout="gamepad"] i[data-preview-command="MOVE_RIGHT"],
+.control-preview[data-layout="gamepad"] i[data-preview-command="SOFT_DROP"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
