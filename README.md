@@ -1,6 +1,6 @@
 # Afterblock
 
-An offline, ad-free falling-tetromino game for Android and the browser. Built as a remake of Tetromino Block Puzzle; the original version remains on `main`, with this edition on `remake/android`.
+An offline, ad-free falling-tetromino game for Android and the browser. This Android remake is the current version on `main`. The original Tetromino Block Puzzle is preserved on [`saved/original`](https://github.com/Gehrman-Sparrow42/tetromino-block-puzzle/tree/saved/original).
 
 ## Play
 

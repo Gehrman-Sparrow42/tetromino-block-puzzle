@@ -2,7 +2,7 @@ name: Android debug APK
 on:
   workflow_dispatch:
   push:
-    branches: [remake/android]
+    branches: [main]
 permissions:
   contents: read
 concurrency:
