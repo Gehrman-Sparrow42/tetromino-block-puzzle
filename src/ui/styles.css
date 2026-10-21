@@ -328,19 +328,19 @@ button:disabled {
   left: 8px;
   right: 8px;
   bottom: 26%;
-  padding: 8px;
+  padding: 6px 8px;
   border-radius: 6px;
-  color: var(--accent-ink);
-  background: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   font-size: 11px;
   text-align: center;
   font-weight: 650;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transition: opacity 0.08s;
 }
 .feedback.visible {
-  opacity: 1;
+  opacity: 0.42;
 }
 .modal-layer {
   position: fixed;

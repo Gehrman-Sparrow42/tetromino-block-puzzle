@@ -642,7 +642,7 @@ export function startApp(root: HTMLDivElement) {
         const names = ["", "SINGLE", "DOUBLE", "TRIPLE", "FOUR LINES"];
         el("feedback").textContent =
           `${event.perfectClear ? "PERFECT CLEAR" : event.tSpin !== "none" ? "T-SPIN" : names[event.linesCleared]}${event.combo > 0 ? ` · ${event.combo + 1} COMBO` : ""} +${num(event.pointsAwarded)}`;
-        feedbackUntil = performance.now() + 1500;
+        feedbackUntil = performance.now() + 450;
         flashRows = settings.reducedMotion ? [] : event.rows;
         playSound("clear", settings);
         pulseHaptic("clear", settings);
@@ -690,7 +690,7 @@ export function startApp(root: HTMLDivElement) {
       canvas,
       state,
       settings.ghostEnabled,
-      now < feedbackUntil - 1250 ? flashRows : [],
+      now < feedbackUntil - 300 ? flashRows : [],
       getTheme(settings.theme),
     );
     drawPreview(
