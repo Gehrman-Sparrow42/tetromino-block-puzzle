@@ -110,7 +110,7 @@ export function normalizeGamepadLayouts(value: unknown): GamepadLayouts {
       result[orientation][id] = {
         x: bounded(placement.x, 0.5, 0, 1),
         y: bounded(placement.y, 0.5, 0, 1),
-        size: bounded(placement.size, 1, 0.75, 1.4),
+        size: bounded(placement.size, 1, 0.75, 2),
         opacity: bounded(placement.opacity, 0.18, 0.08, 0.6),
       };
     }
@@ -145,7 +145,7 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
         ? value.gamepadPreset
         : "balanced",
     padMode: value.padMode === "dynamic" ? "dynamic" : "fixed",
-    controlScale: bounded(value.controlScale, defaults.controlScale, 0.85, 1.3),
+    controlScale: bounded(value.controlScale, defaults.controlScale, 0.85, 2),
     controlOpacity: bounded(
       value.controlOpacity,
       defaults.controlOpacity,

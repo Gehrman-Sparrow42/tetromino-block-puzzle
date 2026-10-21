@@ -2,6 +2,7 @@ import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 import type {
   ControlOrientation,
   GamepadControlId,
+  GamepadControlPlacement,
   UserSettings,
 } from "../contracts/game-contract";
 
@@ -20,6 +21,10 @@ export interface ControlRect {
   width: number;
   height: number;
 }
+export const SIDE_RAIL_WIDTH = 48;
+export const SIDE_RAIL_GUTTER = 2;
+export const SIDE_RAIL_SPACE = SIDE_RAIL_WIDTH + SIDE_RAIL_GUTTER;
+
 export interface ControlGeometry {
   width: number;
   /** Actual control deck height, including the empty space below the buttons. */
@@ -32,6 +37,7 @@ export interface ControlGeometry {
   overlay?: boolean;
   orientation?: ControlOrientation;
   minimumRailHeight?: number;
+  baseButtonSize?: number;
   buttons: Record<
     ControlAction,
     { x: number; y: number; width: number; height: number }
@@ -60,7 +66,7 @@ export function computeBoardGeometry(
   layout: UserSettings["controlLayout"],
 ): ControlRect {
   const obstacles = controlObstacles(height, controls, layout);
-  const railSpace = 56;
+  const railSpace = SIDE_RAIL_SPACE;
   const gap = 8;
   const maxWidth = Math.max(0, width - railSpace * 2);
   // Changes in obstacle intersection occur only at their horizontal edges.
@@ -71,6 +77,8 @@ export function computeBoardGeometry(
       width - 2 * (rect.x + rect.width + gap),
       2 * (rect.x - gap) - width,
       Math.max(0, rect.y - gap) / 2,
+      width - 2 * (rect.x + rect.width + gap + SIDE_RAIL_SPACE),
+      2 * (rect.x - gap - SIDE_RAIL_SPACE) - width,
     ]),
   ];
   let best = 0;
@@ -85,6 +93,14 @@ export function computeBoardGeometry(
           right + gap <= rect.x ||
           left >= rect.x + rect.width + gap ||
           size * 2 + gap <= rect.y,
+      ) &&
+      [left - SIDE_RAIL_SPACE, right + SIDE_RAIL_GUTTER].every((x) =>
+        obstacles.every(
+          (rect) =>
+            x + SIDE_RAIL_WIDTH <= rect.x ||
+            x >= rect.x + rect.width ||
+            Math.min(size * 2, width > height ? 220 : 256) + gap <= rect.y,
+        ),
       )
     )
       best = size;
@@ -103,18 +119,23 @@ export function computeRailGeometry(
   const rail = (x: number): ControlRect => ({
     x,
     y: 0,
-    width: 48,
+    width: SIDE_RAIL_WIDTH,
     height: Math.max(
       0,
       Math.min(
         board.height,
         ...obstacles
-          .filter((rect) => rect.x < x + 48 && rect.x + rect.width > x)
+          .filter(
+            (rect) => rect.x < x + SIDE_RAIL_WIDTH && rect.x + rect.width > x,
+          )
           .map((rect) => rect.y - 8),
       ),
     ),
   });
-  return { left: rail(board.x - 56), right: rail(board.x + board.width + 8) };
+  return {
+    left: rail(board.x - SIDE_RAIL_SPACE),
+    right: rail(board.x + board.width + SIDE_RAIL_GUTTER),
+  };
 }
 
 function bounded(
@@ -145,7 +166,7 @@ export function computeControlGeometry(
     return computeGamepadGeometry(width, height, settings, orientation);
   const usableWidth = Math.floor(bounded(width, 360, 276, 10000));
   const usableHeight = Math.floor(bounded(height, 600, 104, 10000));
-  const scale = bounded(settings.controlScale, 1, 0.85, 1.3);
+  const scale = bounded(settings.controlScale, 1, 0.85, 2);
   const spread = bounded(settings.controlSpread, 0.65, 0, 1);
   const verticalOffset = bounded(settings.controlHeight, 0.3, 0, 1);
   const floating = settings.controlLayout === "floating";
@@ -233,6 +254,25 @@ function availableRailHeight(geometry: ControlGeometry): number {
   return Math.min(rails.left.height, rails.right.height);
 }
 
+/** A resize may move only its own center inward to fit the screen edge. */
+export function clampGamepadResize(
+  geometry: ControlGeometry,
+  id: GamepadControlId,
+  placement: GamepadControlPlacement,
+): GamepadControlPlacement {
+  const cell = Math.max(
+    48,
+    Math.round(geometry.baseButtonSize! * placement.size),
+  );
+  const halfWidth = (cell * (id === "pad" ? 3 : 1)) / geometry.width / 2;
+  const halfHeight = (cell * (id === "pad" ? 2 : 1)) / geometry.height / 2;
+  return {
+    ...placement,
+    x: Math.max(halfWidth, Math.min(1 - halfWidth, placement.x)),
+    y: Math.max(halfHeight, Math.min(1 - halfHeight, placement.y)),
+  };
+}
+
 /** Validate a proposed editor move without repositioning any other control. */
 export function canPlaceGamepadGroup(
   geometry: ControlGeometry,
@@ -276,23 +316,35 @@ function computeGamepadGeometry(
     48,
     Math.floor(Math.min((w - 2 * inset - 2 * gap) / 5, (h - gap) / 2)),
   );
-  const baseCell = Math.min(
+  let baseCell = Math.min(
     maxCell,
     Math.round(
       (settings.gamepadPreset === "compact" ? 50 : 60) *
-        bounded(settings.controlScale, 1, 0.85, 1.3),
+        bounded(settings.controlScale, 1, 0.85, 2),
     ),
   );
+  // Large packed controls must still leave a readable center and both side rails.
+  const requestedBottom =
+    16 + Math.round(bounded(settings.controlHeight, 0.3, 0, 1) * 24);
+  if (
+    facing === "landscape" &&
+    h - requestedBottom - 2 * baseCell - gap < 220
+  ) {
+    const fitBetweenSides = Math.floor(
+      (w / 2 - inset - SIDE_RAIL_SPACE - 220 / 4 - gap) / 3,
+    );
+    baseCell = Math.min(baseCell, Math.max(48, fitBetweenSides));
+  }
   const custom = settings.gamepadLayouts?.[facing] ?? {};
   const cells = Object.fromEntries(
     GAMEPAD_CONTROL_IDS.map((id) => [
       id,
       Math.round(
         bounded(
-          baseCell * bounded(custom[id]?.size ?? 1, 1, 0.75, 1.4),
+          baseCell * bounded(custom[id]?.size ?? 1, 1, 0.75, 2),
           baseCell,
           48,
-          maxCell,
+          Math.min(w / (id === "pad" ? 3 : 1), h / (id === "pad" ? 2 : 1)),
         ),
       ),
     ]),
@@ -383,6 +435,7 @@ function computeGamepadGeometry(
       width: w,
       height: h,
       buttonSize: s,
+      baseButtonSize: baseCell,
       bottomPadding: bottom,
       overlay: true,
       orientation: facing,

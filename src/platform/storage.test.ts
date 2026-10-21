@@ -86,7 +86,7 @@ describe("settings and scores", () => {
       landscape: [],
     });
     expect(normalized).toEqual({
-      portrait: { pad: { x: 0, y: 1, size: 1.4, opacity: 0.08 } },
+      portrait: { pad: { x: 0, y: 1, size: 2, opacity: 0.08 } },
       landscape: {},
     });
   });
@@ -129,7 +129,7 @@ describe("settings and scores", () => {
     expect(storage.loadSettings()).toMatchObject({
       theme: "ink",
       controlLayout: "gamepad",
-      controlScale: 1.3,
+      controlScale: 2,
       controlOpacity: 0.08,
       controlSpread: 1,
       controlHeight: 0,

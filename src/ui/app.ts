@@ -61,7 +61,7 @@ const CONTROL_ICONS: Record<string, string> = {
 };
 const control = (command: string, label: string) =>
   `<button class="control" data-command="${command}" aria-label="${label}"><span aria-hidden="true">${CONTROL_ICONS[command]}</span></button>`;
-const padOutline = `<svg class="pad-outline" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2H298V98H198V198H102V98H2Z"/><circle cx="150" cy="50" r="4"/></svg>`;
+const padOutline = `<svg class="pad-outline" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2H298V98H198V198H102V98H2Z"/></svg>`;
 
 export function startApp(root: HTMLDivElement) {
   let settings = loadSettings(),
@@ -228,15 +228,18 @@ export function startApp(root: HTMLDivElement) {
       const overlapsBoardHorizontally =
         geometry.pad.x < boardRect.x + boardRect.width &&
         geometry.pad.x + geometry.pad.width > boardRect.x;
-      const top = Math.max(
-        0,
-        overlapsBoardHorizontally ? boardRect.y + boardRect.height + 8 : 0,
-        geometry.pad.y - 48,
-      );
+      const sidePad =
+        !overlapsBoardHorizontally && orientation() === "landscape";
+      const onLeft = geometry.pad.x + geometry.pad.width / 2 < width / 2;
+      const zoneLeft =
+        sidePad && !onLeft ? boardRect.x + boardRect.width + 8 : 0;
+      const zoneRight =
+        sidePad && onLeft ? Math.max(0, boardRect.x - 8) : width;
+      const top = sidePad ? 0 : boardRect.y + boardRect.height + 8;
       Object.assign(zone.style, {
-        left: `${geometry.pad.x}px`,
+        left: `${zoneLeft}px`,
         top: `${top}px`,
-        width: `${geometry.pad.width}px`,
+        width: `${Math.max(0, zoneRight - zoneLeft)}px`,
         height: `${Math.max(0, height - top)}px`,
       });
     }
@@ -514,7 +517,7 @@ export function startApp(root: HTMLDivElement) {
         "controlLayout",
         "Layout",
         [
-          ["gamepad", "Gamepad"],
+          ["gamepad", "Connected buttons"],
           ["thumbs", "Thumb"],
           ["mirror", "Left-handed"],
           ["floating", "Floating"],
@@ -538,12 +541,12 @@ export function startApp(root: HTMLDivElement) {
           ["fixed", "Fixed"],
           ["dynamic", "Dynamic"],
         ],
-        "Movement pad mode",
+        "Movement button placement",
       )}
-      <p class="control-mode-note" data-dynamic-note>Touch below the board to place the movement pad.</p>
+      <p class="control-mode-note" data-dynamic-note>Touch an empty part of the movement area to position the buttons.</p>
       <div class="control-preview" aria-hidden="true"></div>
       <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
-      ${range("controlScale", "Size", 0.85, 1.3, 0.01, "Control size")}
+      ${range("controlScale", "Size", 0.85, 2, 0.01, "Control size")}
       ${range("controlOpacity", "Opacity", 0.08, 0.6, 0.01, "Control opacity")}
       ${range("controlSpread", "Spacing", 0, 1, 0.01, "Control spacing")}
       ${range("controlHeight", "Height", 0, 1, 0.01, "Control height")}

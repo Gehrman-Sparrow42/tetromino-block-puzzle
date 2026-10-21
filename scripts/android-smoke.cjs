@@ -209,16 +209,10 @@ async function attach() {
       .toBe(true);
     await page.locator('#dialog [data-action="close"]').last().click();
     await page.getByRole("dialog").locator('[data-action="resume"]').click();
-    const left = await page
-      .locator('[data-movement-pad] [data-command="MOVE_LEFT"]')
-      .boundingBox();
+    const left = await page.locator('[data-command="MOVE_LEFT"]').boundingBox();
     const right = await page
-      .locator('[data-movement-pad] [data-command="MOVE_RIGHT"]')
+      .locator('[data-command="MOVE_RIGHT"]')
       .boundingBox();
-    const down = await page
-      .locator('[data-movement-pad] [data-command="SOFT_DROP"]')
-      .boundingBox();
-    const pad = await page.locator("[data-movement-pad]").boundingBox();
     const point = (r) => ({
       x: r.x + r.width / 2,
       y: r.y + r.height / 2,
@@ -228,17 +222,16 @@ async function attach() {
       type: "touchStart",
       touchPoints: [point(left)],
     });
-    for (const r of [right, down])
-      await touch.send("Input.dispatchTouchEvent", {
-        type: "touchMove",
-        touchPoints: [point(r)],
-      });
     await touch.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [
-        { x: pad.x + pad.width / 2, y: pad.y + pad.height / 4, id: 1 },
-      ],
+      touchPoints: [point(right)],
     });
+    await expect(page.locator('[data-command="MOVE_LEFT"]')).toHaveClass(
+      /pressed/,
+    );
+    await expect(page.locator('[data-command="MOVE_RIGHT"]')).not.toHaveClass(
+      /pressed/,
+    );
     await touch.send("Input.dispatchTouchEvent", {
       type: "touchEnd",
       touchPoints: [],
@@ -250,7 +243,7 @@ async function attach() {
     );
     if (released.softDropActive || released.piecesPlaced !== 1)
       throw new Error(
-        "Sliding pad left a held drop or triggered a discrete action.",
+        "Connected buttons left a held drop or triggered a discrete action.",
       );
     await page
       .getByRole("dialog")
@@ -259,42 +252,94 @@ async function attach() {
     await page.locator('select[name="padMode"]').selectOption("dynamic");
     await page.locator('#dialog [data-action="close"]').last().click();
     await page.getByRole("dialog").locator('[data-action="resume"]').click();
-    const zone = await page.locator("[data-dynamic-pad-zone]").boundingBox();
-    const origin = {
-      x: zone.x + zone.width / 2,
-      y: zone.y + zone.height / 3,
-      id: 1,
-    };
+    const home = await page.locator("[data-movement-pad]").boundingBox();
+    const placement = await page.evaluate(() => {
+      const zoneElement = document.querySelector("[data-dynamic-pad-zone]");
+      const zone = zoneElement.getBoundingClientRect();
+      const pad = document
+        .querySelector("[data-movement-pad]")
+        .getBoundingClientRect();
+      const obstacles = [
+        ...document.querySelectorAll(
+          "#board, .left-rail, .next-rail, .control-deck > [data-command]",
+        ),
+      ].map((e) => e.getBoundingClientRect());
+      const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+      for (let y = zone.bottom - 16; y > zone.top; y -= 16) {
+        for (const x of [
+          zone.left + zone.width / 2,
+          zone.left + 24,
+          zone.right - 24,
+        ]) {
+          if (document.elementFromPoint(x, y) !== zoneElement) continue;
+          const left = clamp(
+            x - pad.width / 2,
+            zone.left,
+            zone.right - pad.width,
+          );
+          const top = clamp(
+            y - pad.height / 4,
+            zone.top,
+            zone.bottom - pad.height,
+          );
+          if (Math.abs(left - pad.left) + Math.abs(top - pad.top) < 8) continue;
+          if (
+            obstacles.some(
+              (r) =>
+                r.width &&
+                r.height &&
+                left < r.right + 8 &&
+                left + pad.width + 8 > r.left &&
+                top < r.bottom + 8 &&
+                top + pad.height + 8 > r.top,
+            )
+          )
+            continue;
+          return {
+            x,
+            y,
+            expected: { x: left, y: top },
+            zone: zone.toJSON(),
+            home: pad.toJSON(),
+          };
+        }
+      }
+      return null;
+    });
+    if (!placement)
+      throw new Error(
+        "No safe empty dynamic-positioning touch point is available.",
+      );
+    writeFileSync(
+      `${output}/dynamic-placement.json`,
+      JSON.stringify(placement, null, 2),
+    );
     await touch.send("Input.dispatchTouchEvent", {
       type: "touchStart",
-      touchPoints: [origin],
+      touchPoints: [{ x: placement.x, y: placement.y, id: 1 }],
     });
-    await expect(page.locator("[data-dynamic-origin]")).toBeVisible();
     await touch.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ ...origin, x: origin.x + 25 }],
+      type: "touchEnd",
+      touchPoints: [],
     });
-    await expect(page.locator('[data-command="MOVE_RIGHT"]')).toHaveClass(
-      /pressed/,
+    await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
+    const moved = await page.locator("[data-movement-pad]").boundingBox();
+    writeFileSync(
+      `${output}/dynamic-placement.json`,
+      JSON.stringify({ ...placement, moved }, null, 2),
     );
-    const rotateBounds = await page
-      .locator('[data-command="ROTATE_CW"]')
-      .boundingBox();
-    const rotationTouch = {
-      x: rotateBounds.x + rotateBounds.width / 2,
-      y: rotateBounds.y + rotateBounds.height / 2,
-      id: 2,
-    };
+    if (
+      Math.abs(moved.x - placement.expected.x) > 1 ||
+      Math.abs(moved.y - placement.expected.y) > 1 ||
+      Math.abs(moved.x - home.x) + Math.abs(moved.y - home.y) < 8
+    )
+      throw new Error(
+        "Dynamic positioning did not relocate connected buttons to the safe touch position.",
+      );
+    const down = await page.locator('[data-command="SOFT_DROP"]').boundingBox();
     await touch.send("Input.dispatchTouchEvent", {
       type: "touchStart",
-      touchPoints: [{ ...origin, x: origin.x + 25 }, rotationTouch],
-    });
-    await expect(page.locator('[data-command="ROTATE_CW"]')).toHaveClass(
-      /pressed/,
-    );
-    await touch.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ ...origin, y: origin.y + 30 }, rotationTouch],
+      touchPoints: [point(down)],
     });
     await expect(page.locator('[data-command="SOFT_DROP"]')).toHaveClass(
       /pressed/,
@@ -304,10 +349,6 @@ async function attach() {
       type: "touchEnd",
       touchPoints: [],
     });
-    await expect(page.locator("[data-dynamic-origin]")).toBeHidden();
-    await expect(page.locator('[data-command="ROTATE_CW"]')).not.toHaveClass(
-      /pressed/,
-    );
     await expect(page.locator('[data-command="SOFT_DROP"]')).not.toHaveClass(
       /pressed/,
     );
@@ -377,8 +418,8 @@ async function attach() {
             "rapid background pause",
             "native process restart resume",
             "all thirteen themes",
-            "three-way sliding gamepad touch input",
-            "dynamic thumb origin and simultaneous two-finger movement/rotation",
+            "three independent connected movement buttons with captured holds",
+            "safe empty-zone repositioning and direct arrow activation",
             "editable controls, Back cancellation and separate native orientation layouts",
             "floating controls and size/opacity settings",
           ],

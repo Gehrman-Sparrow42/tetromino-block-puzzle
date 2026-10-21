@@ -33,7 +33,7 @@ async function closeSettings(page: Page) {
   await page.locator('#dialog [data-action="close"]').last().click();
 }
 
-test("dynamic pad anchors at touchdown, isolates rotation and restores its home", async ({
+test("dynamic connected buttons reposition without moving and reset their home on pause", async ({
   page,
 }) => {
   await page.goto("/");
@@ -44,42 +44,32 @@ test("dynamic pad anchors at touchdown, isolates rotation and restores its home"
   const pad = page.locator("[data-movement-pad]");
   const home = (await pad.boundingBox())!;
   const zone = (await page.locator("[data-dynamic-pad-zone]").boundingBox())!;
-  const x = zone.x + zone.width / 2,
-    y = zone.y + zone.height / 3;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
+  await page.mouse.click(
+    zone.x + home.width / 2 - 12,
+    zone.y + zone.height - 8,
+  );
   await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
-  await expect(page.locator("[data-dynamic-origin]")).toBeVisible();
-  await page.mouse.move(x + 25, y);
-  await expect(page.locator('[data-command="MOVE_RIGHT"]')).toHaveClass(
-    /pressed/,
-  );
-  await page.keyboard.down("x");
-  await expect(page.locator('[data-command="ROTATE_CW"]')).toHaveClass(
-    /pressed/,
-  );
-  await page.keyboard.up("x");
-  await page.mouse.move(x, y + 30);
-  await expect(page.locator('[data-command="SOFT_DROP"]')).toHaveClass(
-    /pressed/,
-  );
-  await page.mouse.up();
-  await expect(page.locator("[data-dynamic-origin]")).toBeHidden();
-  await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
-  expect(await pad.boundingBox()).toEqual(home);
-  await page.mouse.move(x, y);
+  const moved = (await pad.boundingBox())!;
+  expect(
+    Math.abs(moved.x - home.x) + Math.abs(moved.y - home.y),
+  ).toBeGreaterThan(8);
+  const left = (await page
+    .locator('[data-command="MOVE_LEFT"]')
+    .boundingBox())!;
+  await page.mouse.move(left.x + left.width / 2, left.y + left.height / 2);
   await page.mouse.down();
-  await page.mouse.move(x, y + 30);
+  await expect(page.locator('[data-command="MOVE_LEFT"]')).toHaveClass(
+    /pressed/,
+  );
+  await page.mouse.move(left.x + left.width * 2.5, left.y + left.height / 2);
+  await expect(page.locator('[data-command="MOVE_RIGHT"]')).not.toHaveClass(
+    /pressed/,
+  );
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await page.mouse.up();
   await expect(page.getByRole("dialog")).toContainText("Paused");
-  await expect(page.locator("[data-dynamic-origin]")).toBeHidden();
-  expect(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("tetromino_v2_run")!).softDropActive,
-    ),
-  ).toBe(false);
+  await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
+  expect(await pad.boundingBox()).toEqual(home);
 });
 
 test("Marathon speed setup persists with the run and can be cancelled", async ({
@@ -461,7 +451,7 @@ test("control presets, sliders and reset are live and safe", async ({
   );
   for (const preset of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('select[name="controlLayout"]').selectOption(preset);
-    await setRange(page, "controlScale", 1.3);
+    await setRange(page, "controlScale", 2);
     await setRange(page, "controlSpread", 1);
     await setRange(page, "controlHeight", 1);
     for (const [railSelector, childSelector] of [
@@ -563,7 +553,7 @@ test("settings preview fits a 320px screen at maximum size", async ({
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
-  await setRange(page, "controlScale", 1.3);
+  await setRange(page, "controlScale", 2);
   await setRange(page, "controlSpread", 1);
   for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('select[name="controlLayout"]').selectOption(layout);
@@ -633,12 +623,32 @@ test("gamepad has three movement zones and saves edited controls without changin
   await openControlEditor(page);
   await expect(page.locator(".shell")).toHaveAttribute("inert", "");
   await dragEditorControl(page, "pad", 0, -70);
-  await page.locator('[data-editor-control="rotateCW"]').click();
+  await page.locator('[data-editor-control="hold"]').click();
   await page.locator('[name="editorControlOpacity"]').press("Home");
   await expect(page.locator('[name="editorControlOpacity"]')).toHaveValue(
     "0.08",
   );
-  await setRange(page, "editorControlSize", 1.2);
+  // Move Hold away from the packed action cluster before doubling its size.
+  // Use logical gameplay coordinates so the same free area works in the scaled
+  // editor with and without the injected native safe-area insets.
+  const frame = (await page.locator(".control-editor-frame").boundingBox())!;
+  const logicalWidth = Number(
+    await page
+      .locator(".control-editor-frame")
+      .getAttribute("data-viewport-width"),
+  );
+  const scale = frame.width / logicalWidth;
+  const hold = (await page
+    .locator('[data-editor-control="hold"]')
+    .boundingBox())!;
+  await dragEditorControl(
+    page,
+    "hold",
+    frame.x + 150 * scale - hold.x - hold.width / 2,
+    frame.y + 430 * scale - hold.y - hold.height / 2,
+  );
+  await setRange(page, "editorControlSize", 2);
+  await expect(page.locator('[name="editorControlSize"]')).toHaveValue("2");
   await setRange(page, "editorControlOpacity", 0.1);
   await page.locator('[data-editor-action="done"]').click();
   await expect(page.locator("#dialog")).toContainText("Settings");
@@ -647,8 +657,8 @@ test("gamepad has three movement zones and saves edited controls without changin
   );
   expect(saved.controlLayout).toBe("gamepad");
   expect(saved.gamepadLayouts.portrait.pad).toBeDefined();
-  expect(saved.gamepadLayouts.portrait.rotateCW).toMatchObject({
-    size: 1.2,
+  expect(saved.gamepadLayouts.portrait.hold).toMatchObject({
+    size: 2,
     opacity: 0.1,
   });
   expect(
@@ -660,7 +670,7 @@ test("gamepad has three movement zones and saves edited controls without changin
   await page.getByRole("dialog").locator('[data-action="resume"]').click();
   expect(
     await page
-      .locator('.control-deck [data-command="ROTATE_CW"]')
+      .locator('.control-deck [data-command="HOLD"]')
       .evaluate((n) =>
         (n as HTMLElement).style.getPropertyValue("--control-opacity"),
       ),
@@ -668,10 +678,11 @@ test("gamepad has three movement zones and saves edited controls without changin
   await page.reload();
   await page.locator('#home [data-action="settings"]').click();
   await openControlEditor(page);
-  await page.locator('[data-editor-control="rotateCW"]').click();
+  await page.locator('[data-editor-control="hold"]').click();
   await expect(page.locator('[name="editorControlOpacity"]')).toHaveValue(
     "0.1",
   );
+  await expect(page.locator('[name="editorControlSize"]')).toHaveValue("2");
 });
 
 test("control editor cancel, escape and pointer cancellation preserve saved settings", async ({
@@ -893,7 +904,7 @@ test("landscape side information stays inside rails at maximum control settings"
     .click();
   for (const preset of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('[name="controlLayout"]').selectOption(preset);
-    await setRange(page, "controlScale", 1.3);
+    await setRange(page, "controlScale", 2);
     await setRange(page, "controlSpread", 1);
     await setRange(page, "controlHeight", 1);
     for (const [railSelector, childSelector] of [

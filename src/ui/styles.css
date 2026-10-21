@@ -1335,3 +1335,36 @@ html[data-theme="classic"] {
     max-width: none;
   }
 }
+/* Spend the old gutters on square board cells and readable side content. */
+.game-screen {
+  padding-left: 0;
+  padding-right: 0;
+}
+.game-screen .left-rail,
+.game-screen .next-rail {
+  container-type: size;
+}
+@container (min-height: 300px) {
+  .game-screen .hold-panel {
+    height: 64px;
+    min-height: 64px;
+  }
+  .game-screen .hold-panel canvas {
+    width: 48px;
+    height: 36px;
+  }
+  .game-screen .rail-stats span,
+  .game-screen .hold-panel > span,
+  .game-screen .next-strip > span {
+    font-size: 11px;
+  }
+  .game-screen .rail-stats strong,
+  .game-screen .rail-stats .hud-score strong {
+    font-size: 18px;
+    line-height: 1.4;
+  }
+  .game-screen .next-strip canvas {
+    width: 48px;
+    height: 36px;
+  }
+}

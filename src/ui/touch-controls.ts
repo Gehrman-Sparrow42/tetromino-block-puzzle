@@ -17,14 +17,7 @@ export class TouchControls {
   private soft = new Set<string>();
   private activeActions = new Map<string, string>();
   private buttons = new Map<string, HTMLButtonElement>();
-  private padPointers = new Map<number, string | null>();
-  private dynamicPointer: {
-    id: number;
-    x: number;
-    y: number;
-    deadzone: number;
-    restore: () => void;
-  } | null = null;
+  private restorePad: (() => void) | null = null;
   private disposers: (() => void)[] = [];
   private gesture: { id: number; x: number; y: number; at: number } | null =
     null;
@@ -43,34 +36,16 @@ export class TouchControls {
     this.listen(window, "keydown", this.keydown as EventListener);
     this.listen(window, "keyup", this.keyup as EventListener);
     this.listen(window, "blur", () => this.releaseAll());
+    this.listen(window, "resize", () => this.releaseAll());
     if (typeof document !== "undefined")
       this.listen(document, "visibilitychange", () => {
         if (document.hidden) this.releaseAll();
       });
-    const movementPad = root.querySelector<HTMLElement>("[data-movement-pad]");
-    const dynamicZone = root.querySelector<HTMLElement>(
-      "[data-dynamic-pad-zone]",
-    );
-    const origin =
-      dynamicZone && typeof document !== "undefined"
-        ? document.createElement("span")
-        : null;
-    if (origin) {
-      origin.className = "dynamic-pad-origin";
-      origin.dataset.dynamicOrigin = "";
-      origin.hidden = true;
-      origin.setAttribute("aria-hidden", "true");
-      dynamicZone!.parentElement!.append(origin);
-      this.disposers.push(() => origin.remove());
-    }
-    const usesPad = () =>
-      this.settings().controlLayout === "gamepad" && movementPad !== null;
     root
       .querySelectorAll<HTMLButtonElement>("[data-command]")
       .forEach((button) => {
         this.buttons.set(button.dataset.command!, button);
         this.listen(button, "pointerdown", ((event: PointerEvent) => {
-          if (usesPad() && movementPad!.contains(button)) return;
           if (!this.enabled()) return;
           event.preventDefault();
           button.setPointerCapture(event.pointerId);
@@ -91,110 +66,70 @@ export class TouchControls {
           }
         }) as EventListener);
       });
-    if (movementPad) {
-      const updatePad = (event: PointerEvent) => {
-        const id = `pointer-${event.pointerId}`;
-        let action: string | null = null;
-        if (this.enabled() && usesPad()) {
-          if (this.dynamicPointer?.id === event.pointerId) {
-            const { x, y, deadzone } = this.dynamicPointer;
-            const dx = event.clientX - x,
-              dy = event.clientY - y;
-            if (dy > deadzone && dy > Math.abs(dx)) action = "SOFT_DROP";
-            else if (Math.abs(dx) > deadzone && Math.abs(dx) >= Math.abs(dy))
-              action = dx < 0 ? "MOVE_LEFT" : "MOVE_RIGHT";
-          } else {
-            for (const direction of ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"]) {
-              const button = this.buttons.get(direction);
-              if (!button || !movementPad.contains(button)) continue;
-              const bounds = button.getBoundingClientRect();
-              if (
-                event.clientX >= bounds.left &&
-                event.clientX < bounds.right &&
-                event.clientY >= bounds.top &&
-                event.clientY < bounds.bottom
-              ) {
-                action = direction;
-                break;
-              }
-            }
-          }
+    const movementPad = root.querySelector<HTMLElement>("[data-movement-pad]");
+    const dynamicZone = root.querySelector<HTMLElement>(
+      "[data-dynamic-pad-zone]",
+    );
+    if (movementPad && dynamicZone) {
+      const positionPad = ((event: PointerEvent) => {
+        if (
+          ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"].some((action) => {
+            const button = this.buttons.get(action);
+            return button && event.composedPath().includes(button);
+          })
+        )
+          return;
+        if (
+          !this.enabled() ||
+          this.settings().controlLayout !== "gamepad" ||
+          this.settings().padMode !== "dynamic"
+        )
+          return;
+        const pad = movementPad.getBoundingClientRect();
+        const zone = dynamicZone.getBoundingClientRect();
+        if (zone.width < pad.width || zone.height < pad.height) return;
+        event.preventDefault();
+        const deck = movementPad.parentElement!.getBoundingClientRect();
+        const clamp = (n: number, min: number, max: number) =>
+          Math.max(min, Math.min(max, n));
+        const left = clamp(
+          event.clientX - pad.width / 2,
+          zone.left,
+          zone.right - pad.width,
+        );
+        const top = clamp(
+          event.clientY - pad.height / 4,
+          zone.top,
+          zone.bottom - pad.height,
+        );
+        const obstacles = root.querySelectorAll<HTMLElement>(
+          "#board, .left-rail, .next-rail, .control-deck > [data-command]",
+        );
+        for (const obstacle of obstacles) {
+          const r = obstacle.getBoundingClientRect();
+          if (
+            r.width &&
+            r.height &&
+            left < r.right + 8 &&
+            left + pad.width + 8 > r.left &&
+            top < r.bottom + 8 &&
+            top + pad.height + 8 > r.top
+          )
+            return;
         }
-        if (this.padPointers.get(event.pointerId) === action) return;
-        this.release(id);
-        this.padPointers.set(event.pointerId, action);
-        if (action) this.press(id, action);
-      };
-      const beginPad = (event: PointerEvent, capture: HTMLElement) => {
-        if (!usesPad() || !this.enabled()) return;
-        if (this.settings().padMode === "dynamic") {
-          // One thumb owns the moving pad; rotation and keyboard remain independent.
-          if (this.padPointers.size) return;
-          const bounds = movementPad.getBoundingClientRect();
+        if (!this.restorePad) {
           const homeLeft = movementPad.style.left,
             homeTop = movementPad.style.top;
-          if (dynamicZone && !dynamicZone.hidden) {
-            const zone = dynamicZone.getBoundingClientRect();
-            const deck = movementPad.parentElement!.getBoundingClientRect();
-            if (origin) {
-              origin.hidden = false;
-              origin.style.left = `${event.clientX - deck.left}px`;
-              origin.style.top = `${event.clientY - deck.top}px`;
-            }
-            const clamp = (n: number, min: number, max: number) =>
-              Math.max(min, Math.min(max, n));
-            if (zone.width >= bounds.width && zone.height >= bounds.height) {
-              movementPad.style.left = `${clamp(event.clientX - bounds.width / 2, zone.left, zone.right - bounds.width) - deck.left}px`;
-              movementPad.style.top = `${clamp(event.clientY - bounds.height / 4, zone.top, zone.bottom - bounds.height) - deck.top}px`;
-            }
-          }
-          this.dynamicPointer = {
-            id: event.pointerId,
-            x: event.clientX,
-            y: event.clientY,
-            deadzone: Math.max(10, (bounds.width / 3) * 0.22),
-            restore: () => {
-              if (origin) origin.hidden = true;
-              movementPad.style.left = homeLeft;
-              movementPad.style.top = homeTop;
-            },
+          this.restorePad = () => {
+            movementPad.style.left = homeLeft;
+            movementPad.style.top = homeTop;
           };
         }
-        event.preventDefault();
-        capture.setPointerCapture(event.pointerId);
-        this.padPointers.set(event.pointerId, null);
-        updatePad(event);
-      };
-      this.listen(movementPad, "pointerdown", ((event: PointerEvent) => {
-        beginPad(event, movementPad);
-      }) as EventListener);
-      const movePad = ((event: PointerEvent) => {
-        if (!this.padPointers.has(event.pointerId)) return;
-        event.preventDefault();
-        updatePad(event);
+        movementPad.style.left = `${left - deck.left}px`;
+        movementPad.style.top = `${top - deck.top}px`;
       }) as EventListener;
-      this.listen(movementPad, "pointermove", movePad);
-      const releasePad = ((event: PointerEvent) => {
-        if (!this.padPointers.delete(event.pointerId)) return;
-        this.release(`pointer-${event.pointerId}`);
-        if (this.dynamicPointer?.id === event.pointerId) {
-          this.dynamicPointer.restore();
-          this.dynamicPointer = null;
-        }
-      }) as EventListener;
-      ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) =>
-        this.listen(movementPad, type, releasePad),
-      );
-      if (dynamicZone) {
-        this.listen(dynamicZone, "pointerdown", ((event: PointerEvent) => {
-          if (this.settings().padMode === "dynamic")
-            beginPad(event, dynamicZone);
-        }) as EventListener);
-        this.listen(dynamicZone, "pointermove", movePad);
-        ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) =>
-          this.listen(dynamicZone, type, releasePad),
-        );
-      }
+      this.listen(dynamicZone, "pointerdown", positionPad);
+      this.listen(movementPad, "pointerdown", positionPad);
     }
     const canvas = root.querySelector<HTMLCanvasElement>("#board")!;
     this.listen(canvas, "pointerdown", ((event: PointerEvent) => {
@@ -328,10 +263,9 @@ export class TouchControls {
     this.gesture = null;
   }
   releaseAll() {
-    this.dynamicPointer?.restore();
-    this.dynamicPointer = null;
+    this.restorePad?.();
+    this.restorePad = null;
     this.held.clear();
-    this.padPointers.clear();
     this.activeActions.clear();
     this.gesture = null;
     if (this.soft.size) {

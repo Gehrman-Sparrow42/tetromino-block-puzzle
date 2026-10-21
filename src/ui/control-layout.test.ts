@@ -3,10 +3,12 @@ import type { UserSettings } from "../contracts/game-contract";
 import { DEFAULT_SETTINGS } from "../platform/storage";
 import {
   canPlaceGamepadGroup,
+  clampGamepadResize,
   computeBoardGeometry,
   computeControlGeometry,
   controlObstacles,
   computeRailGeometry,
+  SIDE_RAIL_SPACE,
 } from "./control-layout";
 import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 
@@ -174,7 +176,7 @@ describe("ergonomic touch geometry", () => {
       [850, 300],
       [276, 104],
     ]) {
-      for (const size of [0.75, 1, 1.4]) {
+      for (const size of [0.75, 1, 1.4, 2]) {
         for (const coordinate of [0, 0.5, 1]) {
           const edits = Object.fromEntries(
             GAMEPAD_CONTROL_IDS.map((id) => [
@@ -238,7 +240,7 @@ describe("ergonomic touch geometry", () => {
     for (const width of [320, 344, 377, 414, 752]) {
       for (const height of [400, 440, 760, 936]) {
         for (const controlLayout of ["thumbs", "mirror", "floating"] as const) {
-          for (const controlScale of [0.85, 1, 1.3]) {
+          for (const controlScale of [0.85, 1, 1.3, 2]) {
             for (const controlSpread of [0, 0.65, 1]) {
               for (const controlHeight of [0, 0.3, 1]) {
                 const geometry = computeControlGeometry(
@@ -295,7 +297,7 @@ describe("ergonomic touch geometry", () => {
         }
       }
     }
-    expect(layoutsChecked).toBe(1620);
+    expect(layoutsChecked).toBe(2160);
   });
 
   it("places movement on the left normally and on the right when mirrored, preserving arrow meanings", () => {
@@ -447,7 +449,7 @@ describe("board-first side rails", () => {
         "mirror",
         "floating",
       ] as const) {
-        for (const controlScale of [0.85, 1.3]) {
+        for (const controlScale of [0.85, 1.3, 2]) {
           const g = computeControlGeometry(
             width!,
             height!,
@@ -463,7 +465,7 @@ describe("board-first side rails", () => {
           expect(board.x + board.width / 2).toBe(width! / 2);
           expect(board.height).toBe(board.width * 2);
           expect(board.width).toBeGreaterThan(90);
-          expect(board.x).toBeGreaterThanOrEqual(56);
+          expect(board.x).toBeGreaterThanOrEqual(SIDE_RAIL_SPACE);
           for (const r of [
             board,
             ...Object.values(
@@ -546,4 +548,93 @@ it("uses the full landscape width to keep side information readable at maximum c
     ))
       expect(rail.height).toBeGreaterThanOrEqual(220);
   }
+});
+
+it("grows the square phone board using the old horizontal gutters", () => {
+  const controls = computeControlGeometry(
+    384,
+    849,
+    settings({ controlLayout: "gamepad" }),
+  );
+  const board = computeBoardGeometry(384, 849, controls, "gamepad");
+  expect(board.width).toBe(284);
+  expect(board.height).toBe(568);
+});
+
+it("permits a 200% individual action in free space without moving other controls", () => {
+  const prefs = structuredClone(settings({ controlLayout: "gamepad" }));
+  const baseline = computeControlGeometry(384, 849, prefs, "portrait");
+  prefs.gamepadLayouts.portrait.hold = {
+    x: 0.447,
+    y: 0.75,
+    size: 2,
+    opacity: 0.3,
+  };
+  const grown = computeControlGeometry(384, 849, prefs, "portrait");
+  expect(grown.groups!.hold.width).toBe(120);
+  expect(canPlaceGamepadGroup(grown, "hold", grown.groups!.hold)).toBe(true);
+  for (const id of GAMEPAD_CONTROL_IDS.filter((id) => id !== "hold"))
+    expect(grown.groups![id]).toEqual(baseline.groups![id]);
+});
+
+it("supports a larger global size where space exists and preserves board and rail access at 200%", () => {
+  const roomy = computeControlGeometry(
+    1440,
+    896,
+    settings({ controlLayout: "gamepad", controlScale: 2 }),
+    "landscape",
+  );
+  expect(roomy.baseButtonSize).toBe(120);
+  expect(roomy.groups!.rotateCW.width).toBeGreaterThan(78);
+  for (const [width, height] of [
+    [384, 849],
+    [360, 524],
+    [853, 308],
+    [1440, 896],
+  ]) {
+    for (const controlLayout of [
+      "gamepad",
+      "thumbs",
+      "mirror",
+      "floating",
+    ] as const) {
+      const g = computeControlGeometry(
+        width!,
+        height!,
+        settings({ controlLayout, controlScale: 2, controlHeight: 1 }),
+        width! > height! ? "landscape" : "portrait",
+      );
+      const board = computeBoardGeometry(width!, height!, g, controlLayout);
+      expect(board.width).toBeGreaterThan(90);
+      for (const rail of Object.values(
+        computeRailGeometry(board, height!, g, controlLayout),
+      ))
+        expect(rail.height).toBeGreaterThanOrEqual(Math.min(200, board.height));
+    }
+  }
+});
+
+it("accepts a default pad resize by moving only its own center inward at an edge", () => {
+  const prefs = structuredClone(settings({ controlLayout: "gamepad" }));
+  const before = computeControlGeometry(384, 849, prefs, "portrait");
+  const pad = before.groups!.pad;
+  const placement = clampGamepadResize(before, "pad", {
+    x: (pad.x + pad.width / 2) / 384,
+    y: (pad.y + pad.height / 2) / 849,
+    size: 1.2,
+    opacity: 0.18,
+  });
+  prefs.gamepadLayouts.portrait.pad = placement;
+  const after = computeControlGeometry(384, 849, prefs, "portrait");
+  expect(after.groups!.pad.x).toBe(0);
+  expect(after.groups!.pad.width).toBe(216);
+  expect(canPlaceGamepadGroup(before, "pad", after.groups!.pad)).toBe(true);
+  for (const id of GAMEPAD_CONTROL_IDS.filter((id) => id !== "pad"))
+    expect(after.groups![id]).toEqual(before.groups![id]);
+  expect(
+    canPlaceGamepadGroup(before, "pad", {
+      ...after.groups!.pad,
+      x: before.groups!.hardDrop.x,
+    }),
+  ).toBe(false);
 });

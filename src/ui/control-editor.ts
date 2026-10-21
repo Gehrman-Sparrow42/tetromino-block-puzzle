@@ -7,6 +7,7 @@ import type {
 import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 import {
   canPlaceGamepadGroup,
+  clampGamepadResize,
   computeBoardGeometry,
   computeControlGeometry,
   computeRailGeometry,
@@ -18,7 +19,7 @@ import {
 import "./control-editor.css";
 
 const NAMES: Record<GamepadControlId, string> = {
-  pad: "Movement pad",
+  pad: "Movement buttons",
   hardDrop: "Hard drop",
   rotateCW: "Rotate clockwise",
   rotateCCW: "Rotate counterclockwise",
@@ -89,11 +90,11 @@ export class ControlEditor {
         <h2 id="control-editor-title">Controls</h2>
         <button type="button" data-editor-action="done">Done</button>
       </header>
-      <div class="control-editor-hint"><span>Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
+      <div class="control-editor-hint"><span data-editor-feedback aria-live="polite">Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
       <div class="control-editor-stage"><div class="control-editor-frame"><div class="control-editor-board" aria-hidden="true"></div><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">Hold<br>Score<br>Lines<br>Level<br>Time</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">Pause<br>Next</div></div></div>
       <footer class="control-editor-tools">
         <div class="control-editor-selection"><strong data-editor-selection></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
-        <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="1.4" step="0.05"></label>
+        <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="2" step="0.05"></label>
         <label><span>Opacity</span><input name="editorControlOpacity" type="range" min="0.08" max="0.6" step="0.01"></label>
       </footer>`;
     this.stage = this.wrapper.querySelector<HTMLDivElement>(
@@ -269,7 +270,7 @@ export class ControlEditor {
     const placement = this.placement(this.selected);
     this.selectionLabel.textContent =
       this.selected === "pad" && this.settings.padMode === "dynamic"
-        ? "Movement pad home"
+        ? "Movement buttons home"
         : NAMES[this.selected];
     this.orientationLabel.textContent =
       this.orientation === "portrait" ? "Portrait" : "Landscape";
@@ -353,7 +354,11 @@ export class ControlEditor {
   private adjust(field: "size" | "opacity", value: number): void {
     this.rollbackDrag();
     const previous = this.placement(this.selected);
-    const candidate = { ...previous, [field]: value };
+    const requested = { ...previous, [field]: value };
+    const candidate =
+      field === "size"
+        ? clampGamepadResize(this.geometry(), this.selected, requested)
+        : requested;
     this.tryPlacement(this.selected, candidate);
     this.updateFields();
   }
@@ -470,12 +475,25 @@ export class ControlEditor {
     const centered =
       Math.abs((rect.x + rect.width / 2) / after.width - placement.x) < 0.002 &&
       Math.abs((rect.y + rect.height / 2) / after.height - placement.y) < 0.002;
-    const valid = centered && canPlaceGamepadGroup(before, id, rect);
+    const cell = Math.max(
+      48,
+      Math.round(after.baseButtonSize! * placement.size),
+    );
+    const requestedSizeFits =
+      rect.width === cell * (id === "pad" ? 3 : 1) &&
+      rect.height === cell * (id === "pad" ? 2 : 1);
+    const valid =
+      centered && requestedSizeFits && canPlaceGamepadGroup(before, id, rect);
     if (!valid) {
       if (previous) map[id] = previous;
       else delete map[id];
     }
     this.targets.get(id)!.toggleAttribute("data-blocked", !valid);
+    this.wrapper.querySelector<HTMLElement>(
+      "[data-editor-feedback]",
+    )!.textContent = valid
+      ? "Drag to move. Select to resize."
+      : "No space here. Keep controls clear.";
     this.render();
     return valid;
   }

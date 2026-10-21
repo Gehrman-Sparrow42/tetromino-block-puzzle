@@ -45,8 +45,10 @@ function setup(gamepad = false) {
   left.bounds = { left: 0, top: 0, right: 50, bottom: 50 };
   right.bounds = { left: 100, top: 0, right: 150, bottom: 50 };
   down.bounds = { left: 50, top: 50, right: 100, bottom: 100 };
+  const obstacles: ButtonStub[] = [];
   const root = {
-    querySelectorAll: () => [left, down, right, rotate],
+    querySelectorAll: (selector: string) =>
+      selector.startsWith("#board,") ? obstacles : [left, down, right, rotate],
     querySelector: (selector: string) =>
       selector === "#board"
         ? canvas
@@ -90,6 +92,7 @@ function setup(gamepad = false) {
   }
   return {
     controls,
+    obstacles,
     left,
     down,
     right,
@@ -110,48 +113,6 @@ function setup(gamepad = false) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("held touch input", () => {
-  it("anchors dynamic movement at touch-down with a dead zone and no up action", () => {
-    const { controls, zone, pad, pointer, commands, settings, rotate } =
-      setup(true);
-    settings.padMode = "dynamic";
-    pointer(zone, "pointerdown", 1, 85, 30);
-    expect(commands).toEqual([]);
-    expect(pad.style.left).toBe("10px");
-    pointer(zone, "pointermove", 1, 89, 32);
-    expect(commands).toEqual([]);
-    pointer(zone, "pointermove", 1, 110, 30);
-    pointer(rotate, "pointerdown", 2);
-    pointer(zone, "pointermove", 1, 85, 65);
-    pointer(zone, "pointermove", 1, 85, 0);
-    pointer(zone, "pointerup", 1);
-    expect(commands).toEqual([
-      { type: "MOVE_RIGHT" },
-      { type: "ROTATE_CW" },
-      { type: "SOFT_DROP", active: true },
-      { type: "SOFT_DROP", active: false },
-    ]);
-    expect(pad.style.left).toBe("0px");
-    expect(rotate.classList.contains("pressed")).toBe(true);
-    controls.destroy();
-  });
-  it("ignores a second dynamic thumb and releases movement on blur", () => {
-    const { controls, zone, pointer, commands, settings, windowStub } =
-      setup(true);
-    settings.padMode = "dynamic";
-    pointer(zone, "pointerdown", 1, 85, 30);
-    pointer(zone, "pointerdown", 2, 40, 30);
-    pointer(zone, "pointermove", 2, 5, 30);
-    expect(commands).toEqual([]);
-    pointer(zone, "pointermove", 1, 85, 65);
-    windowStub.dispatchEvent(new Event("blur"));
-    controls.update(performance.now() + 1000);
-    pointer(zone, "pointermove", 1, 110, 30);
-    expect(commands).toEqual([
-      { type: "SOFT_DROP", active: true },
-      { type: "SOFT_DROP", active: false },
-    ]);
-    controls.destroy();
-  });
   it("repeats only the latest direction and resumes the remaining source", () => {
     const { controls, left, right, pointer, commands } = setup();
     pointer(left, "pointerdown", 1);
@@ -257,147 +218,64 @@ describe("held touch input", () => {
   });
 });
 
-describe("sliding gamepad input", () => {
-  it("retains keyboard soft drop when a pad pointer leaves its down region", () => {
-    const { controls, pad, down, pointer, commands, windowStub } = setup(true);
-    const key = new Event("keydown", { cancelable: true });
-    Object.assign(key, { code: "ArrowDown", repeat: false });
-    windowStub.dispatchEvent(key);
-    pointer(pad, "pointerdown", 1, 75, 75);
-    pointer(pad, "pointermove", 1, 75, 25);
-    expect(
-      commands.some(
-        (command) => command.type === "SOFT_DROP" && !command.active,
-      ),
-    ).toBe(false);
-    expect(down.classList.contains("pressed")).toBe(true);
-    const up = new Event("keyup");
-    Object.assign(up, { code: "ArrowDown" });
-    windowStub.dispatchEvent(up);
-    expect(commands.at(-1)).toEqual({ type: "SOFT_DROP", active: false });
-    expect(down.classList.contains("pressed")).toBe(false);
-    controls.destroy();
-  });
-
-  it("keeps movement buttons accessible without a pointer gesture", () => {
-    const { controls, left, commands } = setup(true);
-    const click = new Event("click");
-    Object.assign(click, { detail: 0 });
-    left.dispatchEvent(click);
-    controls.update(performance.now() + 1000);
-    expect(commands).toEqual([{ type: "MOVE_LEFT" }]);
-    expect(left.classList.contains("pressed")).toBe(false);
-    controls.destroy();
-  });
-
-  it("slides left, right, down and neutral without lifting, then cancels", () => {
-    const { controls, pad, left, right, down, pointer, commands } = setup(true);
-    pointer(pad, "pointerdown", 1, 25, 25);
-    expect(pad.setPointerCapture).toHaveBeenCalledWith(1);
-    expect(left.classList.contains("pressed")).toBe(true);
-    pointer(pad, "pointermove", 1, 125, 25);
-    expect(left.classList.contains("pressed")).toBe(false);
-    expect(right.classList.contains("pressed")).toBe(true);
-    pointer(pad, "pointermove", 1, 75, 75);
-    expect(down.classList.contains("pressed")).toBe(true);
-    pointer(pad, "pointermove", 1, 75, 25);
-    expect(down.classList.contains("pressed")).toBe(false);
-    pointer(pad, "pointermove", 1, 25, 25);
-    pointer(pad, "pointercancel", 1);
-    const count = commands.length;
-    controls.update(performance.now() + 1000);
-    pointer(pad, "pointermove", 1, 125, 25);
-    expect(commands).toHaveLength(count);
-    expect(commands).toEqual([
-      { type: "MOVE_LEFT" },
-      { type: "MOVE_RIGHT" },
-      { type: "SOFT_DROP", active: true },
-      { type: "SOFT_DROP", active: false },
-      { type: "MOVE_LEFT" },
-    ]);
-    controls.destroy();
-  });
-
-  it("starts in neutral and releases outside the pad without triggering action buttons", () => {
-    const { controls, pad, pointer, commands } = setup(true);
-    pointer(pad, "pointerdown", 1, 75, 25);
-    expect(commands).toHaveLength(0);
-    pointer(pad, "pointermove", 1, 75, 75);
-    pointer(pad, "pointermove", 1, 250, 25);
-    pointer(pad, "pointerup", 1);
-    expect(commands).toEqual([
-      { type: "SOFT_DROP", active: true },
-      { type: "SOFT_DROP", active: false },
-    ]);
-    controls.destroy();
-  });
-
-  it("preserves another pointer and keyboard ownership while the pad slides or releases", () => {
-    const { controls, pad, left, rotate, pointer, commands, windowStub } =
+describe("connected gamepad buttons", () => {
+  it("repositions only on empty-zone touches, rejects collisions, and restores home on pause", () => {
+    const { controls, zone, pad, pointer, commands, settings, obstacles } =
       setup(true);
-    const key = new Event("keydown", { cancelable: true });
-    Object.assign(key, { code: "ArrowLeft", repeat: false });
-    windowStub.dispatchEvent(key);
-    pointer(pad, "pointerdown", 1, 25, 25);
-    pointer(rotate, "pointerdown", 2);
-    pointer(pad, "pointermove", 1, 125, 25);
-    expect(left.classList.contains("pressed")).toBe(true);
-    expect(rotate.classList.contains("pressed")).toBe(true);
-    pointer(pad, "lostpointercapture", 1);
-    controls.update(performance.now() + 1000);
-    expect(commands).toEqual([
-      { type: "MOVE_LEFT" },
-      { type: "ROTATE_CW" },
-      { type: "MOVE_RIGHT" },
-      { type: "MOVE_LEFT" },
-    ]);
-    expect(rotate.classList.contains("pressed")).toBe(true);
-    pointer(rotate, "pointerup", 2);
-    expect(rotate.classList.contains("pressed")).toBe(false);
-    const up = new Event("keyup");
-    Object.assign(up, { code: "ArrowLeft" });
-    windowStub.dispatchEvent(up);
-    expect(left.classList.contains("pressed")).toBe(false);
+    settings.padMode = "dynamic";
+    pointer(zone, "pointerdown", 1, 85, 60);
+    expect(pad.style.left).toBe("10px");
+    expect(pad.style.top).toBe("35px");
+    expect(commands).toEqual([]);
+    const obstacle = new ButtonStub("obstacle");
+    obstacle.bounds = { left: 0, top: 0, right: 170, bottom: 150 };
+    obstacles.push(obstacle);
+    pointer(zone, "pointerdown", 2, 85, 25);
+    expect(pad.style.top).toBe("35px");
+    controls.releaseAll();
+    expect(pad.style.left).toBe("0px");
+    expect(pad.style.top).toBe("0px");
     controls.destroy();
   });
 
-  it.each(["pointerup", "pointercancel", "lostpointercapture"])(
-    "releases soft drop on %s",
-    (event) => {
-      const { controls, pad, pointer, commands } = setup(true);
-      pointer(pad, "pointerdown", 1, 75, 75);
-      pointer(pad, event, 1);
-      expect(commands).toEqual([
+  it.each(["fixed", "dynamic"] as const)(
+    "taps and holds arrows directly in %s mode without sliding commands",
+    (mode) => {
+      const { controls, left, down, right, pad, pointer, commands, settings } =
+        setup(true);
+      settings.padMode = mode;
+      pointer(left, "pointerdown", 1, 25, 25);
+      expect(commands).toEqual([{ type: "MOVE_LEFT" }]);
+      controls.update(performance.now() + 1000);
+      expect(commands).toHaveLength(2);
+      pointer(left, "pointermove", 1, 125, 25);
+      pointer(pad, "pointermove", 1, 75, 75);
+      expect(commands).toHaveLength(2);
+      pointer(left, "pointerup", 1);
+      pointer(down, "pointerdown", 2);
+      pointer(right, "pointerdown", 3);
+      expect(commands.slice(-2)).toEqual([
         { type: "SOFT_DROP", active: true },
-        { type: "SOFT_DROP", active: false },
+        { type: "MOVE_RIGHT" },
       ]);
+      pointer(down, "pointercancel", 2);
+      expect(commands.at(-1)).toEqual({ type: "SOFT_DROP", active: false });
+      pointer(right, "pointerup", 3);
+      pointer(pad, "pointerdown", 4, 75, 25);
+      pointer(pad, "pointermove", 4, 125, 25);
+      const count = commands.length;
+      controls.update(performance.now() + 2000);
+      expect(commands).toHaveLength(count);
       controls.destroy();
     },
   );
 
-  it("clears tracked pad pointers when disabled, blurred or destroyed", () => {
-    for (const release of ["disabled", "blur", "destroy"]) {
-      const { controls, pad, pointer, commands, windowStub, setEnabled } =
-        setup(true);
-      pointer(pad, "pointerdown", 1, 75, 75);
-      if (release === "disabled") {
-        setEnabled(false);
-        controls.update(performance.now());
-        setEnabled(true);
-      } else if (release === "blur")
-        windowStub.dispatchEvent(new Event("blur"));
-      else controls.destroy();
-      pointer(pad, "pointermove", 1, 125, 25);
-      expect(commands).toEqual([
-        { type: "SOFT_DROP", active: true },
-        { type: "SOFT_DROP", active: false },
-      ]);
-      if (release !== "destroy") controls.destroy();
-    }
-  });
-
-  it("keeps a pressed button marked until its last pointer releases", () => {
-    const { controls, left, pointer } = setup();
+  it("supports accessible arrow activation and isolates multi-pointer releases", () => {
+    const { controls, left, pointer, commands } = setup(true);
+    const click = new Event("click");
+    Object.assign(click, { detail: 0 });
+    left.dispatchEvent(click);
+    expect(commands).toEqual([{ type: "MOVE_LEFT" }]);
     pointer(left, "pointerdown", 1);
     pointer(left, "pointerdown", 2);
     pointer(left, "pointerup", 1);
