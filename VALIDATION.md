@@ -50,3 +50,9 @@ The user approved a gamepad-style scheme with no up button. New/default Gamepad 
 - Batched phone/compact/desktop/landscape game and editor captures were inspected; target bounds fit their stages. Layouts use at least48px targets; 8px group separation is verified in geometry tests. Demonstration screenshots use a synthetic game state.
 - Android assembly/lint and APK signature verification pass. Offline installed API35/WebView124 smoke passes touch-event dragging, opacity changes, hardware Back cancellation, actual OS rotation, orientation-isolated placement persistence and three-way continuous touch input returning soft drop to neutral. Lifecycle/process-restart and all13theme checks remain passing. These are emulator/synthesized-input checks, not a physical comfort test.
 - An independent Flash High review of the supplied editor/input/geometry/persistence/integration code found no material correctness defects. The review was read-only; executed browser/native checks supply the runtime evidence. Keyboard routing was subsequently narrowed to editor-owned keys and covered by the keyboard range regression.
+
+## Board clearance fix — 2.3.1
+
+The board now starts at the top of the play area and fits above or beside the actual Gamepad groups, including custom placements, with an 8 px gutter. Short screens use two action rows. All twenty rows remain visible without button overlap; the board scales down when necessary.
+
+Verified: 110 unit tests, 39 browser scenarios, TypeScript/Vite build, Capacitor sync, Android debug assembly/lint (no lint issues), APK signature verification, and an offline standalone HTML render at 384 × 853 in the user's LCD theme. The rendered board and seven control bounds do not overlap. The updated APK has not been installed on the user's physical phone during this fix.

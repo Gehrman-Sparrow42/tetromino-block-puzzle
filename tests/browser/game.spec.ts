@@ -78,12 +78,12 @@ test("larger board, seven spacious controls and no overlap", async ({
   const deck = (await page.locator(".control-deck").boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(board.height / board.width).toBeCloseTo(2, 1);
-  // Gamepad controls overlay the board; both fit inside the same play area.
+  // The complete board stays above or beside the controls, including its bottom rows.
   expect(board.y + board.height).toBeLessThanOrEqual(deck.y + deck.height + 1);
   if (info.project.name === "phone")
-    expect(board.width).toBeGreaterThanOrEqual(280);
+    expect(board.width).toBeGreaterThanOrEqual(250);
   if (info.project.name === "small-phone")
-    expect(board.width).toBeGreaterThanOrEqual(150);
+    expect(board.width).toBeGreaterThanOrEqual(130);
   const inset = await page.evaluate(
     () =>
       parseFloat(
@@ -102,6 +102,11 @@ test("larger board, seven spacious controls and no overlap", async ({
     );
   expect(rects).toHaveLength(7);
   for (const r of rects) {
+    expect(
+      board.x + board.width <= r.x - 7 ||
+        board.x >= r.x + r.width + 7 ||
+        board.y + board.height <= r.y - 7,
+    ).toBe(true);
     expect(r.width).toBeGreaterThanOrEqual(48);
     expect(r.height).toBeGreaterThanOrEqual(48);
     expect(r.x).toBeGreaterThanOrEqual(0);

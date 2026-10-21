@@ -37,6 +37,61 @@ export interface ControlGeometry {
   >;
 }
 
+/** Fit the full board above or beside the edited Gamepad, with a clear gutter. */
+export function computeBoardGeometry(
+  width: number,
+  height: number,
+  controls: ControlGeometry,
+  layout: UserSettings["controlLayout"],
+): ControlRect {
+  if (layout !== "gamepad") {
+    const available = Math.max(
+      0,
+      height - (layout === "floating" ? 0 : controls.height),
+    );
+    const size = Math.min(width, available / 2);
+    return {
+      x: (width - size) / 2,
+      y: (available - size * 2) / 2,
+      width: size,
+      height: size * 2,
+    };
+  }
+  const obstacles = Object.values(controls.groups!);
+  const gap = 8;
+  // Every free horizontal interval is bounded by the screen or a control edge.
+  // Searching those intervals also leaves a useful board beside landscape controls.
+  const edges = [
+    0,
+    width,
+    ...obstacles.flatMap((r) => [
+      Math.max(0, r.x - gap),
+      Math.min(width, r.x + r.width + gap),
+    ]),
+  ];
+  let best: ControlRect = { x: width / 2, y: 0, width: 0, height: 0 };
+  for (const left of edges)
+    for (const right of edges) {
+      if (right <= left) continue;
+      const ceiling = Math.min(
+        height,
+        ...obstacles
+          .filter((r) => r.x < right + gap && r.x + r.width > left - gap)
+          .map((r) => Math.max(0, r.y - gap)),
+      );
+      const size = Math.min(right - left, ceiling / 2);
+      const x = Math.max(left, Math.min((width - size) / 2, right - size));
+      if (
+        size > best.width ||
+        (size === best.width &&
+          Math.abs(x + size / 2 - width / 2) <
+            Math.abs(best.x + best.width / 2 - width / 2))
+      )
+        best = { x, y: 0, width: size, height: size * 2 };
+    }
+  return best;
+}
+
 function bounded(
   value: number,
   fallback: number,
@@ -185,7 +240,8 @@ function computeGamepadGeometry(
   const right = w - actionSize;
   const left = right - actionSize - gap;
   const bottomY = h - bottom - actionSize;
-  const roomy = 3 * actionSize + 2 * gap <= h - bottom;
+  // Short screens use two action rows so controls leave a readable board above.
+  const roomy = 3 * actionSize + 2 * gap + 320 <= h - bottom;
   const rect = (id: GamepadControlId, x: number, y: number): ControlRect => ({
     x: Math.round(x),
     y: Math.round(y),

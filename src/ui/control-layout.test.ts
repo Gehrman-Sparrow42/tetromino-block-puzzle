@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UserSettings } from "../contracts/game-contract";
 import { DEFAULT_SETTINGS } from "../platform/storage";
-import { computeControlGeometry } from "./control-layout";
+import { computeBoardGeometry, computeControlGeometry } from "./control-layout";
 import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 
 function settings(overrides: Partial<UserSettings> = {}): UserSettings {
@@ -17,6 +17,46 @@ function settings(overrides: Partial<UserSettings> = {}): UserSettings {
 }
 
 describe("ergonomic touch geometry", () => {
+  it("keeps all twenty board rows clear of default and edited gamepad controls", () => {
+    for (const [width, height] of [
+      [377, 755],
+      [344, 432],
+      [560, 1100],
+      [600, 250],
+    ]) {
+      for (const y of [undefined, 0.6, 0.85]) {
+        const prefs = settings({
+          controlLayout: "gamepad",
+          gamepadLayouts: {
+            portrait:
+              y === undefined
+                ? {}
+                : { hold: { x: 0.9, y, size: 1.3, opacity: 0.2 } },
+            landscape: {},
+          },
+        });
+        const controls = computeControlGeometry(width!, height!, prefs);
+        const board = computeBoardGeometry(
+          width!,
+          height!,
+          controls,
+          "gamepad",
+        );
+        expect(board.width).toBeGreaterThan(0);
+        expect(board.height).toBe(board.width * 2);
+        expect(board.y).toBe(0);
+        expect(board.x).toBeGreaterThanOrEqual(0);
+        expect(board.x + board.width).toBeLessThanOrEqual(width!);
+        for (const r of Object.values(controls.groups!)) {
+          expect(
+            board.x + board.width <= r.x - 8 ||
+              board.x >= r.x + r.width + 8 ||
+              board.y + board.height <= r.y - 8,
+          ).toBe(true);
+        }
+      }
+    }
+  });
   it("makes a three-direction pad with neutral center and no up command", () => {
     const g = computeControlGeometry(
       375,

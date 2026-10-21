@@ -21,7 +21,7 @@ import { setupLifecycle, exitApp } from "../platform/lifecycle";
 import { drawBoard, drawPreview } from "./canvas-renderer";
 import { TouchControls } from "./touch-controls";
 import { THEMES, applyTheme, getTheme } from "./themes";
-import { computeControlGeometry } from "./control-layout";
+import { computeBoardGeometry, computeControlGeometry } from "./control-layout";
 import { ControlEditor } from "./control-editor";
 
 const MODE_NAMES: Record<GameMode, string> = {
@@ -170,17 +170,20 @@ export function startApp(root: HTMLDivElement) {
         );
       else button.style.removeProperty("--control-opacity");
     }
-    const boardHeight = Math.max(
-      0,
-      height -
-        (geometry.overlay || settings.controlLayout === "floating"
-          ? 0
-          : geometry.height),
+    const boardRect = computeBoardGeometry(
+      width,
+      height,
+      geometry,
+      settings.controlLayout,
     );
     const board = root.querySelector<HTMLElement>(".board-wrap")!;
-    const boardWidth = Math.min(width, boardHeight / 2);
-    board.style.width = `${boardWidth}px`;
-    board.style.height = `${boardWidth * 2}px`;
+    Object.assign(board.style, {
+      position: "absolute",
+      left: `${boardRect.x}px`,
+      top: `${boardRect.y}px`,
+      width: `${boardRect.width}px`,
+      height: `${boardRect.height}px`,
+    });
     drawControlPreview();
   }
   function drawControlPreview() {

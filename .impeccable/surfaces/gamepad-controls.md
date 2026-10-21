@@ -15,7 +15,7 @@ The user approved a gamepad-style layout based on supplied screenshots, with a t
 
 ## Appearance
 
-Keep the board large, using a transparent overlay for Gamepad controls. The movement pad is an outlined T with no upper arm. Actions are circular and retain the selected theme's colors. The editor uses the current theme, short labels and a bounded stage; inactive settings for legacy spacing/height stay hidden in Gamepad mode. Theme changes do not move controls.
+Keep the full board visible above or beside the Gamepad controls with an 8 px gutter. Fit the largest clear 10-by-20 board from the top of the play area, including edited control positions. Short screens use two action rows. The movement pad is an outlined T with no upper arm. Actions are circular and retain the selected theme's colors. The editor uses the current theme, short labels and a bounded stage; inactive settings for legacy spacing/height stay hidden in Gamepad mode. Theme changes do not move controls.
 
 ## Verification evidence
 
