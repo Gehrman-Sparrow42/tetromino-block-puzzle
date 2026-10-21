@@ -45,6 +45,7 @@ describe("ergonomic touch geometry", () => {
         expect(board.width).toBeGreaterThan(0);
         expect(board.height).toBe(board.width * 2);
         expect(board.y).toBe(0);
+        expect(board.x + board.width / 2).toBeCloseTo(width! / 2);
         expect(board.x).toBeGreaterThanOrEqual(0);
         expect(board.x + board.width).toBeLessThanOrEqual(width!);
         for (const r of Object.values(controls.groups!)) {

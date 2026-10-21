@@ -56,3 +56,7 @@ The user approved a gamepad-style scheme with no up button. New/default Gamepad 
 The board now starts at the top of the play area and fits above or beside the actual Gamepad groups, including custom placements, with an 8 px gutter. Short screens use two action rows. All twenty rows remain visible without button overlap; the board scales down when necessary.
 
 Verified: 110 unit tests, 39 browser scenarios, TypeScript/Vite build, Capacitor sync, Android debug assembly/lint (no lint issues), APK signature verification, and an offline standalone HTML render at 384 × 853 in the user's LCD theme. The rendered board and seven control bounds do not overlap. The updated APK has not been installed on the user's physical phone during this fix.
+
+## Centered board correction — 2.3.2
+
+Board fitting now requires horizontal centering, including custom control layouts. Verified 110 unit tests, 39 browser scenarios with a centerline assertion, TypeScript/Vite build and standalone LCD rendering at 384 × 853: the board center is exactly 192 px. Android assembly/lint and signature verification also pass.

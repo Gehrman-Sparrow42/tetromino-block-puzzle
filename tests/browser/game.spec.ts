@@ -78,6 +78,9 @@ test("larger board, seven spacious controls and no overlap", async ({
   const deck = (await page.locator(".control-deck").boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(board.height / board.width).toBeCloseTo(2, 1);
+  expect(
+    Math.abs(board.x + board.width / 2 - (deck.x + deck.width / 2)),
+  ).toBeLessThan(1);
   // The complete board stays above or beside the controls, including its bottom rows.
   expect(board.y + board.height).toBeLessThanOrEqual(deck.y + deck.height + 1);
   if (info.project.name === "phone")

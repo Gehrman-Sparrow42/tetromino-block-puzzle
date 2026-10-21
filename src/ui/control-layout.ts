@@ -37,7 +37,7 @@ export interface ControlGeometry {
   >;
 }
 
-/** Fit the full board above or beside the edited Gamepad, with a clear gutter. */
+/** Keep the full board horizontally centered and clear of the edited Gamepad. */
 export function computeBoardGeometry(
   width: number,
   height: number,
@@ -60,7 +60,7 @@ export function computeBoardGeometry(
   const obstacles = Object.values(controls.groups!);
   const gap = 8;
   // Every free horizontal interval is bounded by the screen or a control edge.
-  // Searching those intervals also leaves a useful board beside landscape controls.
+  // Only consider board widths that keep the board on the screen's centerline.
   const edges = [
     0,
     width,
@@ -79,15 +79,12 @@ export function computeBoardGeometry(
           .filter((r) => r.x < right + gap && r.x + r.width > left - gap)
           .map((r) => Math.max(0, r.y - gap)),
       );
-      const size = Math.min(right - left, ceiling / 2);
-      const x = Math.max(left, Math.min((width - size) / 2, right - size));
-      if (
-        size > best.width ||
-        (size === best.width &&
-          Math.abs(x + size / 2 - width / 2) <
-            Math.abs(best.x + best.width / 2 - width / 2))
-      )
-        best = { x, y: 0, width: size, height: size * 2 };
+      const size = Math.max(
+        0,
+        Math.min(width - 2 * left, 2 * right - width, ceiling / 2),
+      );
+      const x = (width - size) / 2;
+      if (size > best.width) best = { x, y: 0, width: size, height: size * 2 };
     }
   return best;
 }
