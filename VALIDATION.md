@@ -1,5 +1,19 @@
 # Remake verification - 2026-10-21
 
+## Current control repair — 2.5.0
+
+- 134 unit tests and 51 browser scenarios pass, including exact preview/editor/gameplay coordinate parity, side safe areas, collision rejection, preset/movement persistence, dynamic deadzone, independent input ownership and cancellation.
+- TypeScript/Vite build, Capacitor sync and Android debug assembly/lint pass; app lint reports no issues and the APK signature verifies. Package version is 2.5.0 (20500).
+- Installed offline API35/WebView124 checks pass: all thirteen themes, actual OS rotation, editor drag/save, Android Back cancellation, background/process recovery, continuous fixed-pad input, dynamic origin and simultaneous two-finger movement/rotation. No WebView errors.
+- Installing over 2.4.0 preserves an existing Fixed-level-4 Marathon run, one placed piece, LCD theme and legacy custom control settings. New preset/movement fields default safely.
+- Exported standalone HTML passes editor, Dynamic movement, hard-drop/save and no-network checks at 393 x 851. Batched renders cover phone, compact and landscape. Settings preview icon centers match their button centers.
+- Impeccable detector: zero primary and 32 advisory findings from incumbent theme/type/radius tokens. No claim that automated checks establish physical thumb comfort.
+- Argon Medium was attempted in an isolated worktree but hit its 20-minute limit without edits. It was not restarted. Native agents completed geometry/persistence and editor/preview; Codex integrated dynamic input and performed final native/offline delivery checks.
+
+The previous reports below are historical. The 2.5.0 APK has not been tested on the user's physical phone.
+
+## Historical baseline — 2.3.0
+
 Verified on Windows with Node 24, JDK 21, Android SDK platform 36 and build tools 36.0.0.
 
 - 109 Vitest tests pass: deterministic engine/rules, snapshot validation, storage migration/corruption/failures, native lifecycle adapters, timer formatting, input ownership/cancellation, thirteen theme palettes, and control geometry across 1,620 size/layout combinations.
@@ -36,7 +50,7 @@ Initialized Impeccable 4.7.0 globally for Codex and captured the Afterblock brie
 The user approved all nine themes presented on the localhost decision page, including the smaller alternative cards and Classic Arcade. They are selectable alongside the original four. `THEME_IDS` drives persistence validation and browser coverage; the Settings list derives labels from the actual palette catalog. Core engine files are unchanged.
 
 - 94 unit tests and 30 browser scenarios pass. Theme coverage includes all thirteen palettes, settings persistence, unique board backgrounds, ordinary text/accent contrast >=4.5:1 on shell surfaces, seven distinct static patterns in Movement Score and Data Field, and finite/nonnegative tiny-canvas geometry. These are targeted checks, not accessibility certification.
-- Batched rendering covers all nine new home, game and settings views at393x851, plus Basalt at1440x900 and360x600. The settings layout was also checked at320/360px after resize settled. Demonstration game screenshots use a validated synthetic run fixture; displayed scores are not personal records.
+- Batched rendering covers all nine new home, game and settings views at 393 x 851, plus Basalt at1440x900 and360x600. The settings layout was also checked at320/360px after resize settled. Demonstration game screenshots use a validated synthetic run fixture; displayed scores are not personal records.
 - Local Familjen Grotesk and Newsreader fonts embed in the single-file HTML, with SIL OFL licenses and source records under `src/ui/fonts/`. No runtime font requests are needed. The build is approximately802kB uncompressed,399kB gzip.
 - Final Impeccable mechanical scan found no issues in the changed UI files. A fresh independent native subagent applied the bundled finish-reviewer instructions and returned `ship` with no material fixes, within the supplied code-led web-render scope. The harness could not select the custom shipped agent role directly. Catalog inspiration images could not be viewed through the web tool; the review makes no pixel-fidelity claim against those images.
 - Strict TypeScript/Vite build, Android assembly/lint and APK signature verification pass. Installed Android API35/WebView124 testing runs offline, selects all thirteen themes and checks gameplay, Back/Home pause, native process-restart recovery and floating controls. The native screenshot check waits for the actual Basalt Canvas pixel before capture, rather than treating immediate DOM theme selection as render proof. Physical-phone ergonomics and haptics remain unverified.

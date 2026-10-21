@@ -4,15 +4,15 @@ An offline, ad-free falling-tetromino game for Android and the browser. This And
 
 ## Play
 
-- **Marathon:** endless play with increasing gravity every ten lines.
+- **Marathon:** endless play with a selectable starting level and progressive or fixed speed.
 - **Sprint 40:** clear forty lines as quickly as possible.
 - **Ultra 120:** score as much as possible in two minutes of active play.
 
 Seven-piece bags, SRS quarter-turn rotation kicks, hold once per piece, five-piece next queue, ghost projection, 500 ms lock delay and a fixed fifteen-reset cap per piece. Scoring includes line clears, drops, consecutive-clear combos, back-to-back four-line clears/T-spins, and perfect clears. Runs pause when the app loses focus or enters the background, and restore paused after reopening.
 
-The Gamepad layout has a large translucent three-way movement pad on the left: left/right across the top, a neutral center, and soft drop below. There is no on-screen up button. Slide a held thumb between directions while the other thumb uses the separate clockwise/counterclockwise rotation, hard-drop and hold buttons. The full board stays horizontally centered above the controls, keeping the bottom rows visible. Short screens use a compact two-row action cluster.
+The Gamepad layout has a large translucent three-way movement pad on the left: left/right across the top, a neutral center, and soft drop below. There is no on-screen up button. Slide a held thumb between directions while the other thumb uses the separate clockwise/counterclockwise rotation, hard-drop and hold buttons. The full board stays horizontally centered above the controls, keeping the bottom rows visible. Actions use two rows: hard drop and hold above the two rotation buttons.
 
-Choose **Settings → Layout → Gamepad → Edit controls** to drag each control, resize it and adjust its background opacity. The movement pad moves/resizes as one group. Done saves; Cancel, Escape or Android Back discards the draft. Reset layout resets only the current orientation. Portrait and landscape positions are saved separately; controls stay bounded with at least 48 px targets and separation when the screen changes. Existing saved layout choices are preserved, while new installations default to Gamepad.
+Choose **Settings → Layout → Gamepad** for Balanced, Compact or Mirrored presets. Fixed movement uses the stationary pad. Dynamic movement starts neutral where your thumb touches the movement area, then a short slide moves or soft-drops; its origin marker disappears on release. Open **Edit controls** to drag each control, resize it and adjust its background opacity. The movement pad moves/resizes as one group. Done saves; Cancel, Escape or Android Back discards the draft. Reset layout resets only the current orientation. Portrait and landscape positions are saved separately; controls stay bounded with at least 48 px targets and separation when the screen changes. Invalid edits are blocked without moving other controls. The editor and complete Settings preview use the actual gameplay viewport, including safe areas. Selecting a preset explicitly resets both custom orientation maps while preserving other preferences. Existing saved layout choices are preserved, while new installations default to Gamepad.
 
 Thumb, Left-handed and Floating remain available as legacy layouts, with their size, opacity, spacing and height adjustments. Optional hybrid controls add swipe movement and tap rotation on the board. Keyboard: arrows to move/soft drop, Z/X to rotate, C or Shift to hold, Space to hard drop, P/Escape to pause. Help explains controls and goals.
 

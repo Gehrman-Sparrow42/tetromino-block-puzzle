@@ -21,6 +21,29 @@ beforeEach(async () => {
 });
 
 describe("settings and scores", () => {
+  it("defaults legacy pad settings safely and round-trips new presets and pad modes", () => {
+    data.set(
+      "tetromino_v2_settings",
+      JSON.stringify({
+        soundEnabled: false,
+        gamepadPreset: "unknown",
+        padMode: "bad",
+      }),
+    );
+    expect(storage.loadSettings()).toMatchObject({
+      soundEnabled: false,
+      gamepadPreset: "balanced",
+      padMode: "fixed",
+    });
+    for (const gamepadPreset of ["balanced", "compact", "mirrored"] as const) {
+      for (const padMode of ["fixed", "dynamic"] as const) {
+        const prefs = { ...storage.loadSettings(), gamepadPreset, padMode };
+        expect(storage.saveSettings(prefs)).toBe(true);
+        expect(storage.loadSettings()).toEqual(prefs);
+      }
+    }
+  });
+
   it("keeps existing presets, defaults fresh installs to gamepad, and isolates nested settings", () => {
     expect(storage.loadSettings().controlLayout).toBe("gamepad");
     const first = storage.loadSettings();

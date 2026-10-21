@@ -1118,3 +1118,53 @@ html[data-theme="classic"] {
   border-radius: 0;
   background: transparent;
 }
+.control-preview-board {
+  position: absolute;
+  border: 1px solid var(--board-border);
+  background: var(--surface);
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 10% 5%;
+  opacity: 0.6;
+}
+.control-mode-note {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.dynamic-pad-zone {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 0;
+}
+.game-screen[data-layout="gamepad"] .movement-pad,
+.game-screen[data-layout="gamepad"] .control-deck > .control {
+  z-index: 1;
+}
+.dynamic-pad-origin {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--text);
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.control-preview i > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  font-size: var(--preview-icon-size);
+  line-height: 1;
+}
+.control-preview i > span svg {
+  width: var(--preview-icon-size);
+  height: var(--preview-icon-size);
+}

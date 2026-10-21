@@ -24,6 +24,7 @@ import { TouchControls } from "./touch-controls";
 import { THEMES, applyTheme, getTheme } from "./themes";
 import { computeBoardGeometry, computeControlGeometry } from "./control-layout";
 import { ControlEditor } from "./control-editor";
+import { measureControlViewport } from "./control-viewport";
 
 const MODE_NAMES: Record<GameMode, string> = {
   marathon: "Marathon",
@@ -101,7 +102,7 @@ export function startApp(root: HTMLDivElement) {
         <div class="play-area">
           <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
           <div class="control-deck" aria-label="Game controls">
-            <div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
+            <div class="dynamic-pad-zone" data-dynamic-pad-zone hidden></div><div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
           </div>
         </div>
       </section>
@@ -120,10 +121,14 @@ export function startApp(root: HTMLDivElement) {
       ? ("landscape" as const)
       : ("portrait" as const);
   function layoutControls() {
+    controls.releaseAll();
     const area = root.querySelector<HTMLElement>(".play-area")!;
     const width = area.clientWidth,
       height = area.clientHeight;
-    if (!width || !height) return;
+    if (!width || !height) {
+      drawControlPreview();
+      return;
+    }
     const geometry = computeControlGeometry(
       width,
       height,
@@ -189,6 +194,21 @@ export function startApp(root: HTMLDivElement) {
       width: `${boardRect.width}px`,
       height: `${boardRect.height}px`,
     });
+    const zone = deck.querySelector<HTMLElement>("[data-dynamic-pad-zone]")!;
+    zone.hidden =
+      settings.controlLayout !== "gamepad" || settings.padMode !== "dynamic";
+    if (geometry.pad) {
+      const top = Math.max(
+        boardRect.y + boardRect.height + 8,
+        geometry.pad.y - 48,
+      );
+      Object.assign(zone.style, {
+        left: `${geometry.pad.x}px`,
+        top: `${top}px`,
+        width: `${geometry.pad.width}px`,
+        height: `${Math.max(0, height - top)}px`,
+      });
+    }
     drawControlPreview();
   }
   function drawControlPreview() {
@@ -196,34 +216,56 @@ export function startApp(root: HTMLDivElement) {
     if (!preview) return;
     const actualWidth = preview.clientWidth;
     if (!actualWidth) return;
+    const viewport = measureControlViewport(el("game"));
     const geometry = computeControlGeometry(
-      Math.max(280, actualWidth),
-      420,
+      viewport.width,
+      viewport.height,
       settings,
-      orientation(),
+      viewport.orientation,
     );
-    // The miniature may shrink below playable touch-target sizes inside a narrow sheet.
-    const scale = Math.min(1, actualWidth / geometry.width);
-    const top = geometry.pad
-      ? Math.min(...Object.values(geometry.buttons).map((r) => r.y))
-      : 0;
-    const bottom = geometry.pad
-      ? Math.max(...Object.values(geometry.buttons).map((r) => r.y + r.height))
-      : geometry.height;
+    const scale = Math.min(actualWidth / viewport.width, 240 / viewport.height);
+    const offset = (actualWidth - viewport.width * scale) / 2;
+    const board = computeBoardGeometry(
+      viewport.width,
+      viewport.height,
+      geometry,
+      settings.controlLayout,
+    );
+    const deckTop =
+      settings.controlLayout === "gamepad" ||
+      settings.controlLayout === "floating"
+        ? 0
+        : viewport.height - geometry.height;
+    const groupForAction = {
+      MOVE_LEFT: "pad",
+      MOVE_RIGHT: "pad",
+      SOFT_DROP: "pad",
+      HARD_DROP: "hardDrop",
+      HOLD: "hold",
+      ROTATE_CW: "rotateCW",
+      ROTATE_CCW: "rotateCCW",
+    } as const;
     preview.dataset.layout = settings.controlLayout;
-    preview.style.height = `${(bottom - top) * scale}px`;
+    preview.dataset.viewportWidth = String(viewport.width);
+    preview.dataset.viewportHeight = String(viewport.height);
+    preview.style.height = `${viewport.height * scale}px`;
     const padPreview = geometry.pad
-      ? `<b class="movement-preview" style="left:${geometry.pad.x * scale}px;top:${(geometry.pad.y - top) * scale}px;width:${geometry.pad.width * scale}px;height:${geometry.pad.height * scale}px">${padOutline}</b>`
+      ? `<b class="movement-preview" style="--control-opacity:${geometry.groupOpacity?.pad};left:${offset + geometry.pad.x * scale}px;top:${geometry.pad.y * scale}px;width:${geometry.pad.width * scale}px;height:${geometry.pad.height * scale}px">${padOutline}</b>`
       : "";
     preview.innerHTML =
+      `<div class="control-preview-board" style="left:${offset + board.x * scale}px;top:${board.y * scale}px;width:${board.width * scale}px;height:${board.height * scale}px"></div>` +
       padPreview +
       Object.entries(geometry.buttons)
-        .map(
-          ([action, rect]) =>
-            `<i data-preview-command="${action}" style="left:${rect.x * scale}px;top:${(rect.y - top) * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px"><span style="display:grid;place-items:center;transform:scale(${scale})">${CONTROL_ICONS[action]}</span></i>`,
-        )
+        .map(([action, rect]) => {
+          const opacity =
+            geometry.groupOpacity?.[
+              groupForAction[action as keyof typeof groupForAction]
+            ] ?? settings.controlOpacity;
+          return `<i data-preview-command="${action}" style="--control-opacity:${opacity};left:${offset + rect.x * scale}px;top:${(rect.y + deckTop) * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px"><span style="--preview-icon-size:${32 * scale}px">${CONTROL_ICONS[action]}</span></i>`;
+        })
         .join("");
   }
+
   const applySettings = () => {
     controls.releaseAll();
     root.classList.toggle("reduce-motion", settings.reducedMotion);
@@ -243,7 +285,15 @@ export function startApp(root: HTMLDivElement) {
       '[data-action="edit-controls"]',
     );
     if (edit) edit.hidden = settings.controlLayout !== "gamepad";
-    for (const name of ["controlSpread", "controlHeight"]) {
+    for (const name of ["gamepadPreset", "padMode"]) {
+      const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
+      if (row) row.hidden = settings.controlLayout !== "gamepad";
+    }
+    const note = dialog.querySelector<HTMLElement>("[data-dynamic-note]");
+    if (note)
+      note.hidden =
+        settings.controlLayout !== "gamepad" || settings.padMode !== "dynamic";
+    for (const name of ["controlSpread"]) {
       const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
       if (row) row.hidden = settings.controlLayout === "gamepad";
     }
@@ -428,6 +478,26 @@ export function startApp(root: HTMLDivElement) {
         ],
         "Control layout",
       )}
+      ${select(
+        "gamepadPreset",
+        "Preset",
+        [
+          ["balanced", "Balanced"],
+          ["compact", "Compact"],
+          ["mirrored", "Mirrored"],
+        ],
+        "Gamepad preset",
+      )}
+      ${select(
+        "padMode",
+        "Movement",
+        [
+          ["fixed", "Fixed"],
+          ["dynamic", "Dynamic"],
+        ],
+        "Movement pad mode",
+      )}
+      <p class="control-mode-note" data-dynamic-note>Touch below the board to place the movement pad.</p>
       <div class="control-preview" aria-hidden="true"></div>
       <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
       ${range("controlScale", "Size", 0.85, 1.3, 0.01, "Control size")}
@@ -635,6 +705,8 @@ export function startApp(root: HTMLDivElement) {
         settings = {
           ...settings,
           controlLayout: DEFAULT_SETTINGS.controlLayout,
+          gamepadPreset: DEFAULT_SETTINGS.gamepadPreset,
+          padMode: DEFAULT_SETTINGS.padMode,
           controlScale: DEFAULT_SETTINGS.controlScale,
           controlOpacity: DEFAULT_SETTINGS.controlOpacity,
           controlSpread: DEFAULT_SETTINGS.controlSpread,
@@ -645,6 +717,8 @@ export function startApp(root: HTMLDivElement) {
         applySettings();
         for (const key of [
           "controlLayout",
+          "gamepadPreset",
+          "padMode",
           "controlScale",
           "controlOpacity",
           "controlSpread",
@@ -704,9 +778,19 @@ export function startApp(root: HTMLDivElement) {
     if (!input.closest("#settings-form")) return;
     if (input instanceof HTMLInputElement && input.type === "checkbox")
       settings = { ...settings, [input.name]: input.checked };
-    else if (["controlScheme", "controlLayout", "theme"].includes(input.name))
+    else if (
+      [
+        "controlScheme",
+        "controlLayout",
+        "gamepadPreset",
+        "padMode",
+        "theme",
+      ].includes(input.name)
+    )
       settings = { ...settings, [input.name]: input.value };
     else settings = { ...settings, [input.name]: Number(input.value) };
+    if (input.name === "gamepadPreset")
+      settings.gamepadLayouts = { portrait: {}, landscape: {} };
     if (!saveSettings(settings)) el("storage-notice").hidden = false;
     applySettings();
   }

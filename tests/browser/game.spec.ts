@@ -32,6 +32,55 @@ async function closeSettings(page: Page) {
   await page.locator('#dialog [data-action="close"]').last().click();
 }
 
+test("dynamic pad anchors at touchdown, isolates rotation and restores its home", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('#home [data-action="settings"]').click();
+  await page.locator('[name="padMode"]').selectOption("dynamic");
+  await closeSettings(page);
+  await startMarathon(page);
+  const pad = page.locator("[data-movement-pad]");
+  const home = (await pad.boundingBox())!;
+  const zone = (await page.locator("[data-dynamic-pad-zone]").boundingBox())!;
+  const x = zone.x + zone.width / 2,
+    y = zone.y + zone.height / 3;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
+  await expect(page.locator("[data-dynamic-origin]")).toBeVisible();
+  await page.mouse.move(x + 25, y);
+  await expect(page.locator('[data-command="MOVE_RIGHT"]')).toHaveClass(
+    /pressed/,
+  );
+  await page.keyboard.down("x");
+  await expect(page.locator('[data-command="ROTATE_CW"]')).toHaveClass(
+    /pressed/,
+  );
+  await page.keyboard.up("x");
+  await page.mouse.move(x, y + 30);
+  await expect(page.locator('[data-command="SOFT_DROP"]')).toHaveClass(
+    /pressed/,
+  );
+  await page.mouse.up();
+  await expect(page.locator("[data-dynamic-origin]")).toBeHidden();
+  await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
+  expect(await pad.boundingBox()).toEqual(home);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y + 30);
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await page.mouse.up();
+  await expect(page.getByRole("dialog")).toContainText("Paused");
+  await expect(page.locator("[data-dynamic-origin]")).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("tetromino_v2_run")!).softDropActive,
+    ),
+  ).toBe(false);
+});
+
 test("Marathon speed setup persists with the run and can be cancelled", async ({
   page,
 }) => {
@@ -593,4 +642,133 @@ test("control editor keeps portrait and landscape layouts separate and resets on
   );
   expect(reset.portrait).toEqual(portrait);
   expect(reset.landscape).toEqual({});
+});
+
+test("editor and settings preview preserve gameplay coordinates and reject overlaps", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 851 });
+  await page.goto("/");
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty(
+      "--safe-area-inset-left",
+      "24px",
+    );
+    document.documentElement.style.setProperty(
+      "--safe-area-inset-right",
+      "24px",
+    );
+    window.dispatchEvent(new Event("resize"));
+  });
+  await page.waitForTimeout(50);
+  await page.locator('#home [data-action="settings"]').click();
+  const homeViewport = await page.locator(".control-preview").evaluate((n) => ({
+    width: n.getAttribute("data-viewport-width"),
+    height: n.getAttribute("data-viewport-height"),
+  }));
+  await closeSettings(page);
+  await startMarathon(page);
+  const actual = await page
+    .locator(".play-area")
+    .evaluate((n) => ({ width: n.clientWidth, height: n.clientHeight }));
+  expect(homeViewport).toEqual({
+    width: String(actual.width),
+    height: String(actual.height),
+  });
+  const gameRects = await page
+    .locator(".movement-pad, .control-deck > .control")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => ({
+        id: (n as HTMLElement).dataset.command ?? "pad",
+        x: parseFloat((n as HTMLElement).style.left),
+        y: parseFloat((n as HTMLElement).style.top),
+        width: parseFloat((n as HTMLElement).style.width),
+        height: parseFloat((n as HTMLElement).style.height),
+      })),
+    );
+  await pausedRun(page);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  const preview = await page.locator(".control-preview").evaluate((n) => {
+    const frame = n.getBoundingClientRect();
+    const target = n.querySelector<HTMLElement>(
+      '[data-preview-command="ROTATE_CW"]',
+    )!;
+    const rect = target.getBoundingClientRect();
+    const scale =
+      frame.height / Number((n as HTMLElement).dataset.viewportHeight);
+    const offset =
+      (frame.width - Number((n as HTMLElement).dataset.viewportWidth) * scale) /
+      2;
+    return {
+      x: (rect.x - frame.x - offset) / scale,
+      y: (rect.y - frame.y) / scale,
+      width: rect.width / scale,
+    };
+  });
+  const cw = gameRects.find((r) => r.id === "ROTATE_CW")!;
+  expect(preview.x).toBeCloseTo(cw.x, 0);
+  expect(preview.y).toBeCloseTo(cw.y, 0);
+  expect(preview.width).toBeCloseTo(cw.width, 0);
+  await openControlEditor(page);
+  const frame = page.locator(".control-editor-frame");
+  await expect(frame).toHaveAttribute(
+    "data-viewport-height",
+    String(actual.height),
+  );
+  const original = await page
+    .locator("[data-editor-control]")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => ({
+        id: (n as HTMLElement).dataset.editorControl,
+        x: parseFloat((n as HTMLElement).style.left),
+        y: parseFloat((n as HTMLElement).style.top),
+      })),
+    );
+  expect(original.find((r) => r.id === "rotateCW")).toMatchObject({
+    x: cw.x,
+    y: cw.y,
+  });
+  const otherBefore = await page
+    .locator('[data-editor-control="rotateCW"]')
+    .getAttribute("style");
+  await dragEditorControl(page, "pad", 200, 0);
+  expect(
+    await page
+      .locator('[data-editor-control="rotateCW"]')
+      .getAttribute("style"),
+  ).toBe(otherBefore);
+  await page.locator('[data-editor-action="cancel"]').click();
+});
+
+test("gamepad preset and movement mode persist and preset clears custom maps only", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('#home [data-action="settings"]').click();
+  await openControlEditor(page);
+  await dragEditorControl(page, "pad", 0, -30);
+  await page.locator('[data-editor-action="done"]').click();
+  await setRange(page, "controlOpacity", 0.3);
+  await page.locator('[name="padMode"]').selectOption("dynamic");
+  await page.locator('[name="gamepadPreset"]').selectOption("mirrored");
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
+  );
+  expect(saved).toMatchObject({
+    gamepadPreset: "mirrored",
+    padMode: "dynamic",
+    controlOpacity: 0.3,
+    gamepadLayouts: { portrait: {}, landscape: {} },
+  });
+  await page.reload();
+  await page.locator('#home [data-action="settings"]').click();
+  await expect(page.locator('[name="padMode"]')).toHaveValue("dynamic");
+  await expect(page.locator('[name="gamepadPreset"]')).toHaveValue("mirrored");
+  await page.locator('[name="padMode"]').selectOption("fixed");
+  await page.reload();
+  await page.locator('#home [data-action="settings"]').click();
+  await expect(page.locator('[name="padMode"]')).toHaveValue("fixed");
 });

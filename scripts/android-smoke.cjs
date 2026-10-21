@@ -230,6 +230,66 @@ async function attach() {
       .getByRole("dialog")
       .getByRole("button", { name: "Settings", exact: true })
       .click();
+    await page.locator('select[name="padMode"]').selectOption("dynamic");
+    await page.locator('#dialog [data-action="close"]').last().click();
+    await page.getByRole("dialog").locator('[data-action="resume"]').click();
+    const zone = await page.locator("[data-dynamic-pad-zone]").boundingBox();
+    const origin = {
+      x: zone.x + zone.width / 2,
+      y: zone.y + zone.height / 3,
+      id: 1,
+    };
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [origin],
+    });
+    await expect(page.locator("[data-dynamic-origin]")).toBeVisible();
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ ...origin, x: origin.x + 25 }],
+    });
+    await expect(page.locator('[data-command="MOVE_RIGHT"]')).toHaveClass(
+      /pressed/,
+    );
+    const rotateBounds = await page
+      .locator('[data-command="ROTATE_CW"]')
+      .boundingBox();
+    const rotationTouch = {
+      x: rotateBounds.x + rotateBounds.width / 2,
+      y: rotateBounds.y + rotateBounds.height / 2,
+      id: 2,
+    };
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ ...origin, x: origin.x + 25 }, rotationTouch],
+    });
+    await expect(page.locator('[data-command="ROTATE_CW"]')).toHaveClass(
+      /pressed/,
+    );
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ ...origin, y: origin.y + 30 }, rotationTouch],
+    });
+    await expect(page.locator('[data-command="SOFT_DROP"]')).toHaveClass(
+      /pressed/,
+    );
+    await page.screenshot({ path: `${output}/dynamic-pad.png` });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect(page.locator("[data-dynamic-origin]")).toBeHidden();
+    await expect(page.locator('[data-command="ROTATE_CW"]')).not.toHaveClass(
+      /pressed/,
+    );
+    await expect(page.locator('[data-command="SOFT_DROP"]')).not.toHaveClass(
+      /pressed/,
+    );
+    await page.locator(".pause-button").click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click();
     await page.locator('select[name="controlLayout"]').selectOption("floating");
     await page.locator('input[name="controlScale"]').press("End");
     await page.locator('input[name="controlOpacity"]').press("Home");
@@ -291,6 +351,7 @@ async function attach() {
             "native process restart resume",
             "all thirteen themes",
             "three-way sliding gamepad touch input",
+            "dynamic thumb origin and simultaneous two-finger movement/rotation",
             "editable controls, Back cancellation and separate native orientation layouts",
             "floating controls and size/opacity settings",
           ],

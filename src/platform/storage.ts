@@ -18,6 +18,8 @@ export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   arrMs: 40,
   theme: "ink",
   controlLayout: "gamepad",
+  gamepadPreset: "balanced",
+  padMode: "fixed",
   controlScale: 1,
   controlOpacity: 0.18,
   controlSpread: 0.65,
@@ -138,6 +140,11 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
       value.controlLayout === "floating"
         ? value.controlLayout
         : "gamepad",
+    gamepadPreset:
+      value.gamepadPreset === "compact" || value.gamepadPreset === "mirrored"
+        ? value.gamepadPreset
+        : "balanced",
+    padMode: value.padMode === "dynamic" ? "dynamic" : "fixed",
     controlScale: bounded(value.controlScale, defaults.controlScale, 0.85, 1.3),
     controlOpacity: bounded(
       value.controlOpacity,

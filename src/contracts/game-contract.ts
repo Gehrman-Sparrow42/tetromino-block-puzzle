@@ -113,6 +113,8 @@ export interface UserSettings {
   arrMs: number;
   theme: ThemeId;
   controlLayout: ControlLayoutId;
+  gamepadPreset: "balanced" | "compact" | "mirrored";
+  padMode: "fixed" | "dynamic";
   controlScale: number;
   controlOpacity: number;
   controlSpread: number;

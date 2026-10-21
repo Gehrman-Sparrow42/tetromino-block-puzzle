@@ -12,8 +12,15 @@ class ButtonStub extends EventTarget {
     contains: (name: string) => this.classes.has(name),
   };
   setPointerCapture = vi.fn();
+  style = { left: "0px", top: "0px" };
+  hidden = false;
+  parentElement = { getBoundingClientRect: () => ({ left: 0, top: 0 }) };
   bounds = { left: 0, top: 0, right: 0, bottom: 0 };
-  getBoundingClientRect = () => this.bounds;
+  getBoundingClientRect = () => ({
+    ...this.bounds,
+    width: this.bounds.right - this.bounds.left,
+    height: this.bounds.bottom - this.bounds.top,
+  });
   constructor(command: string) {
     super();
     this.dataset = { command };
@@ -32,13 +39,22 @@ function setup(gamepad = false) {
     contains: (button: ButtonStub) => boolean;
   };
   pad.contains = (button) => [left, down, right].includes(button);
+  pad.bounds = { left: 0, top: 0, right: 150, bottom: 100 };
+  const zone = new ButtonStub("ZONE");
+  zone.bounds = { left: 0, top: 0, right: 170, bottom: 150 };
   left.bounds = { left: 0, top: 0, right: 50, bottom: 50 };
   right.bounds = { left: 100, top: 0, right: 150, bottom: 50 };
   down.bounds = { left: 50, top: 50, right: 100, bottom: 100 };
   const root = {
     querySelectorAll: () => [left, down, right, rotate],
     querySelector: (selector: string) =>
-      selector === "#board" ? canvas : gamepad ? pad : null,
+      selector === "#board"
+        ? canvas
+        : gamepad && selector === "[data-movement-pad]"
+          ? pad
+          : gamepad && selector === "[data-dynamic-pad-zone]"
+            ? zone
+            : null,
   } as unknown as HTMLElement;
   const commands: GameCommand[] = [];
   const settings: UserSettings = {
@@ -84,6 +100,7 @@ function setup(gamepad = false) {
     windowStub,
     pad,
     rotate,
+    zone,
     setEnabled: (value: boolean) => {
       enabled = value;
     },
@@ -93,6 +110,48 @@ function setup(gamepad = false) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("held touch input", () => {
+  it("anchors dynamic movement at touch-down with a dead zone and no up action", () => {
+    const { controls, zone, pad, pointer, commands, settings, rotate } =
+      setup(true);
+    settings.padMode = "dynamic";
+    pointer(zone, "pointerdown", 1, 85, 30);
+    expect(commands).toEqual([]);
+    expect(pad.style.left).toBe("10px");
+    pointer(zone, "pointermove", 1, 89, 32);
+    expect(commands).toEqual([]);
+    pointer(zone, "pointermove", 1, 110, 30);
+    pointer(rotate, "pointerdown", 2);
+    pointer(zone, "pointermove", 1, 85, 65);
+    pointer(zone, "pointermove", 1, 85, 0);
+    pointer(zone, "pointerup", 1);
+    expect(commands).toEqual([
+      { type: "MOVE_RIGHT" },
+      { type: "ROTATE_CW" },
+      { type: "SOFT_DROP", active: true },
+      { type: "SOFT_DROP", active: false },
+    ]);
+    expect(pad.style.left).toBe("0px");
+    expect(rotate.classList.contains("pressed")).toBe(true);
+    controls.destroy();
+  });
+  it("ignores a second dynamic thumb and releases movement on blur", () => {
+    const { controls, zone, pointer, commands, settings, windowStub } =
+      setup(true);
+    settings.padMode = "dynamic";
+    pointer(zone, "pointerdown", 1, 85, 30);
+    pointer(zone, "pointerdown", 2, 40, 30);
+    pointer(zone, "pointermove", 2, 5, 30);
+    expect(commands).toEqual([]);
+    pointer(zone, "pointermove", 1, 85, 65);
+    windowStub.dispatchEvent(new Event("blur"));
+    controls.update(performance.now() + 1000);
+    pointer(zone, "pointermove", 1, 110, 30);
+    expect(commands).toEqual([
+      { type: "SOFT_DROP", active: true },
+      { type: "SOFT_DROP", active: false },
+    ]);
+    controls.destroy();
+  });
   it("repeats only the latest direction and resumes the remaining source", () => {
     const { controls, left, right, pointer, commands } = setup();
     pointer(left, "pointerdown", 1);

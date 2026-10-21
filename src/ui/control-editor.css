@@ -150,3 +150,23 @@
     padding-block: 4px;
   }
 }
+.control-editor-frame {
+  position: absolute;
+  transform-origin: top left;
+  outline: 1px solid var(--border);
+  background: var(--bg);
+}
+.control-editor-board {
+  inset: auto;
+  max-width: none;
+  margin: 0;
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 10% 5%;
+  opacity: 0.6;
+}
+.control-editor-target[data-blocked] {
+  outline-style: solid;
+}

@@ -5,7 +5,15 @@ import type {
   UserSettings,
 } from "../contracts/game-contract";
 import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
-import { computeControlGeometry } from "./control-layout";
+import {
+  canPlaceGamepadGroup,
+  computeBoardGeometry,
+  computeControlGeometry,
+} from "./control-layout";
+import {
+  measureControlViewport,
+  type ControlViewport,
+} from "./control-viewport";
 import "./control-editor.css";
 
 const NAMES: Record<GamepadControlId, string> = {
@@ -54,12 +62,17 @@ export class ControlEditor {
   private selected: GamepadControlId = "pad";
   private drag: Drag | null = null;
   private destroyed = false;
+  private scale = 1;
+  private readonly getViewport: () => ControlViewport;
 
   constructor(
     root: HTMLElement,
     settings: UserSettings,
     callbacks: EditorCallbacks,
+    getViewport = () =>
+      measureControlViewport(root.querySelector<HTMLElement>("#game")!),
   ) {
+    this.getViewport = getViewport;
     this.settings = structuredClone(settings);
     this.settings.controlLayout = "gamepad";
     this.callbacks = callbacks;
@@ -76,7 +89,7 @@ export class ControlEditor {
         <button type="button" data-editor-action="done">Done</button>
       </header>
       <div class="control-editor-hint"><span>Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
-      <div class="control-editor-stage"><div class="control-editor-board" aria-hidden="true"></div></div>
+      <div class="control-editor-stage"><div class="control-editor-frame"><div class="control-editor-board" aria-hidden="true"></div></div></div>
       <footer class="control-editor-tools">
         <div class="control-editor-selection"><strong data-editor-selection></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
         <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="1.4" step="0.05"></label>
@@ -108,7 +121,7 @@ export class ControlEditor {
         id === "pad"
           ? `<svg viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M2 2H298V98H198V198H102V98H2Z"/><path d="m58 36-18 14 18 14m184-28 18 14-18 14m-106 85 14 18 14-18"/></svg>`
           : `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">${PATHS[id]}</svg>`;
-      this.stage.append(target);
+      this.stage.querySelector(".control-editor-frame")!.append(target);
       this.targets.set(id, target);
       target.addEventListener(
         "pointerdown",
@@ -225,8 +238,8 @@ export class ControlEditor {
 
   private geometry() {
     return computeControlGeometry(
-      this.stage.clientWidth,
-      this.stage.clientHeight,
+      this.getViewport().width,
+      this.getViewport().height,
       this.settings,
       this.orientation,
     );
@@ -253,7 +266,10 @@ export class ControlEditor {
 
   private updateFields(): void {
     const placement = this.placement(this.selected);
-    this.selectionLabel.textContent = NAMES[this.selected];
+    this.selectionLabel.textContent =
+      this.selected === "pad" && this.settings.padMode === "dynamic"
+        ? "Movement pad home"
+        : NAMES[this.selected];
     this.orientationLabel.textContent =
       this.orientation === "portrait" ? "Portrait" : "Landscape";
     this.sizeInput.value = String(placement.size);
@@ -267,6 +283,39 @@ export class ControlEditor {
 
   private render(): void {
     const geometry = this.geometry();
+    const viewport = this.getViewport();
+    this.scale = Math.min(
+      this.stage.clientWidth / viewport.width,
+      this.stage.clientHeight / viewport.height,
+    );
+    const frame = this.stage.querySelector<HTMLElement>(
+      ".control-editor-frame",
+    )!;
+    frame.dataset.viewportWidth = String(viewport.width);
+    frame.dataset.viewportHeight = String(viewport.height);
+    Object.assign(frame.style, {
+      width: `${viewport.width}px`,
+      height: `${viewport.height}px`,
+      left: `${(this.stage.clientWidth - viewport.width * this.scale) / 2}px`,
+      top: `${(this.stage.clientHeight - viewport.height * this.scale) / 2}px`,
+      transform: `scale(${this.scale})`,
+    });
+    const board = computeBoardGeometry(
+      viewport.width,
+      viewport.height,
+      geometry,
+      "gamepad",
+    );
+    Object.assign(
+      frame.querySelector<HTMLElement>(".control-editor-board")!.style,
+      {
+        left: `${board.x}px`,
+        top: `${board.y}px`,
+        width: `${board.width}px`,
+        height: `${board.height}px`,
+      },
+    );
+    this.stage.dataset.padMode = this.settings.padMode;
     for (const [id, target] of this.targets) {
       const rect = geometry.groups![id];
       Object.assign(target.style, {
@@ -284,11 +333,10 @@ export class ControlEditor {
 
   private adjust(field: "size" | "opacity", value: number): void {
     this.rollbackDrag();
-    this.settings.gamepadLayouts[this.orientation][this.selected] = {
-      ...this.placement(this.selected),
-      [field]: value,
-    };
-    this.render();
+    const previous = this.placement(this.selected);
+    const candidate = { ...previous, [field]: value };
+    this.tryPlacement(this.selected, candidate);
+    this.updateFields();
   }
 
   private startDrag(event: PointerEvent, id: GamepadControlId): void {
@@ -313,17 +361,12 @@ export class ControlEditor {
   private moveDrag(event: PointerEvent): void {
     if (!this.drag || event.pointerId !== this.drag.pointer) return;
     const drag = this.drag;
-    const current = this.placement(drag.id);
-    this.settings.gamepadLayouts[this.orientation][drag.id] = {
-      ...current,
-      x: drag.centerX + (event.clientX - drag.x) / this.stage.clientWidth,
-      y: drag.centerY + (event.clientY - drag.y) / this.stage.clientHeight,
-    };
-    this.render();
-    // Persist the resolved bounds/collision position, never the off-stage request.
-    this.settings.gamepadLayouts[this.orientation][drag.id] = this.placement(
-      drag.id,
-    );
+    const viewport = this.getViewport();
+    this.tryPlacement(drag.id, {
+      ...this.placement(drag.id),
+      x: drag.centerX + (event.clientX - drag.x) / this.scale / viewport.width,
+      y: drag.centerY + (event.clientY - drag.y) / this.scale / viewport.height,
+    });
   }
 
   private endDrag(event: PointerEvent, cancelled: boolean): void {
@@ -386,13 +429,35 @@ export class ControlEditor {
     event.preventDefault();
     const placement = this.placement(this.selected);
     const step = event.shiftKey ? 16 : 4;
-    this.settings.gamepadLayouts[this.orientation][this.selected] = {
+    const viewport = this.getViewport();
+    this.tryPlacement(this.selected, {
       ...placement,
-      x: placement.x + (direction[0] * step) / this.stage.clientWidth,
-      y: placement.y + (direction[1] * step) / this.stage.clientHeight,
-    };
+      x: placement.x + (direction[0] * step) / viewport.width,
+      y: placement.y + (direction[1] * step) / viewport.height,
+    });
+  }
+
+  private tryPlacement(
+    id: GamepadControlId,
+    placement: GamepadControlPlacement,
+  ): boolean {
+    const before = this.geometry();
+    const map = this.settings.gamepadLayouts[this.orientation];
+    const previous = map[id];
+    map[id] = placement;
+    const after = this.geometry();
+    const rect = after.groups![id];
+    // A resolved fallback must never silently replace the requested edit.
+    const centered =
+      Math.abs((rect.x + rect.width / 2) / after.width - placement.x) < 0.002 &&
+      Math.abs((rect.y + rect.height / 2) / after.height - placement.y) < 0.002;
+    const valid = centered && canPlaceGamepadGroup(before, id, rect);
+    if (!valid) {
+      if (previous) map[id] = previous;
+      else delete map[id];
+    }
+    this.targets.get(id)!.toggleAttribute("data-blocked", !valid);
     this.render();
-    this.settings.gamepadLayouts[this.orientation][this.selected] =
-      this.placement(this.selected);
+    return valid;
   }
 }

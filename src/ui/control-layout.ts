@@ -180,6 +180,38 @@ export function computeControlGeometry(
   };
 }
 
+function separated(a: ControlRect, b: ControlRect): boolean {
+  return (
+    a.x + a.width + 8 <= b.x ||
+    b.x + b.width + 8 <= a.x ||
+    a.y + a.height + 8 <= b.y ||
+    b.y + b.height + 8 <= a.y
+  );
+}
+
+/** Validate a proposed editor move without repositioning any other control. */
+export function canPlaceGamepadGroup(
+  geometry: ControlGeometry,
+  id: GamepadControlId,
+  rect: ControlRect,
+): boolean {
+  return (
+    Object.values(rect).every(Number.isFinite) &&
+    rect.width >= (id === "pad" ? 144 : 48) &&
+    rect.height >= (id === "pad" ? 96 : 48) &&
+    rect.x >= 0 &&
+    rect.y >= 0 &&
+    rect.x + rect.width <= geometry.width &&
+    rect.y + rect.height <= geometry.height &&
+    GAMEPAD_CONTROL_IDS.every(
+      (other) =>
+        other === id ||
+        !geometry.groups?.[other] ||
+        separated(rect, geometry.groups[other]),
+    )
+  );
+}
+
 /** The pad has three directions and a neutral center: deliberately no up zone. */
 function computeGamepadGeometry(
   width: number,
@@ -191,13 +223,17 @@ function computeGamepadGeometry(
   const h = Math.floor(bounded(height, 600, 104, 10000));
   const facing = orientation ?? (w > h ? "landscape" : "portrait");
   const gap = 8;
+  const inset = Math.min(16, Math.max(0, (w - 256) / 2));
   const maxCell = Math.max(
     48,
-    Math.floor(Math.min((w - 16) / 5, (h - gap) / 2)),
+    Math.floor(Math.min((w - 2 * inset - 2 * gap) / 5, (h - gap) / 2)),
   );
   const baseCell = Math.min(
     maxCell,
-    Math.round(64 * bounded(settings.controlScale, 1, 0.85, 1.3)),
+    Math.round(
+      (settings.gamepadPreset === "compact" ? 50 : 60) *
+        bounded(settings.controlScale, 1, 0.85, 1.3),
+    ),
   );
   const custom = settings.gamepadLayouts?.[facing] ?? {};
   const cells = Object.fromEntries(
@@ -219,110 +255,76 @@ function computeGamepadGeometry(
       bounded(custom[id]?.opacity ?? settings.controlOpacity, 0.18, 0.08, 0.6),
     ]),
   ) as Record<GamepadControlId, number>;
-  const padSize = cells.pad;
-  const actionSize = Math.max(
-    cells.hardDrop,
-    cells.rotateCW,
-    cells.rotateCCW,
-    cells.hold,
-  );
+  const padSize = baseCell;
+  const actionSize = baseCell;
   const bottom = Math.min(
-    12 + Math.round(bounded(settings.controlHeight, 0.3, 0, 1) * 32),
-    Math.max(0, h - Math.max(2 * padSize, 3 * actionSize + 2 * gap)),
+    16 + Math.round(bounded(settings.controlHeight, 0.3, 0, 1) * 24),
+    Math.max(0, h - Math.max(2 * padSize, 2 * actionSize + gap)),
   );
-  const padX = Math.min(
-    8,
-    Math.max(0, w - 3 * padSize - 2 * actionSize - 2 * gap),
-  );
-  const right = w - actionSize;
-  const left = right - actionSize - gap;
-  const bottomY = h - bottom - actionSize;
-  // Short screens use two action rows so controls leave a readable board above.
-  const roomy = 3 * actionSize + 2 * gap + 320 <= h - bottom;
+  const mirrored = settings.gamepadPreset === "mirrored";
+  const padX = mirrored ? w - inset - 3 * padSize : inset;
+  const actionX = mirrored ? inset : w - inset - 2 * actionSize - gap;
+  const lowerY = h - bottom - actionSize;
   const rect = (id: GamepadControlId, x: number, y: number): ControlRect => ({
     x: Math.round(x),
     y: Math.round(y),
-    width: cells[id] * (id === "pad" ? 3 : 1),
-    height: cells[id] * (id === "pad" ? 2 : 1),
+    width: baseCell * (id === "pad" ? 3 : 1),
+    height: baseCell * (id === "pad" ? 2 : 1),
   });
   const defaults: Record<GamepadControlId, ControlRect> = {
     pad: rect("pad", padX, h - bottom - 2 * padSize),
-    hardDrop: rect("hardDrop", left, bottomY - (roomy ? actionSize + gap : 0)),
-    rotateCW: rect("rotateCW", right, bottomY - actionSize - gap),
-    rotateCCW: rect("rotateCCW", right, bottomY),
-    hold: rect(
-      "hold",
-      roomy ? right : left,
-      bottomY - (roomy ? 2 : 1) * (actionSize + gap),
-    ),
+    hardDrop: rect("hardDrop", actionX, lowerY - actionSize - gap),
+    hold: rect("hold", actionX + actionSize + gap, lowerY - actionSize - gap),
+    rotateCCW: rect("rotateCCW", actionX, lowerY),
+    rotateCW: rect("rotateCW", actionX + actionSize + gap, lowerY),
   };
-  const clampRect = (r: ControlRect): ControlRect => ({
-    ...r,
-    x: Math.round(bounded(r.x, 0, 0, w - r.width)),
-    y: Math.round(bounded(r.y, 0, 0, h - r.height)),
-  });
-  const separated = (a: ControlRect, b: ControlRect) =>
-    a.x + a.width + gap <= b.x ||
-    b.x + b.width + gap <= a.x ||
-    a.y + a.height + gap <= b.y ||
-    b.y + b.height + gap <= a.y;
-  let groups = {} as Record<GamepadControlId, ControlRect>;
-  let failed = false;
+  const groups = Object.fromEntries(
+    GAMEPAD_CONTROL_IDS.map((id) => {
+      const p = custom[id];
+      const r = {
+        ...defaults[id],
+        width: cells[id] * (id === "pad" ? 3 : 1),
+        height: cells[id] * (id === "pad" ? 2 : 1),
+      };
+      return [
+        id,
+        p
+          ? {
+              ...r,
+              x: Math.round(bounded(p.x, 0.5, 0, 1) * w - r.width / 2),
+              y: Math.round(bounded(p.y, 0.5, 0, 1) * h - r.height / 2),
+            }
+          : r,
+      ];
+    }),
+  ) as Record<GamepadControlId, ControlRect>;
   for (const id of GAMEPAD_CONTROL_IDS) {
-    const p = custom[id];
-    const target = clampRect(
-      p
-        ? {
-            ...defaults[id],
-            x: bounded(p.x, 0.5, 0, 1) * w - defaults[id].width / 2,
-            y: bounded(p.y, 0.5, 0, 1) * h - defaults[id].height / 2,
-          }
-        : defaults[id],
-    );
-    const placed = Object.values(groups);
-    const xs = [
-      target.x,
-      0,
-      w - target.width,
-      ...placed.flatMap((r) => [r.x - target.width - gap, r.x + r.width + gap]),
-    ];
-    const ys = [
-      target.y,
-      0,
-      h - target.height,
-      ...placed.flatMap((r) => [
-        r.y - target.height - gap,
-        r.y + r.height + gap,
-      ]),
-    ];
-    let winner: ControlRect | undefined;
-    let distance = Infinity;
-    for (const x of xs)
-      for (const y of ys) {
-        const candidate = clampRect({ ...target, x, y });
-        if (!placed.every((other) => separated(candidate, other))) continue;
-        const d = (candidate.x - target.x) ** 2 + (candidate.y - target.y) ** 2;
-        if (d < distance) {
-          winner = candidate;
-          distance = d;
-        }
-      }
-    if (!winner) {
-      failed = true;
-      break;
-    }
-    groups[id] = winner;
-  }
-  // Pathological edits can partition the remaining space. A deterministic 2x2
-  // action cluster always fits alongside the pad at the clamped target sizes.
-  if (failed) {
-    groups = {
-      pad: rect("pad", 0, h - 2 * padSize),
-      hardDrop: rect("hardDrop", left, h - actionSize),
-      rotateCW: rect("rotateCW", right, h - 2 * actionSize - gap),
-      rotateCCW: rect("rotateCCW", right, h - actionSize),
-      hold: rect("hold", left, h - 2 * actionSize - gap),
+    const r = groups[id];
+    groups[id] = {
+      ...r,
+      x: Math.max(0, Math.min(w - r.width, r.x)),
+      y: Math.max(0, Math.min(h - r.height, r.y)),
     };
+  }
+  // Reject invalid legacy edits in place. Never search for spare space or move
+  // unrelated groups when an editor changes one control. New edits are checked
+  // with canPlaceGamepadGroup before being stored.
+  const rejected = new Set<GamepadControlId>();
+  for (let pass = 0; pass < GAMEPAD_CONTROL_IDS.length; pass++) {
+    let changed = false;
+    for (const id of GAMEPAD_CONTROL_IDS) {
+      if (!custom[id] || rejected.has(id)) continue;
+      if (
+        !GAMEPAD_CONTROL_IDS.every(
+          (other) => other === id || separated(groups[id], groups[other]),
+        )
+      ) {
+        groups[id] = defaults[id];
+        rejected.add(id);
+        changed = true;
+      }
+    }
+    if (!changed) break;
   }
   const pad = groups.pad;
   const s = pad.width / 3;

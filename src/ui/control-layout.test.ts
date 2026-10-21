@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { UserSettings } from "../contracts/game-contract";
 import { DEFAULT_SETTINGS } from "../platform/storage";
-import { computeBoardGeometry, computeControlGeometry } from "./control-layout";
+import {
+  canPlaceGamepadGroup,
+  computeBoardGeometry,
+  computeControlGeometry,
+} from "./control-layout";
 import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 
 function settings(overrides: Partial<UserSettings> = {}): UserSettings {
@@ -17,6 +21,93 @@ function settings(overrides: Partial<UserSettings> = {}): UserSettings {
 }
 
 describe("ergonomic touch geometry", () => {
+  it("uses comfortable two-row action clusters for every gamepad preset", () => {
+    for (const gamepadPreset of ["balanced", "compact", "mirrored"] as const) {
+      for (const [width, height] of [
+        [360, 600],
+        [393, 851],
+        [780, 340],
+      ]) {
+        const g = computeControlGeometry(
+          width!,
+          height!,
+          settings({ controlLayout: "gamepad", gamepadPreset }),
+        );
+        const b = g.buttons;
+        expect(b.HARD_DROP.y).toBe(b.HOLD.y);
+        expect(b.ROTATE_CCW.y).toBe(b.ROTATE_CW.y);
+        expect(b.HARD_DROP.y + b.HARD_DROP.height + 8).toBeLessThanOrEqual(
+          b.ROTATE_CCW.y,
+        );
+        expect(b.HARD_DROP.x).toBe(b.ROTATE_CCW.x);
+        expect(b.HOLD.x).toBe(b.ROTATE_CW.x);
+        expect(b.ROTATE_CCW.x + b.ROTATE_CCW.width + 8).toBeLessThanOrEqual(
+          b.ROTATE_CW.x,
+        );
+        expect(b.MOVE_LEFT.x).toBeLessThan(b.MOVE_RIGHT.x);
+        expect(
+          gamepadPreset === "mirrored"
+            ? b.HOLD.x < b.MOVE_LEFT.x
+            : b.MOVE_RIGHT.x < b.HARD_DROP.x,
+        ).toBe(true);
+        for (const id of GAMEPAD_CONTROL_IDS)
+          expect(canPlaceGamepadGroup(g, id, g.groups![id])).toBe(true);
+        expect(g.pad!.x).toBeGreaterThan(0);
+        expect(g.groups!.rotateCW.x + g.groups!.rotateCW.width).toBeLessThan(
+          width!,
+        );
+      }
+    }
+  });
+
+  it("rejects colliding editor moves and preserves unrelated positions after a valid move", () => {
+    const prefs = settings({ controlLayout: "gamepad" });
+    const g = computeControlGeometry(393, 851, prefs);
+    const r = g.groups!.hold;
+    expect(canPlaceGamepadGroup(g, "hold", g.groups!.rotateCW)).toBe(false);
+    expect(canPlaceGamepadGroup(g, "hold", { ...r, x: -1 })).toBe(false);
+    const moved = { ...r, y: r.y - 12 };
+    expect(canPlaceGamepadGroup(g, "hold", moved)).toBe(true);
+    const next = computeControlGeometry(393, 851, {
+      ...prefs,
+      gamepadLayouts: {
+        portrait: {
+          hold: {
+            x: (moved.x + moved.width / 2) / 393,
+            y: (moved.y + moved.height / 2) / 851,
+            size: 1,
+            opacity: 0.3,
+          },
+        },
+        landscape: {},
+      },
+    });
+    expect(next.groups!.hold).toEqual(moved);
+    for (const id of GAMEPAD_CONTROL_IDS.filter((id) => id !== "hold"))
+      expect(next.groups![id]).toEqual(g.groups![id]);
+    expect(
+      computeBoardGeometry(393, 851, next, "gamepad").width,
+    ).toBeGreaterThanOrEqual(
+      computeBoardGeometry(393, 851, g, "gamepad").width - 6,
+    );
+  });
+
+  it("resizes a separately moved control without changing other group positions", () => {
+    const prefs = settings({
+      controlLayout: "gamepad",
+      gamepadLayouts: {
+        portrait: { hold: { x: 0.8, y: 0.5, size: 1, opacity: 0.3 } },
+        landscape: {},
+      },
+    });
+    const before = computeControlGeometry(393, 851, prefs);
+    prefs.gamepadLayouts.portrait.hold!.size = 1.3;
+    const after = computeControlGeometry(393, 851, prefs);
+    expect(after.groups!.hold.width).toBeGreaterThan(before.groups!.hold.width);
+    for (const id of GAMEPAD_CONTROL_IDS.filter((id) => id !== "hold"))
+      expect(after.groups![id]).toEqual(before.groups![id]);
+  });
+
   it("keeps all twenty board rows clear of default and edited gamepad controls", () => {
     for (const [width, height] of [
       [377, 755],
