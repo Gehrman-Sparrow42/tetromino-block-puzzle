@@ -1,6 +1,14 @@
 # Remake verification - 2026-10-21
 
-## Current control repair — 2.5.0
+## Current play-screen overhaul — 2.6.0
+
+- **137 unit tests and 60 browser scenarios pass.** The board starts at safe-area top + 4 px. Hold/statistics are on the left; Pause/Next5 are on the right. All presets, including saved legacy Floating, keep controls clear of the board. Regressions cover actual child containment at maximum settings, high saved custom maps, large scores, side insets, exact preview/editor parity, and landscape width/Dynamic input.
+- TypeScript/Vite, Capacitor sync, Android assembly/lint and APK signature verification pass (version 2.6.0 / code 20600).
+- Installed offline API35/WebView124 checks pass: top board/rails/clearance, all thirteen themes, actual rotation, editor/Back/persistence, background/process restart and simultaneous Dynamic movement/rotation. Zero WebView errors. Installing over the previous APK preserves settings and the saved run.
+- Exported LCD/Floating HTML passes board-top 4 px, button clearance, hard-drop/save and zero-network checks at 384 × 853. Renders cover compact phone, normal phone and landscape.
+- Argon Medium completed an independent design/reliability review. Its rail clipping and custom-placement findings were fixed and covered by regressions. Impeccable detector: zero primary and 36 advisory token/ramp findings. Physical-phone comfort for this updated build remains untested.
+
+## Historical control repair — 2.5.0
 
 - 134 unit tests and 51 browser scenarios pass, including exact preview/editor/gameplay coordinate parity, side safe areas, collision rejection, preset/movement persistence, dynamic deadzone, independent input ownership and cancellation.
 - TypeScript/Vite build, Capacitor sync and Android debug assembly/lint pass; app lint reports no issues and the APK signature verifies. Package version is 2.5.0 (20500).

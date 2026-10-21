@@ -9,6 +9,7 @@ import {
   canPlaceGamepadGroup,
   computeBoardGeometry,
   computeControlGeometry,
+  computeRailGeometry,
 } from "./control-layout";
 import {
   measureControlViewport,
@@ -89,7 +90,7 @@ export class ControlEditor {
         <button type="button" data-editor-action="done">Done</button>
       </header>
       <div class="control-editor-hint"><span>Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
-      <div class="control-editor-stage"><div class="control-editor-frame"><div class="control-editor-board" aria-hidden="true"></div></div></div>
+      <div class="control-editor-stage"><div class="control-editor-frame"><div class="control-editor-board" aria-hidden="true"></div><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">Hold<br>Score<br>Lines<br>Level<br>Time</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">Pause<br>Next</div></div></div>
       <footer class="control-editor-tools">
         <div class="control-editor-selection"><strong data-editor-selection></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
         <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="1.4" step="0.05"></label>
@@ -315,6 +316,24 @@ export class ControlEditor {
         height: `${board.height}px`,
       },
     );
+    const rails = computeRailGeometry(
+      board,
+      viewport.height,
+      geometry,
+      "gamepad",
+    );
+    for (const [side, rect] of Object.entries(rails)) {
+      Object.assign(
+        frame.querySelector<HTMLElement>(`[data-reference-rail="${side}"]`)!
+          .style,
+        {
+          left: `${rect.x}px`,
+          top: "0px",
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+        },
+      );
+    }
     this.stage.dataset.padMode = this.settings.padMode;
     for (const [id, target] of this.targets) {
       const rect = geometry.groups![id];

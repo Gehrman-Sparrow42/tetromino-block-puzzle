@@ -5,6 +5,8 @@ import {
   canPlaceGamepadGroup,
   computeBoardGeometry,
   computeControlGeometry,
+  controlObstacles,
+  computeRailGeometry,
 } from "./control-layout";
 import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
 
@@ -338,7 +340,7 @@ describe("ergonomic touch geometry", () => {
         400,
         settings({ controlScale: 1.3, controlLayout: "floating" }),
       ).buttonSize,
-    ).toBe(78);
+    ).toBe(52);
   });
 
   it("moves clusters toward the edges with spread and raises them with height without moving hitboxes into each other", () => {
@@ -429,4 +431,119 @@ describe("ergonomic touch geometry", () => {
       expect(geometry.buttonSize).toBe(48);
     }
   });
+});
+
+describe("board-first side rails", () => {
+  it("keeps the top aligned full board and rails clear of every preset at slider extremes", () => {
+    for (const [width, height] of [
+      [377, 847],
+      [344, 524],
+      [368, 849],
+      [584, 389],
+    ]) {
+      for (const controlLayout of [
+        "gamepad",
+        "thumbs",
+        "mirror",
+        "floating",
+      ] as const) {
+        for (const controlScale of [0.85, 1.3]) {
+          const g = computeControlGeometry(
+            width!,
+            height!,
+            settings({
+              controlLayout,
+              controlScale,
+              controlHeight: 1,
+              controlSpread: 1,
+            }),
+          );
+          const board = computeBoardGeometry(width!, height!, g, controlLayout);
+          expect(board.y).toBe(0);
+          expect(board.x + board.width / 2).toBe(width! / 2);
+          expect(board.height).toBe(board.width * 2);
+          expect(board.width).toBeGreaterThan(90);
+          expect(board.x).toBeGreaterThanOrEqual(56);
+          for (const r of [
+            board,
+            ...Object.values(
+              computeRailGeometry(board, height!, g, controlLayout),
+            ),
+          ]) {
+            for (const c of controlObstacles(height!, g, controlLayout)) {
+              expect(
+                r.x + r.width <= c.x ||
+                  c.x + c.width <= r.x ||
+                  r.y + r.height <= c.y ||
+                  c.y + c.height <= r.y,
+              ).toBe(true);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+it("rejects high editor moves and renders unsafe saved maps without hiding side information", () => {
+  for (const [width, height, orientation] of [
+    [377, 847, "portrait"],
+    [344, 524, "portrait"],
+    [584, 389, "landscape"],
+  ] as const) {
+    const prefs = structuredClone(settings({ controlLayout: "gamepad" }));
+    const baseline = computeControlGeometry(width, height, prefs, orientation);
+    const high = {
+      ...baseline.groups!.hold,
+      x: Math.round(width / 2 - 30),
+      y: 8,
+    };
+    expect(canPlaceGamepadGroup(baseline, "hold", high)).toBe(false);
+    prefs.gamepadLayouts[orientation].hold = {
+      x: (high.x + high.width / 2) / width,
+      y: (high.y + high.height / 2) / height,
+      size: 1,
+      opacity: 0.3,
+    };
+    const saved = structuredClone(prefs.gamepadLayouts);
+    const resolved = computeControlGeometry(width, height, prefs, orientation);
+    expect(prefs.gamepadLayouts).toEqual(saved);
+    expect(resolved.groups!.hold).toEqual(baseline.groups!.hold);
+    for (const id of GAMEPAD_CONTROL_IDS)
+      expect(resolved.groups![id]).toEqual(baseline.groups![id]);
+    const board = computeBoardGeometry(width, height, resolved, "gamepad");
+    for (const rail of Object.values(
+      computeRailGeometry(board, height, resolved, "gamepad"),
+    ))
+      expect(rail.height).toBeGreaterThanOrEqual(resolved.minimumRailHeight!);
+    const safe = { ...baseline.groups!.hold, y: baseline.groups!.hold.y - 12 };
+    expect(canPlaceGamepadGroup(baseline, "hold", safe)).toBe(true);
+  }
+});
+
+it("uses the full landscape width to keep side information readable at maximum controls", () => {
+  for (const controlLayout of [
+    "gamepad",
+    "thumbs",
+    "mirror",
+    "floating",
+  ] as const) {
+    const geometry = computeControlGeometry(
+      837,
+      308,
+      settings({
+        controlLayout,
+        controlScale: 1.3,
+        controlHeight: 1,
+        controlSpread: 1,
+      }),
+      "landscape",
+    );
+    const board = computeBoardGeometry(837, 308, geometry, controlLayout);
+    expect(board.height).toBe(308);
+    for (const rail of Object.values(
+      computeRailGeometry(board, 308, geometry, controlLayout),
+    ))
+      expect(rail.height).toBeGreaterThanOrEqual(220);
+  }
 });

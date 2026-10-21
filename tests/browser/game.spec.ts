@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { THEME_IDS } from "../../src/contracts/game-contract";
+import { createInitialState } from "../../src/engine/engine";
 
 test.beforeEach(async ({ page }, info) => {
   if (info.project.name === "small-phone")
@@ -218,9 +219,98 @@ test("larger board, seven spacious controls and no overlap", async ({
       () => document.documentElement.scrollWidth > innerWidth,
     ),
   ).toBe(false);
-  await expect(
-    page.locator(".left-rail,.next-rail,.lock-row,.keyboard-hint"),
-  ).toHaveCount(0);
+  await expect(page.locator(".left-rail")).toBeVisible();
+  await expect(page.locator(".next-rail")).toBeVisible();
+  await expect(page.locator(".game-hud,.preview-strip")).toHaveCount(0);
+  const topInset = await page.evaluate(
+    () =>
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--safe-area-inset-top",
+        ),
+      ) || 0,
+  );
+  expect(board.y).toBeLessThanOrEqual(topInset + 8);
+  const leftRail = (await page.locator(".left-rail").boundingBox())!;
+  const nextRail = (await page.locator(".next-rail").boundingBox())!;
+  expect(leftRail.x + leftRail.width).toBeLessThanOrEqual(board.x + 1);
+  expect(nextRail.x).toBeGreaterThanOrEqual(board.x + board.width - 1);
+});
+
+test("side rails fit large scores and keep all previews beside the top-aligned board", async ({
+  page,
+}) => {
+  const run = createInitialState("marathon", 47);
+  run.status = "paused";
+  run.score = 12345678;
+  await page.addInitScript(
+    (run) => localStorage.setItem("tetromino_v2_run", JSON.stringify(run)),
+    run,
+  );
+  for (const viewport of [
+    { width: 384, height: 853 },
+    { width: 853, height: 384 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.locator("#resume-card").click();
+    const board = (await page.locator("#board").boundingBox())!;
+    const topInset = await page.evaluate(
+      () =>
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--safe-area-inset-top",
+          ),
+        ) || 0,
+    );
+    expect(board.y).toBeLessThanOrEqual(topInset + 8);
+    await expect(page.locator(".next-rail canvas")).toHaveCount(5);
+    for (const preview of await page.locator(".next-rail canvas").all())
+      await expect(preview).toBeVisible();
+    const score = page.locator("#score");
+    expect(
+      await score.evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
+    ).toBe(true);
+    const pause = (await page.locator(".pause-button").boundingBox())!;
+    expect(pause.width).toBeGreaterThanOrEqual(48);
+    expect(pause.height).toBeGreaterThanOrEqual(48);
+    expect(pause.x).toBeGreaterThanOrEqual(board.x + board.width - 1);
+  }
+});
+
+test("saved high custom controls cannot hide side information or Pause", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "tetromino_v2_settings",
+      JSON.stringify({
+        controlLayout: "gamepad",
+        gamepadLayouts: {
+          portrait: { pad: { x: 0.25, y: 0.15, size: 1, opacity: 0.2 } },
+          landscape: {},
+        },
+      }),
+    ),
+  );
+  await page.goto("/");
+  await startMarathon(page);
+  const rail = (await page.locator(".next-rail").boundingBox())!;
+  const pause = (await page.locator(".pause-button").boundingBox())!;
+  expect(pause.y + pause.height).toBeLessThanOrEqual(rail.y + rail.height + 1);
+  for (const item of await page.locator(".next-rail canvas").all()) {
+    const r = (await item.boundingBox())!;
+    expect(r.y + r.height).toBeLessThanOrEqual(rail.y + rail.height + 1);
+  }
+  await page.locator(".pause-button").click();
+  await expect(page.getByRole("dialog")).toContainText("Paused");
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("tetromino_v2_settings")!)
+          .gamepadLayouts.portrait.pad.y,
+    ),
+  ).toBe(0.15);
 });
 
 test("background and pointer cancellation stop held movement", async ({
@@ -374,6 +464,16 @@ test("control presets, sliders and reset are live and safe", async ({
     await setRange(page, "controlScale", 1.3);
     await setRange(page, "controlSpread", 1);
     await setRange(page, "controlHeight", 1);
+    for (const [railSelector, childSelector] of [
+      [".left-rail", "#time"],
+      [".next-rail", "#next-4"],
+    ]) {
+      const rail = (await page.locator(railSelector).boundingBox())!;
+      const child = (await page.locator(childSelector).boundingBox())!;
+      expect(child.y + child.height).toBeLessThanOrEqual(
+        rail.y + rail.height + 1,
+      );
+    }
     const positions = await page
       .locator(".control-deck .control")
       .evaluateAll((nodes) =>
@@ -385,6 +485,12 @@ test("control presets, sliders and reset are live and safe", async ({
     for (const r of positions) {
       expect(r.w).toBeGreaterThanOrEqual(48);
       expect(r.h).toBeGreaterThanOrEqual(48);
+      const board = (await page.locator("#board").boundingBox())!;
+      expect(
+        board.x + board.width <= r.x - 7 ||
+          board.x >= r.x + r.w + 7 ||
+          board.y + board.height <= r.y - 7,
+      ).toBe(true);
     }
     for (let i = 0; i < positions.length; i++)
       for (let j = i + 1; j < positions.length; j++) {
@@ -405,9 +511,10 @@ test("control presets, sliders and reset are live and safe", async ({
   await closeSettings(page);
   await page.getByRole("dialog").locator('[data-action="resume"]').click();
   const floating = (await page.locator("#board").boundingBox())!;
-  expect(floating.width).toBeGreaterThan(initial.width);
+  expect(floating.width).toBeGreaterThan(0);
+  expect(floating.y).toBeLessThanOrEqual(initial.y + 1);
   if (info.project.name === "phone")
-    expect(floating.width).toBeGreaterThanOrEqual(340);
+    expect(floating.width).toBeGreaterThanOrEqual(200);
   await pausedRun(page);
   await page
     .getByRole("dialog")
@@ -625,14 +732,14 @@ test("control editor keeps portrait and landscape layouts separate and resets on
     "Landscape",
   );
   await expect(page.locator('[data-editor-action="done"]')).toBeInViewport();
-  await dragEditorControl(page, "hardDrop", -50, -20);
+  await dragEditorControl(page, "rotateCW", 0, 4);
   await page.locator('[data-editor-action="done"]').click();
   const edited = await page.evaluate(
     () =>
       JSON.parse(localStorage.getItem("tetromino_v2_settings")!).gamepadLayouts,
   );
   expect(edited.portrait).toEqual(portrait);
-  expect(edited.landscape.hardDrop).toBeDefined();
+  expect(edited.landscape.rotateCW).toBeDefined();
   await openControlEditor(page);
   await page.locator('[data-editor-action="reset"]').click();
   await page.locator('[data-editor-action="done"]').click();
@@ -771,4 +878,36 @@ test("gamepad preset and movement mode persist and preset clears custom maps onl
   await page.reload();
   await page.locator('#home [data-action="settings"]').click();
   await expect(page.locator('[name="padMode"]')).toHaveValue("fixed");
+});
+
+test("landscape side information stays inside rails at maximum control settings", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 853, height: 384 });
+  await page.goto("/");
+  await page.locator('[data-mode="sprint40"]').click();
+  await pausedRun(page);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
+  for (const preset of ["gamepad", "thumbs", "mirror", "floating"]) {
+    await page.locator('[name="controlLayout"]').selectOption(preset);
+    await setRange(page, "controlScale", 1.3);
+    await setRange(page, "controlSpread", 1);
+    await setRange(page, "controlHeight", 1);
+    for (const [railSelector, childSelector] of [
+      [".left-rail", "#time"],
+      [".next-rail", "#next-4"],
+    ]) {
+      const rail = (await page.locator(railSelector).boundingBox())!;
+      const child = (await page.locator(childSelector).boundingBox())!;
+      expect(child.y + child.height).toBeLessThanOrEqual(
+        rail.y + rail.height + 1,
+      );
+    }
+    const pause = (await page.locator(".pause-button").boundingBox())!;
+    expect(pause.height).toBeGreaterThanOrEqual(48);
+    expect(pause.width).toBeGreaterThanOrEqual(48);
+  }
 });

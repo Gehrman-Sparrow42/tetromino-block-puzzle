@@ -183,17 +183,17 @@ The system display fallback in legacy themes and existing system-rendered contro
 
 ## Layout
 
-The centered home container has a maximum width of 480px; its top padding responds to viewport height. The centered game container has a maximum width of 600px and fills the viewport after safe-area insets. Its vertical stack is a 48px status row, a 40px hold/next strip and a flexible playfield plus configurable control deck. Modal sheets max out at 440px and scroll within available height. Padding uses the recorded spacing values; this is an observed vocabulary rather than a mandatory mathematical scale.
+The centered home container has a maximum width of 480px; its top padding responds to viewport height. The centered game container has a maximum portrait width of 600px and fills the viewport after safe-area insets. Landscape uses the full safe width. The play area fills the safe screen height with a 4px top inset. A centered board is flanked by 48px side rails with 8px gutters: Hold and statistics on the left, Pause and a vertical five-piece Next queue on the right. Controls occupy clear space below or, in landscape, beside the board. Modal sheets max out at 440px and scroll within available height. Padding uses the recorded spacing values; this is an observed vocabulary rather than a mandatory mathematical scale.
 
 Safe areas take the maximum of native CSS environment values and injected Android values on each side. The board is a 10-column by 20-visible-row Canvas; theme materials do not change that grid. The control layout module computes seven targets with a 48px minimum, five column footprints and an 8px row gap. It preserves movement/rotation order while offering mirrored, floating and other saved settings. Below 276px content width its documented overflow requirement remains applicable.
 
-At viewport heights up to 650px, home spacing and mode padding compress and the preview strip becomes 32px. At widths up to 370px, standard HUD values become 15px and the main score 20px. These are shared responsive adaptations, not per-theme layouts.
+At viewport heights up to 650px, home spacing and mode padding compress. Side-rail labels are 9px and values 14px (score 15px); rails shorter than 200px use 8px labels and 12px values while retaining 48px button targets; large scores use compact notation with their full value available through a title and accessible label. Landscape rail spacing compresses. These are shared responsive adaptations, not per-theme layouts.
 
 **The Shared Geometry Rule.** Theme styling must not change the board sizing, safe areas, control placement or control geometry calculations.
 
 ## Elevation & Depth
 
-The nine new worlds use borders, palette layers and Canvas material marks rather than floating sheets: their sheet shadow is `none` and modal backdrop blur is removed. The inherited modal scrim still dims the game. Legacy sheets retain a diffuse shadow and a 5px backdrop blur. Basalt and Movement Score add a one-pixel rule under the preview strip; that is a separator, not raised-card depth. Neon retains its bounded Canvas glow, while Ink retains tile bevels. These are native parts of their respective worlds.
+The nine new worlds use borders, palette layers and Canvas material marks rather than floating sheets: their sheet shadow is `none` and modal backdrop blur is removed. The inherited modal scrim still dims the game. Legacy sheets retain a diffuse shadow and a 5px backdrop blur. Basalt and Movement Score retain their ruled material treatment; the playing screen has no top preview strip. Neon retains its bounded Canvas glow, while Ink retains tile bevels. These are native parts of their respective worlds.
 
 Pressed controls use an inset accent outline, and the shared feedback indicator fades over 0.15s. Reduced-motion settings and the operating-system preference disable animations and transitions. Static piece patterns carry identity without animation.
 

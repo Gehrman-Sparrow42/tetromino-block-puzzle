@@ -54,6 +54,32 @@ async function attach() {
       await page.locator('[data-action="confirm-new"]').click();
     await page.getByRole("button", { name: "Hard drop", exact: true }).click();
     await expect(page.locator("#score")).not.toHaveText("0");
+    await expect(page.locator(".left-rail")).toBeVisible();
+    await expect(page.locator(".next-rail")).toBeVisible();
+    const topLayout = await page.evaluate(() => {
+      const board = document.querySelector("#board").getBoundingClientRect();
+      const topInset =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--safe-area-inset-top",
+          ),
+        ) || 0;
+      const clear = [
+        ...document.querySelectorAll(".control-deck .control"),
+      ].every((button) => {
+        const r = button.getBoundingClientRect();
+        return (
+          board.right <= r.left - 7 ||
+          board.left >= r.right + 7 ||
+          board.bottom <= r.top - 7
+        );
+      });
+      return { top: board.top, topInset, clear };
+    });
+    if (!topLayout.clear || topLayout.top > topLayout.topInset + 8)
+      throw new Error(
+        "Side-rail board is not top-aligned or clear of controls.",
+      );
     await page.screenshot({ path: `${output}/game.png` });
     command("shell", "input", "keyevent", "4");
     await expect(page.getByRole("dialog")).toContainText("Paused");
@@ -162,7 +188,7 @@ async function attach() {
     await expect(page.locator("[data-editor-orientation]")).toHaveText(
       "Landscape",
     );
-    await touchDrag(page.locator('[data-editor-control="hardDrop"]'), -40, -10);
+    await touchDrag(page.locator('[data-editor-control="rotateCW"]'), 0, 4);
     await page.screenshot({ path: `${output}/editor-landscape.png` });
     await page.locator('[data-editor-action="done"]').click();
     const layouts = await page.evaluate(
@@ -171,7 +197,7 @@ async function attach() {
           .gamepadLayouts,
     );
     if (
-      !layouts.landscape.hardDrop ||
+      !layouts.landscape.rotateCW ||
       JSON.stringify(layouts.portrait) !== JSON.stringify(portrait)
     )
       throw new Error("Native orientation layouts were not isolated.");
@@ -344,6 +370,7 @@ async function attach() {
           page: page.url(),
           checks: [
             "offline home",
+            "top-aligned board with side information and no control overlap",
             "new game",
             "hard drop",
             "hardware Back pause",

@@ -1168,3 +1168,170 @@ html[data-theme="classic"] {
   width: var(--preview-icon-size);
   height: var(--preview-icon-size);
 }
+/* Board-first play screen: status and previews occupy the side rails. */
+.game-screen .play-area {
+  display: block;
+}
+.game-screen .playfield {
+  position: absolute;
+  inset: 0;
+}
+.game-screen .left-rail,
+.game-screen .next-rail {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+  overflow: hidden;
+  color: var(--text);
+}
+.game-screen .hold-panel {
+  min-width: 48px;
+  width: 48px;
+  min-height: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 4px;
+}
+.game-screen .hold-panel canvas {
+  width: 44px;
+  height: 28px;
+}
+.game-screen .rail-stats {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.game-screen .rail-stats span,
+.game-screen .hold-panel > span,
+.game-screen .next-strip > span {
+  display: block;
+  font-size: 9px;
+  line-height: 1.25;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.game-screen .rail-stats strong {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.game-screen .rail-stats .hud-score strong {
+  font-size: 15px;
+}
+.game-screen .next-strip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: 48px;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  gap: 8px;
+}
+.game-screen .next-strip > span {
+  margin: 0;
+}
+.game-screen .next-strip canvas {
+  flex-shrink: 0;
+  width: 44px;
+  height: 28px;
+}
+.game-screen .next-rail .pause-button {
+  margin: 0;
+}
+@media (orientation: landscape) {
+  .game-screen .rail-stats {
+    gap: 8px;
+  }
+  .game-screen .next-strip {
+    gap: 4px;
+  }
+  .game-screen .left-rail,
+  .game-screen .next-rail {
+    gap: 4px;
+  }
+}
+.game-screen .next-strip canvas {
+  height: clamp(14px, calc((var(--rail-height, 256px) - 112px) / 5), 28px);
+}
+@media (orientation: landscape) {
+  .game-screen .next-strip canvas {
+    height: clamp(14px, calc((var(--rail-height, 220px) - 88px) / 5), 28px);
+  }
+}
+.game-screen .left-rail,
+.game-screen .next-rail {
+  pointer-events: none;
+}
+.game-screen .hold-panel,
+.game-screen .pause-button {
+  pointer-events: auto;
+}
+.control-reference-rail {
+  position: absolute;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--surface);
+  opacity: 0.55;
+  font-size: 9px;
+  line-height: 2.5;
+  text-align: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+.game-screen .rail-stats {
+  gap: clamp(2px, calc((var(--rail-height, 256px) - 204px) / 3), 14px);
+}
+@media (orientation: landscape) {
+  .game-screen .rail-stats {
+    gap: clamp(1px, calc((var(--rail-height, 220px) - 196px) / 3), 8px);
+  }
+}
+.game-screen .rail-stats span,
+.game-screen .hold-panel > span,
+.game-screen .next-strip > span {
+  letter-spacing: var(--label-spacing, 0);
+  text-transform: var(--label-case, none);
+}
+/* Short landscape rails retain all run values and the full Hold target. */
+.game-screen .left-rail {
+  container: status-rail / size;
+}
+@container status-rail (max-height: 200px) {
+  .game-screen .hold-panel {
+    height: 48px;
+    min-height: 48px;
+  }
+  .game-screen .rail-stats {
+    gap: 2px;
+  }
+  .game-screen .rail-stats span {
+    font-size: 8px;
+    line-height: 1.25;
+  }
+  .game-screen .rail-stats strong,
+  .game-screen .rail-stats .hud-score strong {
+    font-size: 12px;
+    line-height: 1.25;
+  }
+}
+@media (orientation: landscape) {
+  .game-screen {
+    max-width: none;
+  }
+}

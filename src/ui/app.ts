@@ -22,7 +22,11 @@ import { setupLifecycle, exitApp } from "../platform/lifecycle";
 import { drawBoard, drawPreview } from "./canvas-renderer";
 import { TouchControls } from "./touch-controls";
 import { THEMES, applyTheme, getTheme } from "./themes";
-import { computeBoardGeometry, computeControlGeometry } from "./control-layout";
+import {
+  computeBoardGeometry,
+  computeControlGeometry,
+  computeRailGeometry,
+} from "./control-layout";
 import { ControlEditor } from "./control-editor";
 import { measureControlViewport } from "./control-viewport";
 
@@ -88,18 +92,20 @@ export function startApp(root: HTMLDivElement) {
         <nav class="home-links" aria-label="Menu"><button data-action="records">Records</button><button data-action="settings">Settings</button><button data-action="help">Help</button></nav>
       </section>
       <section id="game" class="game-screen" hidden aria-label="Game">
-        <header class="game-hud">
-          <div class="hud-score"><span id="mode-label">Marathon</span><strong id="score">0</strong></div>
-          <div><span>Lines</span><strong id="lines">0</strong></div>
-          <div><span>Level</span><strong id="level">1</strong></div>
-          <div><span id="time-label">Time</span><strong id="time">00:00</strong></div>
-          <button class="icon-button pause-button" data-action="pause" aria-label="Pause game">Ⅱ</button>
-        </header>
-        <div class="preview-strip">
-          <button class="hold-panel" data-command="HOLD" aria-label="Hold piece"><span>Hold</span><canvas id="hold" aria-hidden="true"></canvas></button>
-          <div class="next-strip"><span>Next</span>${Array.from({ length: 5 }, (_, i) => `<canvas id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}</div>
-        </div>
         <div class="play-area">
+          <aside class="left-rail" aria-label="Run status">
+            <button class="hold-panel" data-command="HOLD" aria-label="Hold piece"><span>Hold</span><canvas id="hold" aria-hidden="true"></canvas></button>
+            <div class="rail-stats">
+              <div class="hud-score"><span id="mode-label">Marathon</span><strong id="score">0</strong></div>
+              <div><span>Lines</span><strong id="lines">0</strong></div>
+              <div><span>Level</span><strong id="level">1</strong></div>
+              <div><span id="time-label">Time</span><strong id="time">00:00</strong></div>
+            </div>
+          </aside>
+          <aside class="next-rail" aria-label="Upcoming pieces">
+            <button class="icon-button pause-button" data-action="pause" aria-label="Pause game">Ⅱ</button>
+            <div class="next-strip"><span>Next</span>${Array.from({ length: 5 }, (_, i) => `<canvas id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}</div>
+          </aside>
           <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
           <div class="control-deck" aria-label="Game controls">
             <div class="dynamic-pad-zone" data-dynamic-pad-zone hidden></div><div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
@@ -137,6 +143,9 @@ export function startApp(root: HTMLDivElement) {
     );
     const deck = root.querySelector<HTMLElement>(".control-deck")!;
     deck.style.height = `${geometry.height}px`;
+    deck.style.position = "absolute";
+    deck.style.left = "0";
+    deck.style.bottom = "0";
     const pad = deck.querySelector<HTMLElement>(".movement-pad")!;
     if (geometry.pad) {
       Object.assign(pad.style, {
@@ -194,12 +203,34 @@ export function startApp(root: HTMLDivElement) {
       width: `${boardRect.width}px`,
       height: `${boardRect.height}px`,
     });
+    const rails = computeRailGeometry(
+      boardRect,
+      height,
+      geometry,
+      settings.controlLayout,
+    );
+    for (const [side, rect] of Object.entries(rails)) {
+      const rail = root.querySelector<HTMLElement>(
+        side === "left" ? ".left-rail" : ".next-rail",
+      )!;
+      rail.style.setProperty("--rail-height", `${rect.height}px`);
+      Object.assign(rail.style, {
+        left: `${rect.x}px`,
+        top: "0px",
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+      });
+    }
     const zone = deck.querySelector<HTMLElement>("[data-dynamic-pad-zone]")!;
     zone.hidden =
       settings.controlLayout !== "gamepad" || settings.padMode !== "dynamic";
     if (geometry.pad) {
+      const overlapsBoardHorizontally =
+        geometry.pad.x < boardRect.x + boardRect.width &&
+        geometry.pad.x + geometry.pad.width > boardRect.x;
       const top = Math.max(
-        boardRect.y + boardRect.height + 8,
+        0,
+        overlapsBoardHorizontally ? boardRect.y + boardRect.height + 8 : 0,
         geometry.pad.y - 48,
       );
       Object.assign(zone.style, {
@@ -232,8 +263,7 @@ export function startApp(root: HTMLDivElement) {
       settings.controlLayout,
     );
     const deckTop =
-      settings.controlLayout === "gamepad" ||
-      settings.controlLayout === "floating"
+      settings.controlLayout === "gamepad"
         ? 0
         : viewport.height - geometry.height;
     const groupForAction = {
@@ -252,7 +282,20 @@ export function startApp(root: HTMLDivElement) {
     const padPreview = geometry.pad
       ? `<b class="movement-preview" style="--control-opacity:${geometry.groupOpacity?.pad};left:${offset + geometry.pad.x * scale}px;top:${geometry.pad.y * scale}px;width:${geometry.pad.width * scale}px;height:${geometry.pad.height * scale}px">${padOutline}</b>`
       : "";
+    const rails = computeRailGeometry(
+      board,
+      viewport.height,
+      geometry,
+      settings.controlLayout,
+    );
+    const railPreview = Object.entries(rails)
+      .map(
+        ([side, rect]) =>
+          `<div class="control-reference-rail" style="left:${offset + rect.x * scale}px;top:0;width:${rect.width * scale}px;height:${rect.height * scale}px;font-size:${9 * scale}px">${side === "left" ? "Hold<br>Score<br>Lines<br>Level<br>Time" : "Pause<br>Next"}</div>`,
+      )
+      .join("");
     preview.innerHTML =
+      railPreview +
       `<div class="control-preview-board" style="left:${offset + board.x * scale}px;top:${board.y * scale}px;width:${board.width * scale}px;height:${board.height * scale}px"></div>` +
       padPreview +
       Object.entries(geometry.buttons)
@@ -626,11 +669,20 @@ export function startApp(root: HTMLDivElement) {
     if (!state || screen !== "game") return;
     const now = performance.now();
     el("mode-label").textContent = MODE_NAMES[state.mode];
-    el("score").textContent = num(state.score);
+    const score = el("score");
+    score.textContent =
+      state.score < 100000
+        ? num(state.score)
+        : new Intl.NumberFormat("en", {
+            notation: "compact",
+            maximumFractionDigits: 1,
+          }).format(state.score);
+    score.title = num(state.score);
+    score.setAttribute("aria-label", `${num(state.score)} points`);
     el("lines").textContent =
       state.mode === "sprint40" ? `${state.lines}/40` : String(state.lines);
     el("level").textContent = String(state.level);
-    el("time-label").textContent = state.mode === "ultra120" ? "LEFT" : "TIME";
+    el("time-label").textContent = state.mode === "ultra120" ? "Left" : "Time";
     el("time").textContent = formatTime(
       state.mode === "ultra120" ? 120000 - state.elapsedMs : state.elapsedMs,
       state.mode === "sprint40",

@@ -24,3 +24,7 @@ See VALIDATION.md and `.impeccable/critique/gamepad-controls-review.md`. Browser
 ## Control usability repair — 2.5.0
 
 Balanced, Compact and Mirrored presets use two action rows. Fixed and Dynamic movement are distinct: Dynamic anchors relative input at touch-down in the movement area with a visible neutral-origin marker and cancels on release, blur or pause. Settings preview and editor use the actual gameplay viewport and uniform scaling. Invalid edits retain the last valid placement; unrelated groups do not teleport. Choosing a preset resets custom maps explicitly. Existing saved maps remain stored and legacy presets remain available.
+
+## Board and side information — 2.6.0
+
+The board begins at the safe-area top rather than below status and preview rows. Hold/statistics occupy the left rail; Pause/Next occupy the right rail. Shared geometry reserves rail width and checks every layout, including legacy Floating, for button clearance. Portrait controls sit below the board; landscape can use clear space to either side. This does not remove control customization or the exact editor/preview coordinate basis.

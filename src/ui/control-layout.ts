@@ -31,62 +31,90 @@ export interface ControlGeometry {
   groupOpacity?: Record<GamepadControlId, number>;
   overlay?: boolean;
   orientation?: ControlOrientation;
+  minimumRailHeight?: number;
   buttons: Record<
     ControlAction,
     { x: number; y: number; width: number; height: number }
   >;
 }
 
-/** Keep the full board horizontally centered and clear of the edited Gamepad. */
+/** Controls in play-area coordinates, shared by the board, rails and previews. */
+export function controlObstacles(
+  height: number,
+  controls: ControlGeometry,
+  layout: UserSettings["controlLayout"],
+): ControlRect[] {
+  if (layout === "gamepad") return Object.values(controls.groups!);
+  const deckTop = height - controls.height;
+  return Object.values(controls.buttons).map((rect) => ({
+    ...rect,
+    y: rect.y + deckTop,
+  }));
+}
+
+/** Full, centered board starts at the top; side rails and every preset stay clear. */
 export function computeBoardGeometry(
   width: number,
   height: number,
   controls: ControlGeometry,
   layout: UserSettings["controlLayout"],
 ): ControlRect {
-  if (layout !== "gamepad") {
-    const available = Math.max(
-      0,
-      height - (layout === "floating" ? 0 : controls.height),
-    );
-    const size = Math.min(width, available / 2);
-    return {
-      x: (width - size) / 2,
-      y: (available - size * 2) / 2,
-      width: size,
-      height: size * 2,
-    };
-  }
-  const obstacles = Object.values(controls.groups!);
+  const obstacles = controlObstacles(height, controls, layout);
+  const railSpace = 56;
   const gap = 8;
-  // Every free horizontal interval is bounded by the screen or a control edge.
-  // Only consider board widths that keep the board on the screen's centerline.
-  const edges = [
-    0,
-    width,
-    ...obstacles.flatMap((r) => [
-      Math.max(0, r.x - gap),
-      Math.min(width, r.x + r.width + gap),
+  const maxWidth = Math.max(0, width - railSpace * 2);
+  // Changes in obstacle intersection occur only at their horizontal edges.
+  const candidates = [
+    maxWidth,
+    height / 2,
+    ...obstacles.flatMap((rect) => [
+      width - 2 * (rect.x + rect.width + gap),
+      2 * (rect.x - gap) - width,
+      Math.max(0, rect.y - gap) / 2,
     ]),
   ];
-  let best: ControlRect = { x: width / 2, y: 0, width: 0, height: 0 };
-  for (const left of edges)
-    for (const right of edges) {
-      if (right <= left) continue;
-      const ceiling = Math.min(
-        height,
+  let best = 0;
+  for (const candidate of candidates) {
+    const size = Math.max(0, Math.min(maxWidth, height / 2, candidate));
+    const left = (width - size) / 2;
+    const right = left + size;
+    if (
+      size > best &&
+      obstacles.every(
+        (rect) =>
+          right + gap <= rect.x ||
+          left >= rect.x + rect.width + gap ||
+          size * 2 + gap <= rect.y,
+      )
+    )
+      best = size;
+  }
+  return { x: (width - best) / 2, y: 0, width: best, height: best * 2 };
+}
+
+/** Rails stop before control targets even when a custom group moves upward. */
+export function computeRailGeometry(
+  board: ControlRect,
+  height: number,
+  controls: ControlGeometry,
+  layout: UserSettings["controlLayout"],
+): { left: ControlRect; right: ControlRect } {
+  const obstacles = controlObstacles(height, controls, layout);
+  const rail = (x: number): ControlRect => ({
+    x,
+    y: 0,
+    width: 48,
+    height: Math.max(
+      0,
+      Math.min(
+        board.height,
         ...obstacles
-          .filter((r) => r.x < right + gap && r.x + r.width > left - gap)
-          .map((r) => Math.max(0, r.y - gap)),
-      );
-      const size = Math.max(
-        0,
-        Math.min(width - 2 * left, 2 * right - width, ceiling / 2),
-      );
-      const x = (width - size) / 2;
-      if (size > best.width) best = { x, y: 0, width: size, height: size * 2 };
-    }
-  return best;
+          .filter((rect) => rect.x < x + 48 && rect.x + rect.width > x)
+          .map((rect) => rect.y - 8),
+      ),
+    ),
+  });
+  return { left: rail(board.x - 56), right: rail(board.x + board.width + 8) };
 }
 
 function bounded(
@@ -124,9 +152,7 @@ export function computeControlGeometry(
   const gap = 8;
   const maxByWidth = Math.floor((usableWidth - 36) / 5);
   // Reserve 280px of board plus 8px separation whenever the viewport allows it.
-  const maxByHeight = Math.floor(
-    (usableHeight - (floating ? gap : 280 + 16)) / 2,
-  );
+  const maxByHeight = Math.floor((usableHeight - (280 + 16)) / 2);
   const buttonSize = Math.max(
     48,
     Math.min(Math.round(60 * scale), maxByWidth, maxByHeight),
@@ -140,7 +166,9 @@ export function computeControlGeometry(
     verticalOffset * Math.min(floating ? 48 : 32, verticalSlack),
   );
   const horizontalSlack = usableWidth - (5 * buttonSize + 3 * gap + 12);
-  const clusterGap = 12 + Math.round(spread * horizontalSlack);
+  const clusterGap =
+    12 +
+    Math.round((usableWidth > usableHeight ? 1 : spread) * horizontalSlack);
   const movementWidth = 3 * buttonSize + 2 * gap;
   const rotationWidth = 2 * buttonSize + gap;
   const outerMargin = Math.floor(
@@ -189,6 +217,22 @@ function separated(a: ControlRect, b: ControlRect): boolean {
   );
 }
 
+function availableRailHeight(geometry: ControlGeometry): number {
+  const board = computeBoardGeometry(
+    geometry.width,
+    geometry.height,
+    geometry,
+    "gamepad",
+  );
+  const rails = computeRailGeometry(
+    board,
+    geometry.height,
+    geometry,
+    "gamepad",
+  );
+  return Math.min(rails.left.height, rails.right.height);
+}
+
 /** Validate a proposed editor move without repositioning any other control. */
 export function canPlaceGamepadGroup(
   geometry: ControlGeometry,
@@ -203,6 +247,10 @@ export function canPlaceGamepadGroup(
     rect.y >= 0 &&
     rect.x + rect.width <= geometry.width &&
     rect.y + rect.height <= geometry.height &&
+    availableRailHeight({
+      ...geometry,
+      groups: { ...geometry.groups!, [id]: rect },
+    }) >= (geometry.minimumRailHeight ?? 0) &&
     GAMEPAD_CONTROL_IDS.every(
       (other) =>
         other === id ||
@@ -326,26 +374,70 @@ function computeGamepadGeometry(
     }
     if (!changed) break;
   }
-  const pad = groups.pad;
-  const s = pad.width / 3;
-  return {
-    width: w,
-    height: h,
-    buttonSize: s,
-    bottomPadding: bottom,
-    overlay: true,
-    orientation: facing,
-    pad,
-    groups,
-    groupOpacity: opacity,
-    buttons: {
-      MOVE_LEFT: { x: pad.x, y: pad.y, width: s, height: s },
-      MOVE_RIGHT: { x: pad.x + 2 * s, y: pad.y, width: s, height: s },
-      SOFT_DROP: { x: pad.x + s, y: pad.y + s, width: s, height: s },
-      HARD_DROP: groups.hardDrop,
-      ROTATE_CW: groups.rotateCW,
-      ROTATE_CCW: groups.rotateCCW,
-      HOLD: groups.hold,
-    },
+  const createGeometry = (
+    placements: Record<GamepadControlId, ControlRect>,
+  ): ControlGeometry => {
+    const pad = placements.pad;
+    const s = pad.width / 3;
+    return {
+      width: w,
+      height: h,
+      buttonSize: s,
+      bottomPadding: bottom,
+      overlay: true,
+      orientation: facing,
+      pad,
+      groups: placements,
+      groupOpacity: opacity,
+      buttons: {
+        MOVE_LEFT: { x: pad.x, y: pad.y, width: s, height: s },
+        MOVE_RIGHT: { x: pad.x + 2 * s, y: pad.y, width: s, height: s },
+        SOFT_DROP: { x: pad.x + s, y: pad.y + s, width: s, height: s },
+        HARD_DROP: placements.hardDrop,
+        ROTATE_CW: placements.rotateCW,
+        ROTATE_CCW: placements.rotateCCW,
+        HOLD: placements.hold,
+      },
+    };
   };
+  // Preserve saved maps, but never let an old custom placement remove access to
+  // Pause or run information. The default arrangement defines the achievable
+  // floor on very short screens; portrait and landscape use their actual tools.
+  const minimum = Math.min(
+    facing === "portrait" ? 256 : 220,
+    availableRailHeight(createGeometry(defaults)),
+  );
+  const pending = new Set(
+    GAMEPAD_CONTROL_IDS.filter((id) => !!custom[id] && !rejected.has(id)),
+  );
+  const collisionCount = (placements: Record<GamepadControlId, ControlRect>) =>
+    GAMEPAD_CONTROL_IDS.reduce(
+      (total, id, index) =>
+        total +
+        GAMEPAD_CONTROL_IDS.slice(index + 1).filter(
+          (other) => !separated(placements[id], placements[other]),
+        ).length,
+      0,
+    );
+  while (
+    (availableRailHeight(createGeometry(groups)) < minimum ||
+      collisionCount(groups) > 0) &&
+    pending.size
+  ) {
+    let best = [...pending][0]!;
+    let bestHeight = -Infinity;
+    for (const id of pending) {
+      const candidate = { ...groups, [id]: defaults[id] };
+      const candidateHeight =
+        availableRailHeight(createGeometry(candidate)) -
+        collisionCount(candidate) * 10000;
+      if (candidateHeight > bestHeight) {
+        best = id;
+        bestHeight = candidateHeight;
+      }
+    }
+    groups[best] = defaults[best];
+    pending.delete(best);
+  }
+  return { ...createGeometry(groups), minimumRailHeight: minimum };
 }
