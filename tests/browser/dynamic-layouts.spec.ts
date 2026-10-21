@@ -9,6 +9,23 @@ for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.goto("/");
     await page.locator('#home [data-action="settings"]').click();
     await page.locator('[name="controlLayout"]').selectOption(layout);
+    await expect(page.locator('[data-action="edit-controls"]')).toBeVisible();
+    await page.locator('[data-action="edit-controls"]').click();
+    await expect(page.locator(".control-editor")).toHaveAttribute(
+      "data-layout",
+      layout,
+    );
+    const box = (await page
+      .locator('[data-editor-control="hardDrop"]')
+      .boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 24, {
+      steps: 4,
+    });
+    await page.mouse.up();
+    await page.locator('[data-editor-action="done"]').click();
+    await expect(page.locator('[name="controlLayout"]')).toHaveValue(layout);
     await expect(page.locator('[name="padMode"]')).toBeVisible();
     await page.locator('[name="padMode"]').selectOption("dynamic");
     await page.locator('#dialog [data-action="close"]').last().click();

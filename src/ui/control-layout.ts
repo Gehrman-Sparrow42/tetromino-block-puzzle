@@ -29,6 +29,7 @@ export interface ControlGeometry {
   width: number;
   /** Actual control deck height, including the empty space below the buttons. */
   height: number;
+  playAreaHeight?: number;
   buttonSize: number;
   bottomPadding: number;
   pad?: ControlRect;
@@ -166,6 +167,8 @@ export function computeControlGeometry(
     return computeGamepadGeometry(width, height, settings, orientation);
   const usableWidth = Math.floor(bounded(width, 360, 276, 10000));
   const usableHeight = Math.floor(bounded(height, 600, 104, 10000));
+  const facing =
+    orientation ?? (usableWidth > usableHeight ? "landscape" : "portrait");
   const scale = bounded(settings.controlScale, 1, 0.85, 2);
   const spread = bounded(settings.controlSpread, 0.65, 0, 1);
   const verticalOffset = bounded(settings.controlHeight, 0.3, 0, 1);
@@ -205,28 +208,36 @@ export function computeControlGeometry(
     ? outerMargin
     : outerMargin + movementWidth + clusterGap;
   const lowerY = buttonSize + gap;
-  const rect = (x: number, y: number) => ({
+  const deckHeight = rowsHeight + bottomPadding;
+  const deckTop = usableHeight - deckHeight;
+  const rect = (x: number, y: number): ControlRect => ({
     x,
     y,
     width: buttonSize,
     height: buttonSize,
   });
-
-  return {
-    width: usableWidth,
-    height: rowsHeight + bottomPadding,
-    buttonSize,
+  return resolveControlGroups(
+    usableWidth,
+    usableHeight,
+    deckHeight,
     bottomPadding,
-    buttons: {
-      MOVE_LEFT: rect(movementX, lowerY),
-      SOFT_DROP: rect(movementX + buttonSize + gap, lowerY),
-      MOVE_RIGHT: rect(movementX + 2 * (buttonSize + gap), lowerY),
-      HARD_DROP: rect(movementX, 0),
-      HOLD: rect(movementX + 2 * (buttonSize + gap), 0),
-      ROTATE_CCW: rect(rotationX, lowerY),
-      ROTATE_CW: rect(rotationX + buttonSize + gap, 0),
+    buttonSize,
+    facing,
+    false,
+    {
+      pad: {
+        x: movementX,
+        y: deckTop + lowerY,
+        width: movementWidth,
+        height: buttonSize,
+      },
+      hardDrop: rect(movementX, deckTop),
+      hold: rect(movementX + 2 * (buttonSize + gap), deckTop),
+      rotateCCW: rect(rotationX, deckTop + lowerY),
+      rotateCW: rect(rotationX + buttonSize + gap, deckTop),
     },
-  };
+    settings,
+  );
 }
 
 function separated(a: ControlRect, b: ControlRect): boolean {
@@ -239,15 +250,16 @@ function separated(a: ControlRect, b: ControlRect): boolean {
 }
 
 function availableRailHeight(geometry: ControlGeometry): number {
+  const stageHeight = geometry.playAreaHeight ?? geometry.height;
   const board = computeBoardGeometry(
     geometry.width,
-    geometry.height,
+    stageHeight,
     geometry,
     "gamepad",
   );
   const rails = computeRailGeometry(
     board,
-    geometry.height,
+    stageHeight,
     geometry,
     "gamepad",
   );
@@ -260,12 +272,17 @@ export function clampGamepadResize(
   id: GamepadControlId,
   placement: GamepadControlPlacement,
 ): GamepadControlPlacement {
+  const stageHeight = geometry.playAreaHeight ?? geometry.height;
+  const connected = !!geometry.pad;
   const cell = Math.max(
     48,
     Math.round(geometry.baseButtonSize! * placement.size),
   );
-  const halfWidth = (cell * (id === "pad" ? 3 : 1)) / geometry.width / 2;
-  const halfHeight = (cell * (id === "pad" ? 2 : 1)) / geometry.height / 2;
+  const width =
+    id === "pad" ? cell * 3 + (connected ? 0 : 16) : cell;
+  const height = cell * (id === "pad" && connected ? 2 : 1);
+  const halfWidth = width / geometry.width / 2;
+  const halfHeight = height / stageHeight / 2;
   return {
     ...placement,
     x: Math.max(halfWidth, Math.min(1 - halfWidth, placement.x)),
@@ -279,14 +296,16 @@ export function canPlaceGamepadGroup(
   id: GamepadControlId,
   rect: ControlRect,
 ): boolean {
+  const stageHeight = geometry.playAreaHeight ?? geometry.height;
+  const connected = !!geometry.pad;
   return (
     Object.values(rect).every(Number.isFinite) &&
-    rect.width >= (id === "pad" ? 144 : 48) &&
-    rect.height >= (id === "pad" ? 96 : 48) &&
+    rect.width >= (id === "pad" ? (connected ? 144 : 160) : 48) &&
+    rect.height >= (id === "pad" && connected ? 96 : 48) &&
     rect.x >= 0 &&
     rect.y >= 0 &&
     rect.x + rect.width <= geometry.width &&
-    rect.y + rect.height <= geometry.height &&
+    rect.y + rect.height <= stageHeight &&
     availableRailHeight({
       ...geometry,
       groups: { ...geometry.groups!, [id]: rect },
@@ -335,26 +354,6 @@ function computeGamepadGeometry(
     );
     baseCell = Math.min(baseCell, Math.max(48, fitBetweenSides));
   }
-  const custom = settings.gamepadLayouts?.[facing] ?? {};
-  const cells = Object.fromEntries(
-    GAMEPAD_CONTROL_IDS.map((id) => [
-      id,
-      Math.round(
-        bounded(
-          baseCell * bounded(custom[id]?.size ?? 1, 1, 0.75, 2),
-          baseCell,
-          48,
-          Math.min(w / (id === "pad" ? 3 : 1), h / (id === "pad" ? 2 : 1)),
-        ),
-      ),
-    ]),
-  ) as Record<GamepadControlId, number>;
-  const opacity = Object.fromEntries(
-    GAMEPAD_CONTROL_IDS.map((id) => [
-      id,
-      bounded(custom[id]?.opacity ?? settings.controlOpacity, 0.18, 0.08, 0.6),
-    ]),
-  ) as Record<GamepadControlId, number>;
   const padSize = baseCell;
   const actionSize = baseCell;
   const bottom = Math.min(
@@ -378,13 +377,62 @@ function computeGamepadGeometry(
     rotateCCW: rect("rotateCCW", actionX, lowerY),
     rotateCW: rect("rotateCW", actionX + actionSize + gap, lowerY),
   };
+  return resolveControlGroups(
+    w,
+    h,
+    h,
+    bottom,
+    baseCell,
+    facing,
+    true,
+    defaults,
+    settings,
+  );
+}
+
+function resolveControlGroups(
+  w: number,
+  h: number,
+  deckHeight: number,
+  bottom: number,
+  baseCell: number,
+  facing: ControlOrientation,
+  connected: boolean,
+  defaults: Record<GamepadControlId, ControlRect>,
+  settings: UserSettings,
+): ControlGeometry {
+  const custom = settings.gamepadLayouts?.[facing] ?? {};
+  const padGap = connected ? 0 : 8;
+  const padRows = connected ? 2 : 1;
+  const cells = Object.fromEntries(
+    GAMEPAD_CONTROL_IDS.map((id) => [
+      id,
+      Math.round(
+        bounded(
+          baseCell * bounded(custom[id]?.size ?? 1, 1, 0.75, 2),
+          baseCell,
+          48,
+          Math.min(
+            id === "pad" ? Math.floor((w - 2 * padGap) / 3) : w,
+            Math.floor(h / (id === "pad" ? padRows : 1)),
+          ),
+        ),
+      ),
+    ]),
+  ) as Record<GamepadControlId, number>;
+  const opacity = Object.fromEntries(
+    GAMEPAD_CONTROL_IDS.map((id) => [
+      id,
+      bounded(custom[id]?.opacity ?? settings.controlOpacity, 0.18, 0.08, 0.6),
+    ]),
+  ) as Record<GamepadControlId, number>;
   const groups = Object.fromEntries(
     GAMEPAD_CONTROL_IDS.map((id) => {
       const p = custom[id];
       const r = {
         ...defaults[id],
-        width: cells[id] * (id === "pad" ? 3 : 1),
-        height: cells[id] * (id === "pad" ? 2 : 1),
+        width: id === "pad" ? cells.pad * 3 + 2 * padGap : cells[id],
+        height: cells[id] * (id === "pad" ? padRows : 1),
       };
       return [
         id,
@@ -426,30 +474,46 @@ function computeGamepadGeometry(
     }
     if (!changed) break;
   }
+  const deckTop = connected ? 0 : h - deckHeight;
+  const shift = (rect: ControlRect): ControlRect => ({
+    ...rect,
+    y: rect.y - deckTop,
+  });
   const createGeometry = (
     placements: Record<GamepadControlId, ControlRect>,
   ): ControlGeometry => {
     const pad = placements.pad;
-    const s = pad.width / 3;
+    const s = (pad.width - 2 * padGap) / 3;
     return {
       width: w,
-      height: h,
+      height: deckHeight,
+      playAreaHeight: h,
       buttonSize: s,
       baseButtonSize: baseCell,
       bottomPadding: bottom,
-      overlay: true,
+      overlay: connected || settings.controlLayout === "floating",
       orientation: facing,
-      pad,
+      ...(connected ? { pad } : {}),
       groups: placements,
       groupOpacity: opacity,
       buttons: {
-        MOVE_LEFT: { x: pad.x, y: pad.y, width: s, height: s },
-        MOVE_RIGHT: { x: pad.x + 2 * s, y: pad.y, width: s, height: s },
-        SOFT_DROP: { x: pad.x + s, y: pad.y + s, width: s, height: s },
-        HARD_DROP: placements.hardDrop,
-        ROTATE_CW: placements.rotateCW,
-        ROTATE_CCW: placements.rotateCCW,
-        HOLD: placements.hold,
+        MOVE_LEFT: { x: pad.x, y: pad.y - deckTop, width: s, height: s },
+        MOVE_RIGHT: {
+          x: pad.x + 2 * (s + padGap),
+          y: pad.y - deckTop,
+          width: s,
+          height: s,
+        },
+        SOFT_DROP: {
+          x: pad.x + s + padGap,
+          y: pad.y - deckTop + (connected ? s : 0),
+          width: s,
+          height: s,
+        },
+        HARD_DROP: shift(placements.hardDrop),
+        ROTATE_CW: shift(placements.rotateCW),
+        ROTATE_CCW: shift(placements.rotateCCW),
+        HOLD: shift(placements.hold),
       },
     };
   };

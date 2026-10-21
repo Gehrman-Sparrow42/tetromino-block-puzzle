@@ -327,10 +327,6 @@ export function startApp(root: HTMLDivElement) {
     draw();
   };
   function syncControlFields() {
-    const edit = dialog.querySelector<HTMLButtonElement>(
-      '[data-action="edit-controls"]',
-    );
-    if (edit) edit.hidden = settings.controlLayout !== "gamepad";
     for (const name of ["gamepadPreset"]) {
       const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
       if (row) row.hidden = settings.controlLayout !== "gamepad";
@@ -842,7 +838,7 @@ export function startApp(root: HTMLDivElement) {
     )
       settings = { ...settings, [input.name]: input.value };
     else settings = { ...settings, [input.name]: Number(input.value) };
-    if (input.name === "gamepadPreset")
+    if (input.name === "gamepadPreset" || input.name === "controlLayout")
       settings.gamepadLayouts = { portrait: {}, landscape: {} };
     if (!saveSettings(settings)) el("storage-notice").hidden = false;
     applySettings();

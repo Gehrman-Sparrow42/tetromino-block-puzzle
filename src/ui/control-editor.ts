@@ -76,11 +76,11 @@ export class ControlEditor {
   ) {
     this.getViewport = getViewport;
     this.settings = structuredClone(settings);
-    this.settings.controlLayout = "gamepad";
     this.callbacks = callbacks;
     this.orientation = this.readOrientation();
     this.wrapper = document.createElement("div");
     this.wrapper.className = "control-editor";
+    this.wrapper.dataset.layout = this.settings.controlLayout;
     this.wrapper.setAttribute("role", "dialog");
     this.wrapper.setAttribute("aria-modal", "true");
     this.wrapper.setAttribute("aria-labelledby", "control-editor-title");
@@ -121,7 +121,9 @@ export class ControlEditor {
       target.setAttribute("aria-pressed", String(id === this.selected));
       target.innerHTML =
         id === "pad"
-          ? `<svg viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M2 2H298V98H198V198H102V98H2Z"/><path d="m58 36-18 14 18 14m184-28 18 14-18 14m-106 85 14 18 14-18"/></svg>`
+          ? this.settings.controlLayout === "gamepad"
+            ? `<svg viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M2 2H298V98H198V198H102V98H2Z"/><path d="m58 36-18 14 18 14m184-28 18 14-18 14m-106 85 14 18 14-18"/></svg>`
+            : `<svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M2 2H94V98H2ZM104 2H196V98H104ZM206 2H298V98H206Z"/><path d="m56 36-18 14 18 14m188-28 18 14-18 14m-108 8 14 18 14-18"/></svg>`
           : `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">${PATHS[id]}</svg>`;
       this.stage.querySelector(".control-editor-frame")!.append(target);
       this.targets.set(id, target);
@@ -250,10 +252,11 @@ export class ControlEditor {
   private placement(id: GamepadControlId): GamepadControlPlacement {
     const saved = this.settings.gamepadLayouts[this.orientation][id];
     const geometry = this.geometry();
+    const stageHeight = geometry.playAreaHeight ?? geometry.height;
     const rect = geometry.groups![id];
     return {
       x: (rect.x + rect.width / 2) / geometry.width,
-      y: (rect.y + rect.height / 2) / geometry.height,
+      y: (rect.y + rect.height / 2) / stageHeight,
       size: saved?.size ?? 1,
       opacity: saved?.opacity ?? this.settings.controlOpacity,
     };
@@ -306,7 +309,7 @@ export class ControlEditor {
       viewport.width,
       viewport.height,
       geometry,
-      "gamepad",
+      this.settings.controlLayout,
     );
     Object.assign(
       frame.querySelector<HTMLElement>(".control-editor-board")!.style,
@@ -321,7 +324,7 @@ export class ControlEditor {
       board,
       viewport.height,
       geometry,
-      "gamepad",
+      this.settings.controlLayout,
     );
     for (const [side, rect] of Object.entries(rails)) {
       Object.assign(
@@ -470,18 +473,20 @@ export class ControlEditor {
     const previous = map[id];
     map[id] = placement;
     const after = this.geometry();
+    const stageHeight = after.playAreaHeight ?? after.height;
+    const connected = !!after.pad;
     const rect = after.groups![id];
     // A resolved fallback must never silently replace the requested edit.
     const centered =
       Math.abs((rect.x + rect.width / 2) / after.width - placement.x) < 0.002 &&
-      Math.abs((rect.y + rect.height / 2) / after.height - placement.y) < 0.002;
+      Math.abs((rect.y + rect.height / 2) / stageHeight - placement.y) < 0.002;
     const cell = Math.max(
       48,
       Math.round(after.baseButtonSize! * placement.size),
     );
     const requestedSizeFits =
-      rect.width === cell * (id === "pad" ? 3 : 1) &&
-      rect.height === cell * (id === "pad" ? 2 : 1);
+      rect.width === (id === "pad" ? cell * 3 + (connected ? 0 : 16) : cell) &&
+      rect.height === cell * (id === "pad" && connected ? 2 : 1);
     const valid =
       centered && requestedSizeFits && canPlaceGamepadGroup(before, id, rect);
     if (!valid) {
