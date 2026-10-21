@@ -255,6 +255,13 @@ test("control presets, sliders and reset are live and safe", async ({
     .getByRole("button", { name: "Settings", exact: true })
     .click();
   await expect(page.locator(".control-preview i")).toHaveCount(7);
+  const settingsTargets = await page
+    .locator('#settings-form select, #settings-form input[type="range"]')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getBoundingClientRect().height),
+    );
+  for (const height of settingsTargets)
+    expect(height).toBeGreaterThanOrEqual(48);
   const runBefore = await page.evaluate(() =>
     localStorage.getItem("tetromino_v2_run"),
   );

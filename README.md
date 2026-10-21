@@ -48,6 +48,8 @@ On Windows use `gradlew.bat`, or `scripts/build-android.ps1 -JavaHome <JDK21> -A
 
 ## Code map
 
+Impeccable is initialized for design work on this project. See [the usage guide](docs/IMPECCABLE.md) for global installation paths, commands and the recorded audit.
+
 - `src/contracts`: shared state, settings and action types.
 - `src/engine`: deterministic seeded rules and snapshot validation, without browser dependencies.
 - `src/ui`: Canvas renderer, responsive screens and cancel-safe keyboard/touch controls. `control-layout.ts` computes bounded touch geometry; `themes.ts` supplies shared interface/canvas palettes.
