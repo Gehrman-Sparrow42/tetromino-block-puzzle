@@ -20,6 +20,78 @@ beforeEach(async () => {
 });
 
 describe("settings and scores", () => {
+  it("adds appearance defaults to old settings without changing saved runs or audio", () => {
+    const run = JSON.stringify(createInitialState("marathon", 123));
+    data.set("tetromino_v2_run", run);
+    data.set(
+      "tetromino_v2_settings",
+      JSON.stringify({
+        soundEnabled: false,
+        soundVolume: 0.7,
+        controlScheme: "hybrid",
+        dasMs: 180,
+        arrMs: 24,
+      }),
+    );
+    expect(storage.loadSettings()).toEqual({
+      ...storage.DEFAULT_SETTINGS,
+      soundEnabled: false,
+      soundVolume: 0.7,
+      controlScheme: "hybrid",
+      dasMs: 180,
+      arrMs: 24,
+    });
+    expect(data.get("tetromino_v2_run")).toBe(run);
+  });
+
+  it("clamps appearance fields and rejects invalid theme or layout names", () => {
+    data.set(
+      "tetromino_v2_settings",
+      JSON.stringify({
+        theme: "__proto__",
+        controlLayout: "custom",
+        controlScale: 100,
+        controlOpacity: -1,
+        controlSpread: 2,
+        controlHeight: -5,
+      }),
+    );
+    expect(storage.loadSettings()).toMatchObject({
+      theme: "ink",
+      controlLayout: "thumbs",
+      controlScale: 1.3,
+      controlOpacity: 0.08,
+      controlSpread: 1,
+      controlHeight: 0,
+    });
+    storage.saveSettings({
+      ...storage.DEFAULT_SETTINGS,
+      controlScale: NaN,
+      controlOpacity: Infinity,
+      controlHeight: -Infinity,
+      controlSpread: NaN,
+    });
+    expect(storage.loadSettings()).toEqual(storage.DEFAULT_SETTINGS);
+  });
+
+  it("round-trips all themes and control presets", () => {
+    for (const theme of ["ink", "lcd", "neon", "paper"] as const) {
+      for (const controlLayout of ["thumbs", "mirror", "floating"] as const) {
+        const settings = {
+          ...storage.DEFAULT_SETTINGS,
+          theme,
+          controlLayout,
+          controlScale: 1.15,
+          controlOpacity: 0.35,
+          controlSpread: 0.8,
+          controlHeight: 0.6,
+        };
+        expect(storage.saveSettings(settings)).toBe(true);
+        expect(storage.loadSettings()).toEqual(settings);
+      }
+    }
+  });
+
   it("normalizes finite bounds, invalid fields and corrupted JSON", () => {
     data.set("tetromino_v2_settings", "{broken");
     expect(storage.loadSettings()).toEqual(storage.DEFAULT_SETTINGS);

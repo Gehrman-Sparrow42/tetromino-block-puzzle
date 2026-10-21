@@ -59,6 +59,8 @@ export interface GameStateSnapshot {
   piecesPlaced: number;
   lastEvent: ClearEvent | null;
 }
+export type ThemeId = "ink" | "lcd" | "neon" | "paper";
+export type ControlLayoutId = "thumbs" | "mirror" | "floating";
 export interface UserSettings {
   soundEnabled: boolean;
   soundVolume: number;
@@ -68,6 +70,12 @@ export interface UserSettings {
   controlScheme: "buttons" | "hybrid";
   dasMs: number;
   arrMs: number;
+  theme: ThemeId;
+  controlLayout: ControlLayoutId;
+  controlScale: number;
+  controlOpacity: number;
+  controlSpread: number;
+  controlHeight: number;
 }
 export interface PersonalBestStats {
   marathonHighScore: number;

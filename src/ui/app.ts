@@ -2,6 +2,7 @@ import type {
   GameCommand,
   GameMode,
   PersonalBestStats,
+  UserSettings,
 } from "../contracts/game-contract";
 import { createInitialState, applyCommand } from "../engine/engine";
 import {
@@ -12,12 +13,15 @@ import {
   loadRun,
   saveRun,
   clearRun,
+  DEFAULT_SETTINGS,
 } from "../platform/storage";
 import { playSound } from "../platform/audio";
 import { pulseHaptic } from "../platform/haptics";
 import { setupLifecycle, exitApp } from "../platform/lifecycle";
 import { drawBoard, drawPreview } from "./canvas-renderer";
 import { TouchControls } from "./touch-controls";
+import { applyTheme, getTheme } from "./themes";
+import { computeControlGeometry } from "./control-layout";
 
 const MODE_NAMES: Record<GameMode, string> = {
   marathon: "Marathon",
@@ -39,8 +43,17 @@ export function formatTime(ms: number, hundredths = false, countdown = false) {
         .padStart(2, "0")}`
     : clock;
 }
-const control = (command: string, icon: string, label: string, cls = "") =>
-  `<button class="control ${cls}" data-command="${command}" aria-label="${label}"><span aria-hidden="true">${icon}</span><small>${label}</small></button>`;
+const CONTROL_ICONS: Record<string, string> = {
+  MOVE_LEFT: "←",
+  MOVE_RIGHT: "→",
+  SOFT_DROP: "↓",
+  HARD_DROP: `<svg viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 7 6 7-6M9 14l7 6 7-6M8 26h16"/></svg>`,
+  ROTATE_CCW: "↶",
+  ROTATE_CW: "↷",
+  HOLD: "⇄",
+};
+const control = (command: string, label: string) =>
+  `<button class="control" data-command="${command}" aria-label="${label}"><span aria-hidden="true">${CONTROL_ICONS[command]}</span></button>`;
 
 export function startApp(root: HTMLDivElement) {
   let settings = loadSettings(),
@@ -57,47 +70,105 @@ export function startApp(root: HTMLDivElement) {
   root.innerHTML = `
     <main class="shell">
       <section id="home" class="home-screen" aria-label="Main menu">
-        <header class="home-top"><span class="eyebrow">OFFLINE ARCADE / 01</span><button class="icon-button" data-action="settings" aria-label="Settings">☷</button></header>
-        <div class="brand"><div class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></div><h1>AFTER<br><span>BLOCK</span></h1><p>TETROMINO · FIND YOUR FLOW</p></div>
-        <div class="home-intro"><h2>One more piece.</h2><span>Pure play. Your pace.</span></div>
-        <button id="resume-card" class="resume-card" data-action="resume"><span><small>RIGHT WHERE YOU LEFT OFF</small><strong>Continue your run</strong><em id="resume-detail"></em></span><b>↗</b></button>
+        <h1>Afterblock</h1>
+        <button id="resume-card" class="resume-card" data-action="resume"><span><strong>Resume</strong><small id="resume-detail"></small></span><span aria-hidden="true">→</span></button>
         <div class="mode-list" aria-label="Choose a game mode">
-          <button class="mode-card" data-mode="marathon"><span class="mode-index">01</span><span><strong>Marathon</strong><small>Settle in. Clear lines. Go further.</small></span><span class="mode-glyph">∞</span></button>
-          <button class="mode-card" data-mode="sprint40"><span class="mode-index">02</span><span><strong>Sprint 40</strong><small>Forty lines. Race your best time.</small></span><span class="mode-glyph">↗</span></button>
-          <button class="mode-card" data-mode="ultra120"><span class="mode-index">03</span><span><strong>Ultra 120</strong><small>Two minutes. Make every piece count.</small></span><span class="mode-glyph">◷</span></button>
+          <button class="mode-card" data-mode="marathon"><span><strong>Marathon</strong><small>Endless</small></span><span aria-hidden="true">∞</span></button>
+          <button class="mode-card" data-mode="sprint40"><span><strong>Sprint 40</strong><small>40 lines</small></span><span aria-hidden="true">→</span></button>
+          <button class="mode-card" data-mode="ultra120"><span><strong>Ultra 120</strong><small>2 minutes</small></span><span aria-hidden="true">◷</span></button>
         </div>
-        <div class="home-links"><button data-action="records">Personal records <span>↗</span></button><button data-action="help">How to play <span>↗</span></button></div>
-        <footer class="home-footer"><span>NO ADS. NO DISTRACTIONS.</span><span>JUST BLOCKS.</span></footer>
+        <nav class="home-links" aria-label="Menu"><button data-action="records">Records</button><button data-action="settings">Settings</button><button data-action="help">Help</button></nav>
       </section>
       <section id="game" class="game-screen" hidden aria-label="Game">
-        <header class="game-top"><button class="wordmark" data-action="pause" aria-label="Pause game">AFTERBLOCK<span id="mode-label">MARATHON</span></button><button class="icon-button pause-button" data-action="pause" aria-label="Pause game">Ⅱ</button></header>
-        <div class="scoreboard"><div class="primary-score"><span>SCORE</span><strong id="score">0</strong></div><div><span>LINES</span><strong id="lines">0</strong></div><div><span>LEVEL</span><strong id="level">1</strong></div><div><span id="time-label">TIME</span><strong id="time">00:00</strong></div></div>
-        <div class="playfield">
-          <aside class="left-rail"><button class="hold-panel" data-command="HOLD" aria-label="Hold piece"><span class="rail-label">HOLD <small>C</small></span><canvas id="hold" aria-hidden="true"></canvas></button><div class="rail-bottom"><span id="goal">ENDLESS<br>POSSIBILITY</span><div class="vertical-rule"></div><span class="tiny-word">KEEP<br>YOUR<br>FLOW.</span></div></aside>
-          <div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div class="board-corners" aria-hidden="true"></div><div id="feedback" class="feedback" aria-live="polite"></div></div>
-          <aside class="next-rail"><span class="rail-label">NEXT</span>${Array.from({ length: 5 }, (_, i) => `<canvas class="next-piece" id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}<span class="queue-foot">PLAN<br>AHEAD.</span></aside>
+        <header class="game-hud">
+          <div class="hud-score"><span id="mode-label">Marathon</span><strong id="score">0</strong></div>
+          <div><span>Lines</span><strong id="lines">0</strong></div>
+          <div><span>Level</span><strong id="level">1</strong></div>
+          <div><span id="time-label">Time</span><strong id="time">00:00</strong></div>
+          <button class="icon-button pause-button" data-action="pause" aria-label="Pause game">Ⅱ</button>
+        </header>
+        <div class="preview-strip">
+          <button class="hold-panel" data-command="HOLD" aria-label="Hold piece"><span>Hold</span><canvas id="hold" aria-hidden="true"></canvas></button>
+          <div class="next-strip"><span>Next</span>${Array.from({ length: 5 }, (_, i) => `<canvas id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}</div>
         </div>
-        <div class="lock-row"><span>LOCK</span><div class="lock-track"><i id="lock-meter"></i></div><span id="piece-count">0 PIECES</span></div>
-        <div class="control-deck" aria-label="Game controls">
-          <div class="movement-cluster">${control("MOVE_LEFT", "←", "Left")}${control("SOFT_DROP", "↓", "Soft drop")}${control("MOVE_RIGHT", "→", "Right")}</div>
-          <div class="rotation-cluster">${control("ROTATE_CCW", "↶", "Rotate left")}${control("ROTATE_CW", "↷", "Rotate right")}${control("HOLD", "⇄", "Hold")}</div>
-          ${control("HARD_DROP", "↓", "Hard drop", "hard-drop")}
+        <div class="play-area">
+          <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
+          <div class="control-deck" aria-label="Game controls">
+            ${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
+          </div>
         </div>
-        <div class="keyboard-hint">← ↓ → MOVE <span>Z / X ROTATE</span> C HOLD <span>SPACE DROP</span></div>
       </section>
     </main>
     <div id="modal-layer" class="modal-layer" hidden><section id="dialog" class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"></section></div>
-    <div id="storage-notice" class="storage-notice" role="status" hidden>Storage unavailable. This run stays in memory.</div>`;
+    <div id="storage-notice" class="storage-notice" role="status" hidden>Storage unavailable. Progress cannot be saved.</div>`;
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     root.querySelector<T>(`#${id}`)!;
   const dialog = el("dialog"),
     layer = el("modal-layer"),
     canvas = el<HTMLCanvasElement>("board");
   let lastFocus: HTMLElement | null = null;
+  function layoutControls() {
+    const area = root.querySelector<HTMLElement>(".play-area")!;
+    const width = area.clientWidth,
+      height = area.clientHeight;
+    if (!width || !height) return;
+    const geometry = computeControlGeometry(width, height, settings);
+    const deck = root.querySelector<HTMLElement>(".control-deck")!;
+    deck.style.height = `${geometry.height}px`;
+    for (const [action, rect] of Object.entries(geometry.buttons)) {
+      const button = deck.querySelector<HTMLElement>(
+        `[data-command="${action}"]`,
+      )!;
+      Object.assign(button.style, {
+        left: `${rect.x}px`,
+        top: `${rect.y}px`,
+        width: `${rect.width}px`,
+        height: `${rect.height}px`,
+      });
+    }
+    const boardHeight = Math.max(
+      0,
+      height - (settings.controlLayout === "floating" ? 0 : geometry.height),
+    );
+    const board = root.querySelector<HTMLElement>(".board-wrap")!;
+    const boardWidth = Math.min(width, boardHeight / 2);
+    board.style.width = `${boardWidth}px`;
+    board.style.height = `${boardWidth * 2}px`;
+    drawControlPreview();
+  }
+  function drawControlPreview() {
+    const preview = dialog.querySelector<HTMLElement>(".control-preview");
+    if (!preview) return;
+    const actualWidth = preview.clientWidth;
+    if (!actualWidth) return;
+    const geometry = computeControlGeometry(
+      Math.max(280, actualWidth),
+      420,
+      settings,
+    );
+    // The miniature may shrink below playable touch-target sizes inside a narrow sheet.
+    const scale = Math.min(1, actualWidth / geometry.width);
+    preview.style.height = `${geometry.height * scale}px`;
+    preview.innerHTML = Object.entries(geometry.buttons)
+      .map(
+        ([action, rect]) =>
+          `<i style="left:${rect.x * scale}px;top:${rect.y * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px"><span style="display:grid;place-items:center;transform:scale(${scale})">${CONTROL_ICONS[action]}</span></i>`,
+      )
+      .join("");
+  }
   const applySettings = () => {
+    controls.releaseAll();
     root.classList.toggle("reduce-motion", settings.reducedMotion);
+    el("game").dataset.layout = settings.controlLayout;
+    root.style.setProperty(
+      "--control-opacity",
+      String(settings.controlOpacity),
+    );
+    applyTheme(settings.theme);
+    layoutControls();
+    drawControlPreview();
+    draw();
   };
-  applySettings();
   function persist() {
     if (
       state &&
@@ -119,13 +190,14 @@ export function startApp(root: HTMLDivElement) {
     el("resume-card").hidden = !available;
     if (state)
       el("resume-detail").textContent =
-        `${MODE_NAMES[state.mode]} · ${num(state.score)} points · ${state.lines} lines`;
+        `${MODE_NAMES[state.mode]} · ${num(state.score)}`;
   }
   function showModal(type: string, content: string) {
     controls.releaseAll();
     lastFocus = document.activeElement as HTMLElement;
     modal = type;
     layer.hidden = false;
+    root.querySelector<HTMLElement>(".shell")!.inert = true;
     dialog.innerHTML = content;
     dialog.scrollTop = 0;
     dialog.focus();
@@ -133,11 +205,12 @@ export function startApp(root: HTMLDivElement) {
   function closeModal() {
     modal = "";
     layer.hidden = true;
+    root.querySelector<HTMLElement>(".shell")!.inert = false;
     dialog.innerHTML = "";
     if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true });
   }
-  const sheetHead = (eyebrow: string, title: string, close = true) =>
-    `<div class="sheet-top"><span class="eyebrow">${eyebrow}</span>${close ? '<button class="icon-button" data-action="close" aria-label="Close dialog">×</button>' : ""}</div><h2 id="dialog-title">${title}</h2>`;
+  const sheetHead = (title: string, close = true) =>
+    `<div class="sheet-top"><h2 id="dialog-title">${title}</h2>${close ? '<button class="icon-button" data-action="close" aria-label="Close dialog">×</button>' : ""}</div>`;
   function pause() {
     if (
       screen !== "game" ||
@@ -150,7 +223,7 @@ export function startApp(root: HTMLDivElement) {
     persist();
     showModal(
       "pause",
-      `${sheetHead("A LITTLE BREATHING ROOM", "On pause.", false)}<p>Your next move can wait. This run is saved.</p><div class="sheet-stats"><span>SCORE<strong>${num(state.score)}</strong></span><span>LINES<strong>${state.lines}</strong></span><span>TIME<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">Keep playing <span>→</span></button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart run</button><button data-action="home">Main menu</button></div>`,
+      `${sheetHead("Paused", false)}<div class="sheet-stats"><span>Score<strong>${num(state.score)}</strong></span><span>Lines<strong>${state.lines}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">Resume</button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart</button><button data-action="home">Menu</button></div>`,
     );
   }
   function resume() {
@@ -161,6 +234,7 @@ export function startApp(root: HTMLDivElement) {
     el("game").hidden = false;
     applyCommand(state, { type: "RESUME" });
     previous = performance.now();
+    layoutControls();
     root
       .querySelectorAll<HTMLButtonElement>("button")
       .forEach((button) => button.blur());
@@ -188,7 +262,7 @@ export function startApp(root: HTMLDivElement) {
       }
       showModal(
         "confirm",
-        `${sheetHead("A FRESH START", "Replace this run?")}<p>Your saved ${MODE_NAMES[state.mode]} run will be replaced. Your personal records stay with you.</p><button class="primary-button" data-action="confirm-new">Start ${MODE_NAMES[mode]} <span>→</span></button><button class="secondary-button" data-action="close">Keep current run</button>`,
+        `${sheetHead("Replace saved run?")}<p>Your ${MODE_NAMES[state.mode]} run will be replaced.</p><button class="primary-button" data-action="confirm-new">Start ${MODE_NAMES[mode]}</button><button class="secondary-button" data-action="close">Cancel</button>`,
       );
     } else newRun(mode);
   }
@@ -197,28 +271,89 @@ export function startApp(root: HTMLDivElement) {
       applyCommand(state, { type: "PAUSE" });
       persist();
     }
-    const toggle = (
-      key: string,
+    const toggle = (key: keyof UserSettings, title: string, value: boolean) =>
+      `<label class="setting-row"><span>${title}</span><input type="checkbox" name="${key}" ${value ? "checked" : ""}/></label>`;
+    const range = (
+      key: keyof UserSettings,
       title: string,
-      detail: string,
-      value: boolean,
+      min: number,
+      max: number,
+      step: number,
+      label = title,
     ) =>
-      `<label class="setting-row"><span><strong>${title}</strong><small>${detail}</small></span><input type="checkbox" name="${key}" ${value ? "checked" : ""}/><i class="switch" aria-hidden="true"></i></label>`;
+      `<label class="setting-row range-row"><span>${title}</span><input name="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" aria-label="${label}"/></label>`;
+    const select = (
+      key: keyof UserSettings,
+      title: string,
+      options: [string, string][],
+      label = title,
+    ) =>
+      `<label class="setting-row"><span>${title}</span><select name="${key}" aria-label="${label}">${options.map(([value, text]) => `<option value="${value}" ${settings[key] === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
     showModal(
       "settings",
-      `${sheetHead("MAKE IT YOURS", "Your setup.")}<form id="settings-form">${toggle("soundEnabled", "Sound", "Soft, procedural arcade tones", settings.soundEnabled)}<label class="setting-row range-row"><span><strong>Volume</strong><small>Quiet or a little louder</small></span><input name="soundVolume" type="range" min="0" max="1" step=".05" value="${settings.soundVolume}" aria-label="Sound volume"/></label>${toggle("hapticsEnabled", "Haptics", "A little feedback on supported devices", settings.hapticsEnabled)}${toggle("ghostEnabled", "Landing guide", "Preview where your piece will land", settings.ghostEnabled)}${toggle("reducedMotion", "Reduced motion", "Keep visual feedback still", settings.reducedMotion)}<label class="setting-row select-row"><span><strong>Touch controls</strong><small>Buttons always stay available</small></span><select name="controlScheme" aria-label="Touch control scheme"><option value="buttons" ${settings.controlScheme === "buttons" ? "selected" : ""}>Buttons</option><option value="hybrid" ${settings.controlScheme === "hybrid" ? "selected" : ""}>Buttons + swipes</option></select></label><label class="setting-row range-row"><span><strong>Move delay</strong><small>Hold before repeating · milliseconds</small></span><input name="dasMs" type="range" min="80" max="300" step="5" value="${settings.dasMs}" aria-label="Move repeat delay"/></label><label class="setting-row range-row"><span><strong>Repeat speed</strong><small>Lower is faster · milliseconds</small></span><input name="arrMs" type="range" min="16" max="100" step="1" value="${settings.arrMs}" aria-label="Move repeat interval"/></label></form><button class="primary-button" data-action="close">All set <span>✓</span></button>`,
+      `${sheetHead("Settings")}<form id="settings-form">
+      ${select("theme", "Theme", [
+        ["ink", "Ink"],
+        ["lcd", "LCD"],
+        ["neon", "Neon"],
+        ["paper", "Paper"],
+      ])}
+      <h3>Controls</h3>
+      ${select(
+        "controlLayout",
+        "Layout",
+        [
+          ["thumbs", "Thumb"],
+          ["mirror", "Left-handed"],
+          ["floating", "Floating"],
+        ],
+        "Control layout",
+      )}
+      <div class="control-preview" aria-hidden="true"></div>
+      ${range("controlScale", "Size", 0.85, 1.3, 0.01, "Control size")}
+      ${range("controlOpacity", "Opacity", 0.08, 0.6, 0.01, "Control opacity")}
+      ${range("controlSpread", "Spacing", 0, 1, 0.01, "Control spacing")}
+      ${range("controlHeight", "Height", 0, 1, 0.01, "Control height")}
+      <button type="button" class="secondary-button" data-action="reset-controls">Reset controls</button>
+      ${select(
+        "controlScheme",
+        "Input",
+        [
+          ["buttons", "Buttons"],
+          ["hybrid", "Buttons + swipes"],
+        ],
+        "Touch control scheme",
+      )}
+      ${range("dasMs", "Move delay", 80, 300, 5, "Move repeat delay")}
+      ${range("arrMs", "Repeat interval", 16, 100, 1, "Move repeat interval")}
+      <h3>Sound & display</h3>
+      ${toggle("soundEnabled", "Sound", settings.soundEnabled)}
+      ${range("soundVolume", "Volume", 0, 1, 0.05, "Sound volume")}
+      ${toggle("hapticsEnabled", "Haptics", settings.hapticsEnabled)}
+      ${toggle("ghostEnabled", "Ghost piece", settings.ghostEnabled)}
+      ${toggle("reducedMotion", "Reduced motion", settings.reducedMotion)}
+      </form><button class="primary-button" data-action="close">Done</button>`,
     );
+    drawControlPreview();
   }
   function showRecords(current: PersonalBestStats) {
     showModal(
       "records",
-      `${sheetHead("YOUR OWN HIGH WATER MARK", "Personal bests.")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} completed runs. Stored on this device.</p><button class="primary-button" data-action="close">Back to it <span>→</span></button>`,
+      `${sheetHead("Records")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} games</p><button class="primary-button" data-action="close">Close</button>`,
     );
   }
   function help() {
     showModal(
       "help",
-      `${sheetHead("A FEW SIMPLE MOVES", "Find your flow.")}<div class="help-copy"><p>Fit the falling pieces together. Fill a horizontal row to clear it and make room for more.</p><h3>Move, turn, commit.</h3><p>Use ← / → to move. Hold ↓ for a soft drop. Rotate with ↶ / ↷. Hard drop places a piece instantly at its landing guide.</p><h3>Think one piece ahead.</h3><p>Hold swaps your current piece once per turn. The NEXT rail shows your next five pieces. Every seven-piece bag includes each shape once.</p><h3>Make it count.</h3><p>Clear four rows together for a four-line clear. Consecutive clears build combos. T-spins and back-to-back difficult clears earn extra points. Speed increases every ten Marathon lines.</p><h3>Three ways to play.</h3><p>Marathon goes until your stack reaches the top. Sprint ends at 40 lines. Ultra gives you 120 seconds to score.</p><h3>Keyboard & gestures.</h3><p>Arrow keys move · Z / X rotate · C or Shift holds · Space drops · P / Escape pauses. Enable swipes in Settings: tap to rotate, swipe sideways to move, down to hard drop, up to hold.</p><p>The game pauses when you leave the app. Return whenever you're ready.</p></div><button class="primary-button" data-action="close">Got it <span>→</span></button>`,
+      `${sheetHead("Help")}<div class="help-copy">
+      <p>Fill a horizontal row to clear it. The game ends when the stack reaches the top.</p>
+      <p>Marathon: endless, faster every 10 lines.<br>Sprint 40: clear 40 lines.<br>Ultra 120: score in 2 minutes.</p>
+      <h3>Touch</h3><p>← / → move · ↓ soft drop · ⇓ hard drop<br>↶ / ↷ rotate · ⇄ hold</p>
+      <p>Hold swaps once per piece. Next shows five upcoming pieces.</p>
+      <h3>Keyboard</h3><p>Arrows move · Z / X rotate · C / Shift hold<br>Space drops · P / Escape pauses</p>
+      <h3>Swipes</h3><p>Enable in Settings. Tap rotates; swipe sideways moves, down drops, up holds.</p>
+      <h3>Scoring</h3><p>Clear several rows together, combos and T-spins for extra points. Consecutive four-line clears and T-spins earn a bonus.</p>
+      </div><button class="primary-button" data-action="close">Close</button>`,
     );
   }
   function terminal() {
@@ -231,7 +366,7 @@ export function startApp(root: HTMLDivElement) {
     const won = state.status === "victory";
     showModal(
       "result",
-      `${sheetHead(won ? "NICELY PLAYED" : "THERE IS ALWAYS ANOTHER PIECE", won ? "You did that." : "A good run.", false)}<p>${MODE_NAMES[state.mode]} ${won ? "complete." : "finished."} Take a breath. Then go again.</p><div class="result-score">${num(state.score)}<span>POINTS</span></div><div class="sheet-stats"><span>LINES<strong>${state.lines}</strong></span><span>LEVEL<strong>${state.level}</strong></span><span>TIME<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="restart">Play again <span>↻</span></button><button class="secondary-button" data-action="home">Main menu</button>`,
+      `${sheetHead(won ? "Complete" : "Game over", false)}<div class="result-score">${num(state.score)}<span>Score</span></div><div class="sheet-stats"><span>Lines<strong>${state.lines}</strong></span><span>Level<strong>${state.level}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="restart">Play again</button><button class="secondary-button" data-action="home">Menu</button>`,
     );
   }
   function send(command: GameCommand) {
@@ -299,7 +434,7 @@ export function startApp(root: HTMLDivElement) {
   function draw() {
     if (!state || screen !== "game") return;
     const now = performance.now();
-    el("mode-label").textContent = MODE_NAMES[state.mode].toUpperCase();
+    el("mode-label").textContent = MODE_NAMES[state.mode];
     el("score").textContent = num(state.score);
     el("lines").textContent =
       state.mode === "sprint40" ? `${state.lines}/40` : String(state.lines);
@@ -310,31 +445,29 @@ export function startApp(root: HTMLDivElement) {
       state.mode === "sprint40",
       state.mode === "ultra120",
     );
-    el("goal").innerHTML =
-      state.mode === "marathon"
-        ? "ENDLESS<br>POSSIBILITY"
-        : state.mode === "sprint40"
-          ? `${Math.max(0, 40 - state.lines)} LINES<br>TO GO`
-          : "TWO MINUTES.<br>ALL YOU.";
-    el("piece-count").textContent = `${state.piecesPlaced} PIECES`;
-    el("lock-meter").style.width =
-      `${Math.min(100, (state.active?.lockTimerMs ?? 0) / 5)}%`;
     el("feedback").classList.toggle("visible", now < feedbackUntil);
     drawBoard(
       canvas,
       state,
       settings.ghostEnabled,
       now < feedbackUntil - 1250 ? flashRows : [],
+      getTheme(settings.theme),
     );
     drawPreview(
       el<HTMLCanvasElement>("hold"),
       state.hold,
       state.holdUsedThisTurn,
+      getTheme(settings.theme),
     );
     state.nextQueue
       .slice(0, 5)
       .forEach((type, i) =>
-        drawPreview(el<HTMLCanvasElement>(`next-${i}`), type),
+        drawPreview(
+          el<HTMLCanvasElement>(`next-${i}`),
+          type,
+          false,
+          getTheme(settings.theme),
+        ),
       );
   }
   function back() {
@@ -372,6 +505,30 @@ export function startApp(root: HTMLDivElement) {
       case "settings":
         showSettings();
         break;
+      case "reset-controls":
+        settings = {
+          ...settings,
+          controlLayout: DEFAULT_SETTINGS.controlLayout,
+          controlScale: DEFAULT_SETTINGS.controlScale,
+          controlOpacity: DEFAULT_SETTINGS.controlOpacity,
+          controlSpread: DEFAULT_SETTINGS.controlSpread,
+          controlHeight: DEFAULT_SETTINGS.controlHeight,
+        };
+        saveSettings(settings);
+        applySettings();
+        for (const key of [
+          "controlLayout",
+          "controlScale",
+          "controlOpacity",
+          "controlSpread",
+          "controlHeight",
+        ] as const) {
+          const input = dialog.querySelector<
+            HTMLInputElement | HTMLSelectElement
+          >(`[name="${key}"]`);
+          if (input) input.value = String(settings[key]);
+        }
+        break;
       case "records":
         showRecords(stats);
         break;
@@ -390,20 +547,19 @@ export function startApp(root: HTMLDivElement) {
         break;
     }
   });
-  root.addEventListener("change", (event) => {
+  function changeSettings(event: Event) {
     const input = event.target as HTMLInputElement | HTMLSelectElement;
     if (!input.closest("#settings-form")) return;
     if (input instanceof HTMLInputElement && input.type === "checkbox")
       settings = { ...settings, [input.name]: input.checked };
-    else if (input.name === "controlScheme")
-      settings = {
-        ...settings,
-        controlScheme: input.value as "buttons" | "hybrid",
-      };
+    else if (["controlScheme", "controlLayout", "theme"].includes(input.name))
+      settings = { ...settings, [input.name]: input.value };
     else settings = { ...settings, [input.name]: Number(input.value) };
     if (!saveSettings(settings)) el("storage-notice").hidden = false;
     applySettings();
-  });
+  }
+  root.addEventListener("input", changeSettings);
+  root.addEventListener("change", changeSettings);
   layer.addEventListener("keydown", (event) => {
     if (event.key !== "Tab") return;
     const focusable = Array.from(
@@ -449,6 +605,10 @@ export function startApp(root: HTMLDivElement) {
     draw();
     requestAnimationFrame(frame);
   }
+  const observer = new ResizeObserver(() => layoutControls());
+  observer.observe(root.querySelector<HTMLElement>(".play-area")!);
+  window.addEventListener("resize", layoutControls);
+  applySettings();
   updateResume();
   requestAnimationFrame(frame);
 }

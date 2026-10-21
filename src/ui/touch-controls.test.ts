@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GameCommand, UserSettings } from "../contracts/game-contract";
 import { TouchControls } from "./touch-controls";
+import { DEFAULT_SETTINGS } from "../platform/storage";
 
 class ButtonStub extends EventTarget {
   dataset: { command: string };
@@ -25,6 +26,7 @@ function setup() {
   } as unknown as HTMLElement;
   const commands: GameCommand[] = [];
   const settings: UserSettings = {
+    ...DEFAULT_SETTINGS,
     soundEnabled: false,
     soundVolume: 0,
     hapticsEnabled: false,

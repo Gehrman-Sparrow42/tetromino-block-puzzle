@@ -10,9 +10,11 @@ An offline, ad-free falling-tetromino game for Android and the browser. Built as
 
 Seven-piece bags, SRS quarter-turn rotation kicks, hold once per piece, five-piece next queue, ghost projection, 500 ms lock delay and a fixed fifteen-reset cap per piece. Scoring includes line clears, drops, consecutive-clear combos, back-to-back four-line clears/T-spins, and perfect clears. Runs pause when the app loses focus or enters the background, and restore paused after reopening.
 
-Touch buttons support simultaneous two-thumb input and held movement. Optional hybrid controls add swipe movement and tap rotation on the board. Keyboard: arrows to move/soft drop, Z/X to rotate, C or Shift to hold, Space to hard drop, P/Escape to pause. The in-app guide explains controls and goals.
+Large translucent touch buttons support simultaneous two-thumb input and held movement. Settings offers Thumbs, Mirror and Floating layouts, with live size, opacity, spacing and height adjustments and a reset button. Floating places controls over the lower board to leave more room for play. Optional hybrid controls add swipe movement and tap rotation on the board. Keyboard: arrows to move/soft drop, Z/X to rotate, C or Shift to hold, Space to hard drop, P/Escape to pause. The in-app guide explains controls and goals.
 
-Settings include sound and volume, haptics, ghost, reduced motion, hybrid gestures, and repeat speed. Records and one resumable run are stored locally. There are no accounts, ads, analytics, remote assets or online leaderboards. The Android package does not request internet permission; optional haptics use vibration permission. Clearing app data or uninstalling removes saved progress.
+Four themes change the interface, board, previews and pieces: Ink, LCD, Neon and Paper. LCD uses distinct internal piece patterns as well as monochrome shading. The compact HUD and hold/next strip leave more space for the board.
+
+Settings also include sound and volume, haptics, ghost, reduced motion, hybrid gestures, and repeat speed. Records, appearance, controls and one resumable run are stored locally. Existing settings migrate with defaults for the new appearance/control options. There are no accounts, ads, analytics, remote assets or online leaderboards. The Android package does not request internet permission; optional haptics use vibration permission. Clearing app data or uninstalling removes saved progress.
 
 ## Development
 
@@ -48,7 +50,7 @@ On Windows use `gradlew.bat`, or `scripts/build-android.ps1 -JavaHome <JDK21> -A
 
 - `src/contracts`: shared state, settings and action types.
 - `src/engine`: deterministic seeded rules and snapshot validation, without browser dependencies.
-- `src/ui`: Canvas renderer, responsive screens and cancel-safe keyboard/touch controls.
+- `src/ui`: Canvas renderer, responsive screens and cancel-safe keyboard/touch controls. `control-layout.ts` computes bounded touch geometry; `themes.ts` supplies shared interface/canvas palettes.
 - `src/platform`: local persistence/migration, procedural audio, optional haptics and lifecycle adapters.
 - `android`: Capacitor native shell and app resources.
 

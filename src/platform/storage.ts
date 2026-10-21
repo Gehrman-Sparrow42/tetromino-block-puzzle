@@ -14,6 +14,12 @@ export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   controlScheme: "buttons",
   dasMs: 150,
   arrMs: 40,
+  theme: "ink",
+  controlLayout: "thumbs",
+  controlScale: 1,
+  controlOpacity: 0.18,
+  controlSpread: 0.65,
+  controlHeight: 0.3,
 });
 
 const KEYS = {
@@ -87,6 +93,23 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
     controlScheme: value.controlScheme === "hybrid" ? "hybrid" : "buttons",
     dasMs: bounded(value.dasMs, defaults.dasMs, 80, 300),
     arrMs: bounded(value.arrMs, defaults.arrMs, 16, 100),
+    theme:
+      value.theme === "lcd" || value.theme === "neon" || value.theme === "paper"
+        ? value.theme
+        : "ink",
+    controlLayout:
+      value.controlLayout === "mirror" || value.controlLayout === "floating"
+        ? value.controlLayout
+        : "thumbs",
+    controlScale: bounded(value.controlScale, defaults.controlScale, 0.85, 1.3),
+    controlOpacity: bounded(
+      value.controlOpacity,
+      defaults.controlOpacity,
+      0.08,
+      0.6,
+    ),
+    controlSpread: bounded(value.controlSpread, defaults.controlSpread, 0, 1),
+    controlHeight: bounded(value.controlHeight, defaults.controlHeight, 0, 1),
   };
 }
 

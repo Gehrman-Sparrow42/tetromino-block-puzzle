@@ -41,9 +41,7 @@ async function attach() {
     if (await page.locator("#game").isVisible()) {
       if (!(await page.getByRole("dialog").isVisible()))
         await page.locator(".pause-button").click();
-      await page
-        .getByRole("button", { name: "Main menu", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Menu", exact: true }).click();
     }
     await expect(page.locator("#home")).toBeVisible();
     await expect(page.locator('[data-mode="marathon"]')).toContainText(
@@ -54,20 +52,20 @@ async function attach() {
     if (await page.locator("#dialog").isVisible())
       await page.locator('[data-action="confirm-new"]').click();
     await page.getByRole("button", { name: "Hard drop", exact: true }).click();
-    await expect(page.locator("#piece-count")).toHaveText("1 PIECES");
+    await expect(page.locator("#score")).not.toHaveText("0");
     await page.screenshot({ path: `${output}/game.png` });
     command("shell", "input", "keyevent", "4");
-    await expect(page.getByRole("dialog")).toContainText("On pause.");
+    await expect(page.getByRole("dialog")).toContainText("Paused");
     const run = await page.evaluate(() =>
       JSON.parse(localStorage.getItem("tetromino_v2_run")),
     );
     if (run.piecesPlaced !== 1 || run.status !== "paused")
       throw new Error("Hardware Back did not save the run.");
-    await page.getByRole("button", { name: /Keep playing/ }).click();
+    await page.getByRole("dialog").locator('[data-action="resume"]').click();
     command("shell", "input", "keyevent", "3");
     command("wait-for-device");
     command("shell", "am", "start", "-W", "-n", `${packageName}/.MainActivity`);
-    await expect(page.getByRole("dialog")).toContainText("On pause.");
+    await expect(page.getByRole("dialog")).toContainText("Paused");
     // Restart the real native process; a WebView page.reload is not an Android lifecycle restart.
     await browser.close();
     browser = null;
@@ -75,7 +73,38 @@ async function attach() {
     command("shell", "am", "start", "-W", "-n", `${packageName}/.MainActivity`);
     page = await attach();
     await page.locator("#resume-card").click();
-    await expect(page.locator("#piece-count")).toHaveText("1 PIECES");
+    await expect(page.locator("#game")).toBeVisible();
+    await page.locator(".pause-button").click();
+    const restored = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("tetromino_v2_run")),
+    );
+    if (restored.piecesPlaced !== 1)
+      throw new Error("Native restart lost the saved run.");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Settings", exact: true })
+      .click();
+    for (const theme of ["ink", "lcd", "neon", "paper"]) {
+      await page.locator('select[name="theme"]').selectOption(theme);
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    }
+    await page.locator('select[name="controlLayout"]').selectOption("floating");
+    await page.locator('input[name="controlScale"]').press("End");
+    await page.locator('input[name="controlOpacity"]').press("Home");
+    await page.screenshot({ path: `${output}/settings.png` });
+    await page.locator('#dialog [data-action="close"]').last().click();
+    await page.getByRole("dialog").locator('[data-action="resume"]').click();
+    const buttons = await page
+      .locator(".control-deck .control")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const r = node.getBoundingClientRect();
+          return { x: r.x, y: r.y, w: r.width, h: r.height };
+        }),
+      );
+    for (const b of buttons)
+      if (b.w < 48 || b.h < 48) throw new Error("Native control below 48px.");
+    await page.screenshot({ path: `${output}/floating-paper.png` });
     await page.locator(".pause-button").click();
     await page.screenshot({ path: `${output}/paused.png` });
     if (errors.length) throw new Error(`WebView errors: ${errors.join("; ")}`);
@@ -93,6 +122,8 @@ async function attach() {
             "hardware Back pause",
             "rapid background pause",
             "native process restart resume",
+            "all four themes",
+            "floating controls and size/opacity settings",
           ],
           browser: await browser.version(),
           errors,
