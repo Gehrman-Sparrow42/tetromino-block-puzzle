@@ -105,3 +105,29 @@ it("rejects unapproved browser origins and oversized frames without killing the 
     200,
   );
 });
+
+it("serves only the bundled playtest page and allows an explicitly configured LAN origin", async () => {
+  const origin = "http://192.168.1.118:8172";
+  const server = await startOnlineServer({
+    port: 0,
+    origins: [origin],
+    playtestHtml: "<!doctype html><title>Afterblock</title>",
+  });
+  cleanup.push(server.close);
+  const page = await fetch(`http://127.0.0.1:${server.port}/play?room=ABC234`);
+  expect(page.status).toBe(200);
+  expect(page.headers.get("content-type")).toContain("text/html");
+  expect(await page.text()).toContain("Afterblock");
+  expect(
+    (await fetch(`http://127.0.0.1:${server.port}/src/online/client.ts`))
+      .status,
+  ).toBe(404);
+  const socket = new WebSocket(`ws://127.0.0.1:${server.port}/ws`, { origin });
+  cleanup.push(async () => {
+    socket.terminate();
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once("open", resolve);
+    socket.once("error", reject);
+  });
+});

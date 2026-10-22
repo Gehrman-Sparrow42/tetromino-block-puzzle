@@ -11,6 +11,8 @@ export interface ServerOptions {
   countdownMs?: number;
   maxRooms?: number;
   maxConnections?: number;
+  /** Prebuilt standalone playtest page; no arbitrary filesystem paths are served. */
+  playtestHtml?: string;
 }
 const DEFAULT_ORIGINS = [
   "http://localhost:5173",
@@ -29,18 +31,25 @@ export async function startOnlineServer(options: ServerOptions = {}) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    if (
+      req.method === "GET" &&
+      req.url?.split("?")[0] === "/play" &&
+      options.playtestHtml
+    ) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.writeHead(200).end(options.playtestHtml);
+      return;
+    }
     if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
-      res
-        .writeHead(200)
-        .end(
-          JSON.stringify({
-            service: "afterblock-online",
-            protocol: ONLINE_VERSION,
-            status: "ok",
-            mode: "survival",
-            rooms: rooms.roomCount,
-          }),
-        );
+      res.writeHead(200).end(
+        JSON.stringify({
+          service: "afterblock-online",
+          protocol: ONLINE_VERSION,
+          status: "ok",
+          mode: "survival",
+          rooms: rooms.roomCount,
+        }),
+      );
     } else res.writeHead(404).end(JSON.stringify({ error: "not_found" }));
   });
   const sockets = new WebSocketServer({

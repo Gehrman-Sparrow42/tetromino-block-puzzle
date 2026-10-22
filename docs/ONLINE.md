@@ -1,17 +1,25 @@
-# Online groundwork — development branch
+# Online Survival and LAN playtest
 
-This branch prepares private two-player online play. It does **not** add an Online button to the released app, change offline gameplay, deploy hosting, or publish a new APK. The original checkout remains on `main`.
+The online foundation is merged into `main`. A separate browser playtest lets two devices try Survival on a PC-hosted server. The installed offline APK and saved offline games remain independent; there is no online APK release or public hosting yet.
+
+## Phone and PC on the same Wi-Fi
+
+On Windows, run `scripts/online-lan.cmd` (or `C:\Tools\LAUNCHERS\Launch_Afterblock_Online_Server.bat`). It builds the page and server, enables LAN listening for that process, and prints the phone URLs. Open `/play` at the printed LAN address on the phone, and `http://127.0.0.1:8172/play` on the PC. Create a room on one, enter its six-character code on the other, then both press Ready. Keep the phone on the same Wi-Fi, not mobile data or an isolated guest network.
+
+If Windows blocks the connection, run `scripts/allow-online-lan.ps1` once as administrator. It allows only TCP port 8172 from the local subnet. It does not change the Wi-Fi profile or router. Remove it later with `Remove-NetFirewallRule -Name 'Afterblock-LAN-8172'` in an administrator PowerShell.
+
+The playtest has its own controls and opponent preview; it does not use or edit saved offline control layouts. Touch and keyboard input are supported. Leaving/disconnecting forfeits a started round; browser backgrounding does not pause the server. Leave and create another room to play again. The server stops when its process closes; nothing is registered for Windows startup. The PC must stay awake while hosting.
 
 ## What runs now
 
-- A loopback HTTP/WebSocket server with versioned messages, six-character room codes and two-player lobbies.
+- An HTTP/WebSocket server with versioned messages, six-character room codes and two-player lobbies; loopback by default, LAN listening by explicit opt-in.
 - Create, join, leave, ready and a three-second server-controlled countdown.
 - A server-authoritative Survival round using the existing engine. Both players receive the same seeded piece sequence at their own pace. The server advances gravity, accepts sequenced gameplay commands, broadcasts board views at 20 Hz and declares a topout result.
 - Disconnecting or leaving after the countdown begins forfeits the round. Leaving a waiting lobby frees that seat and clears readiness. A finished room expires after one minute; waiting rooms expire after 15 minutes; rooms have a one-hour maximum lifetime. Empty rooms are removed immediately.
 - A browser-compatible `OnlineClient` with a welcome/version handshake, validation, bounded buffering, cleanup and no automatic input replay. Importing it does not start a connection.
 - Health endpoints, exact browser-origin checks, 4 KiB message limits, 120 messages/second per connection, connection/room caps, ping/pong cleanup and bounded outgoing snapshot buffering.
 
-There is no garbage/attack system, game UI integration, client prediction, reconnect grace, matchmaking, accounts, rematch UI or permanent storage yet. This is working local infrastructure, not a public multiplayer release.
+There is no garbage/attack system, main-app UI integration, client prediction, reconnect grace, matchmaking, accounts, rematch UI or permanent storage yet. This is a local Survival playtest, not a public multiplayer release.
 
 ## Run locally
 
@@ -23,9 +31,9 @@ npm run online:test
 npm run online:server
 ```
 
-`online:server` typechecks and bundles the server, then starts it. Check `http://127.0.0.1:8172/health`; the root URL also returns JSON status. WebSocket clients connect to `ws://127.0.0.1:8172/ws`. Press Ctrl+C to stop it. There is no game page served at this address yet.
+`online:server` typechecks and bundles the server, then starts it. Check `http://127.0.0.1:8172/health`; the root URL also returns JSON status. WebSocket clients connect to `ws://127.0.0.1:8172/ws`. Press Ctrl+C to stop it. Build the separate page first with `npm run online:playtest:build` to serve it at `/play`. The LAN launcher does both builds automatically.
 
-On this computer, `C:\Tools\LAUNCHERS\Launch_Afterblock_Online_Server.bat` starts this worktree's server. The portable project launcher is `scripts/online-server.cmd`.
+`scripts/online-server.cmd` is the loopback-only launcher. `scripts/online-lan.cmd` explicitly opts into LAN access. For a manual LAN start in PowerShell, set `$env:ONLINE_LAN = '1'`, then run `npm run online:lan`.
 
 Environment options:
 
@@ -33,14 +41,15 @@ Environment options:
 | ---------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ONLINE_HOST`    | `127.0.0.1`                        | Listening interface; loopback avoids accidentally exposing the prototype.                                                                  |
 | `ONLINE_PORT`    | `8172`                             | HTTP and WebSocket port.                                                                                                                   |
+| `ONLINE_LAN`     | Off                                | Set to `1` to listen on all interfaces and allow exact origins at this PC's private IPv4 addresses.                                        |
 | `ONLINE_ORIGINS` | Explicit local development origins | Comma-separated exact browser origins. Defaults cover localhost/127.0.0.1 Vite ports 5173/5178 and the Android `https://localhost` origin. |
 
-Origin-less native/test connections are accepted. Origin checking is not authentication. Insecure `ws://` client connections are limited to loopback; nonlocal clients require `wss://`. LAN/public use needs deliberate networking and TLS setup and has not been deployed or verified.
+Origin-less native/test connections are accepted. Origin checking is not authentication. The client requires `wss://` outside loopback by default. Only the separate playtest explicitly opts into `ws://` at private IPv4 addresses (10/8, 172.16/12, 192.168/16). This unencrypted setup is for a trusted LAN. It does not provide an internet route or modify router forwarding. Public use needs TLS, a secure endpoint and deliberate deployment configuration.
 
 ## Client seam
 
 ```ts
-import { OnlineClient, addRoomLink } from "../src/online/client";
+import { OnlineClient } from "../src/online/client";
 
 const client = new OnlineClient("ws://127.0.0.1:8172/ws");
 const unsubscribe = client.subscribe((message) => {
@@ -68,9 +77,9 @@ State is memory-only. Restarting the server ends all rooms. Room codes are invit
 
 ## Next implementation steps
 
-1. Add the lobby in the web/Android client and explicit online-session lifecycle handling. Offline blur/background pause cannot silently pause just one online player.
+1. Integrate the separate playtest into the main web/Android UI and its configurable controls. Offline blur/background pause cannot silently pause just one online player.
 2. Add responsive local prediction/reconciliation and clock-offset handling, then test actual phone latency and background/disconnect cases.
-3. Add the movable/collapsible opponent Canvas below Next without changing the saved local board or control positions.
+3. Bring the playtest opponent preview into the main UI with movable/collapsible placement without changing saved local board or control positions.
 4. Implement Battle separately: a garbage-cell representation, deterministic holes, attack/cancellation rules, arrival timing and tests. The protocol currently advertises Survival only.
 5. Add bounded reconnect tokens/grace and rematches. Choose hosting/TLS, origin policy and public connection/rate limits before exposing the server. Add the real room URL handler and verified Android App Links only after a domain is chosen.
 

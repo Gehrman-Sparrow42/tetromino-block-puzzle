@@ -18,6 +18,9 @@
     "online:typecheck": "tsc --noEmit -p tsconfig.online.json",
     "online:build": "npm run online:typecheck && vite build --config vite.online.config.ts",
     "online:server": "npm run online:build && node dist-online/main.js",
+    "online:playtest:build": "npm run typecheck && vite build --config vite.playtest.config.ts",
+    "online:lan": "npm run online:playtest:build && npm run online:server",
+    "online:test:browser": "playwright test --config playwright.online.config.ts",
     "online:test": "vitest run --config vitest.online.config.ts"
   },
   "dependencies": {

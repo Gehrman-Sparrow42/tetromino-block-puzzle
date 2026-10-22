@@ -15,6 +15,8 @@ type SocketFactory = (url: string) => WebSocket;
 export interface OnlineClientOptions {
   connectTimeoutMs?: number;
   webSocketFactory?: SocketFactory;
+  /** Opt-in for an HTTP playtest on a trusted private IPv4 LAN. Never for public hosting. */
+  allowInsecureLocalNetwork?: boolean;
 }
 
 export type OnlineClientStatus =
@@ -27,7 +29,7 @@ export class OnlineClientError extends Error {
   }
 }
 
-function validateUrl(value: string): string {
+function validateUrl(value: string, allowLocalNetwork = false): string {
   let url: URL;
   try {
     url = new URL(value);
@@ -50,9 +52,20 @@ function validateUrl(value: string): string {
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
     url.hostname === "[::1]";
-  if (url.protocol === "ws:" && !loopback) {
+  const parts = url.hostname.split(".").map(Number);
+  const privateIPv4 =
+    parts.length === 4 &&
+    parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255) &&
+    (parts[0] === 10 ||
+      (parts[0] === 172 && parts[1]! >= 16 && parts[1]! <= 31) ||
+      (parts[0] === 192 && parts[1] === 168));
+  if (
+    url.protocol === "ws:" &&
+    !loopback &&
+    !(allowLocalNetwork && privateIPv4)
+  ) {
     throw new OnlineClientError(
-      "Insecure ws:// connections are allowed only to localhost loopback addresses.",
+      "Use wss:// outside loopback, or explicitly enable a private LAN playtest.",
     );
   }
   return url.href;
@@ -176,7 +189,7 @@ export class OnlineClient {
   private closed = false;
 
   constructor(url: string, options: OnlineClientOptions = {}) {
-    this.url = validateUrl(url);
+    this.url = validateUrl(url, options.allowInsecureLocalNetwork);
     this.timeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) {
       throw new OnlineClientError(

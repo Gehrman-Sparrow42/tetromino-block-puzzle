@@ -80,6 +80,33 @@ describe("OnlineClient", () => {
     );
     expect(() => new OnlineClient("wss://example.com")).not.toThrow();
     expect(() => new OnlineClient("ws://[::1]:8080")).not.toThrow();
+    expect(() => new OnlineClient("ws://192.168.1.10:8172/ws")).toThrow();
+    for (const host of [
+      "192.168.1.10",
+      "10.0.0.2",
+      "172.16.0.1",
+      "172.31.255.254",
+    ]) {
+      expect(
+        () =>
+          new OnlineClient(`ws://${host}/ws`, {
+            allowInsecureLocalNetwork: true,
+          }),
+      ).not.toThrow();
+    }
+    for (const host of [
+      "example.com",
+      "8.8.8.8",
+      "172.32.0.1",
+      "192.169.1.10",
+    ]) {
+      expect(
+        () =>
+          new OnlineClient(`ws://${host}/ws`, {
+            allowInsecureLocalNetwork: true,
+          }),
+      ).toThrow();
+    }
   });
 
   it("shares a pending connection and resolves only after welcome", async () => {

@@ -65,3 +65,4 @@ test-results/
 
 # Online development server bundle
 dist-online/
+dist-playtest/
