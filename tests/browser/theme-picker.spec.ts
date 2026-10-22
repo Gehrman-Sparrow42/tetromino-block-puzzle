@@ -71,7 +71,7 @@ for (const mode of ["light", "dark", "forced"] as const) {
       page.getByRole("radio", { name: "Workshop", exact: true }),
     ).toBeChecked();
     await page.screenshot({
-      path: `C:/Tools/tetromino-remake-artifacts/theme-picker-${mode}-2.10.1.png`,
+      path: info.outputPath(`theme-picker-${mode}-2.10.1.png`),
     });
   });
 }

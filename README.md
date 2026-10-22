@@ -54,6 +54,16 @@ npm run test:e2e
 
 For browser tests, first run `npx playwright install chromium` (or `--with-deps chromium` on Linux). Playwright starts its own development server. `dist/index.html` is a bundled single-file browser build; the Android package embeds this game locally. `npm run build:clean` is a compatibility alias for the same build, with no source rewriting.
 
+### Local project folders
+
+Keep the source checkout and its supporting files in one project directory. On this computer, that is `C:\Tools\tetromino-block-puzzle`:
+
+- `artifacts/` contains local screenshots, build logs and previous delivery artifacts.
+- `.worktrees/` contains preserved temporary Git checkouts for parallel work. Create future worktrees here rather than beside the project in `C:\Tools`.
+- `test-results/` contains generated browser-test outputs, separated by test and browser project.
+
+These local folders are excluded from Git. Branch history remains in Git; separate checkouts are only needed while working on branches in parallel. Windows launchers live in `C:\Tools\LAUNCHERS` and point to this main checkout.
+
 ## Android APK
 
 App ID: `com.berkay.afterblock`. Minimum Android API 24 (Android 7.0), compile/target API 36. A recent Android System WebView is needed. Portrait and landscape are supported on Android and in the browser, with independent customized Gamepad layouts.

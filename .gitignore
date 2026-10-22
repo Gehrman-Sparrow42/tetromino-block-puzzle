@@ -66,3 +66,7 @@ test-results/
 # Online development server bundle
 dist-online/
 dist-playtest/
+
+# Local project support files and temporary parallel checkouts
+/artifacts/
+/.worktrees/

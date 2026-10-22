@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 test("fixed saved controls and draggable board move independently and allow overlap", async ({
   page,
-}) => {
+}, info) => {
   await page.setViewportSize({ width: 384, height: 853 });
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
@@ -73,7 +73,7 @@ test("fixed saved controls and draggable board move independently and allow over
     await gameLeft.evaluate((n) => ({ x: n.style.left, y: n.style.top })),
   ).toEqual(leftPosition);
   await page.screenshot({
-    path: "C:/Tools/tetromino-remake-artifacts/fixed-board-2.10.png",
+    path: info.outputPath("fixed-board-2.10.png"),
   });
   await page.reload();
   await page.locator('#home [data-action="settings"]').click();

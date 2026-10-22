@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 test("profiles preserve independent hidden and overlapping buttons with one Next and board sizing", async ({
   page,
-}) => {
+}, info) => {
   await page.setViewportSize({ width: 384, height: 853 });
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
@@ -9,7 +9,9 @@ test("profiles preserve independent hidden and overlapping buttons with one Next
   await expect(page.locator('[name="controlHeight"]')).toHaveCount(0);
   await page.locator('[name="boardScale"]').fill("0.7");
   await page.locator('[data-action="edit-controls"]').click();
-  await expect(page.locator("[data-editor-control]")).toHaveCount(7);
+  await expect(
+    page.locator('[data-editor-control]:not([data-editor-control="board"])'),
+  ).toHaveCount(7);
   await page.locator('[name="editorControlSize"]').fill("1.2");
   await expect(page.locator('[name="editorControlSize"]')).toHaveValue("1.2");
   const left = await page.locator('[data-editor-control="left"]').boundingBox(),
@@ -56,7 +58,7 @@ test("profiles preserve independent hidden and overlapping buttons with one Next
   expect(a.x + a.width).toBeGreaterThan(b.x);
   expect(a.y).toBeLessThan(b.y + b.height);
   await page.screenshot({
-    path: "C:/Tools/tetromino-remake-artifacts/custom-2.9-overlap.png",
+    path: info.outputPath("custom-2.9-overlap.png"),
   });
   await page.reload();
   await page.locator('#home [data-action="settings"]').click();
