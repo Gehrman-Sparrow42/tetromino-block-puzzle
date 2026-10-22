@@ -309,6 +309,10 @@ export function startApp(root: HTMLDivElement) {
       String(settings.controlOpacity),
     );
     applyTheme(settings.theme);
+    const currentTheme = dialog.querySelector<HTMLElement>(
+      "[data-current-theme]",
+    );
+    if (currentTheme) currentTheme.textContent = THEMES[settings.theme].name;
     syncControlFields();
     layoutControls();
     drawControlPreview();
@@ -487,11 +491,17 @@ export function startApp(root: HTMLDivElement) {
     showModal(
       "settings",
       `${sheetHead("Settings")}<form id="settings-form">
-      ${select(
-        "theme",
-        "Theme",
-        Object.values(THEMES).map((theme) => [theme.id, theme.name]),
-      )}
+      <details class="theme-picker">
+        <summary><span>Theme</span><strong data-current-theme>${THEMES[settings.theme].name}</strong></summary>
+        <fieldset class="theme-options"><legend>Choose theme</legend>
+        ${Object.values(THEMES)
+          .map(
+            (theme) =>
+              `<label class="theme-choice"><input type="radio" name="theme" value="${theme.id}" ${settings.theme === theme.id ? "checked" : ""}><span class="theme-swatches" aria-hidden="true"><i style="background:${theme.css["--bg"]}"></i><i style="background:${theme.css["--accent"]}"></i><i style="background:${theme.pieces.T}"></i></span><span>${theme.name}</span></label>`,
+          )
+          .join("")}
+        </fieldset>
+      </details>
       <h3>Controls</h3>
       ${select(
         "controlLayout",
@@ -800,6 +810,12 @@ export function startApp(root: HTMLDivElement) {
       return;
     }
     if (!input.closest("#settings-form")) return;
+    if (
+      input instanceof HTMLInputElement &&
+      input.type === "radio" &&
+      !input.checked
+    )
+      return;
     const priorKey = controlProfileKey(settings);
     const profiles = {
       ...settings.controlProfiles,
@@ -843,7 +859,7 @@ export function startApp(root: HTMLDivElement) {
     if (event.key !== "Tab") return;
     const focusable = Array.from(
       dialog.querySelectorAll<HTMLElement>(
-        'button,input,select,[tabindex="0"]',
+        'button,input,select,summary,[tabindex="0"]',
       ),
     );
     const first = focusable[0],

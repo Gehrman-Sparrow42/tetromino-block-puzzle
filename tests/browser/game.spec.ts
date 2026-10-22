@@ -392,11 +392,12 @@ test("themes change chrome and canvas immediately and persist", async ({
     .getByRole("button", { name: "Settings", exact: true })
     .click();
   const pixels: string[] = [];
-  await expect(page.locator('select[name="theme"] option')).toHaveCount(
+  await page.locator(".theme-picker summary").click();
+  await expect(page.locator('input[name="theme"]')).toHaveCount(
     THEME_IDS.length,
   );
   for (const theme of THEME_IDS) {
-    await page.locator('select[name="theme"]').selectOption(theme);
+    await page.locator(`input[name="theme"][value="${theme}"]`).check();
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.waitForTimeout(60);
     pixels.push(
@@ -412,7 +413,9 @@ test("themes change chrome and canvas immediately and persist", async ({
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "classic");
   await page.locator('#home [data-action="settings"]').click();
-  await expect(page.locator('select[name="theme"]')).toHaveValue("classic");
+  await expect(
+    page.locator('input[name="theme"][value="classic"]'),
+  ).toBeChecked();
 });
 
 test("control presets, sliders and reset are live and safe", async ({

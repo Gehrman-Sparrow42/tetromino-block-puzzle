@@ -1,5 +1,12 @@
 # Remake verification - 2026-10-22
 
+## Theme-picker compatibility — 2.10.1
+
+- Replaced the Theme native select popup with an expandable in-app list of 13 labelled radio choices and RGB swatches. Other settings retain their existing controls. Checked state, keyboard selection, immediate application and persisted choice are preserved. The native popup is an unconfirmed cause of the reported Samsung black screen; no Samsung device was available to reproduce it directly.
+- Explicitly disable WebView view-level Force Dark and algorithmic darkening using Android-version guards, preserving application-defined light/dark palettes and the existing Android resource configuration.
+- Eight theme unit tests and four focused browser cases pass: all 13 themes under light, dark and forced-colors settings; measured label contrast at least 4.5:1; 48 px targets; keyboard navigation; persistence; and distinct canvas output per theme. TypeScript/Vite, Capacitor sync, Android assembly/lint and signature verification pass.
+- Installed offline API35/WebView124 testing with OS night mode enabled passes all 13 theme selections and reload persistence. The LCD picker remains light and readable under system dark mode, with no WebView errors. Physical Samsung confirmation remains outstanding. Artifacts: `theme-picker-native-2.10.1.json` and `theme-picker-native-dark-2.10.1.png` outside the repository. Full unrelated suites were not rerun.
+
 ## Fixed controls and movable board — 2.10.0
 
 - Removed the Fixed/Dynamic selector and empty-space repositioning. Existing Dynamic settings normalize to Fixed. Controls stay at saved editor positions during play.

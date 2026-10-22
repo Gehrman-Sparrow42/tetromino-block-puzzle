@@ -126,10 +126,14 @@ async function attach() {
       "data",
       "classic",
     ]) {
-      await page.locator('select[name="theme"]').selectOption(theme);
+      if ((await page.locator(".theme-picker").getAttribute("open")) === null) {
+        await page.locator(".theme-picker summary").click();
+      }
+      await page.locator(`input[name="theme"][value="${theme}"]`).check();
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     }
-    await page.locator('select[name="theme"]').selectOption("basalt");
+    await page.locator('input[name="theme"][value="basalt"]').check();
+    await page.locator(".theme-picker summary").click();
     await page.locator('select[name="controlLayout"]').selectOption("gamepad");
     await page.locator('[data-action="edit-controls"]').click();
     await expect(page.locator(".control-editor")).toBeVisible();

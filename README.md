@@ -20,7 +20,7 @@ Controls always stay at their saved editor positions during play. The Fixed/Dyna
 
 Optional hybrid controls add swipe movement and tap rotation on the board. Keyboard: arrows to move/soft drop, Z/X to rotate, C or Shift to hold, Space to hard drop, P/Escape to pause. Hiding an on-screen button does not disable its keyboard shortcut.
 
-Thirteen themes change the interface, board, previews and pieces. Settings → Theme includes the original Ink, LCD, Neon and Paper plus nine complete Impeccable treatments:
+Thirteen themes change the interface, board, previews and pieces. Settings → Theme opens an in-app list with theme names and color swatches, avoiding the device-native popup; selection applies immediately and is saved. Settings → Theme includes the original Ink, LCD, Neon and Paper plus nine complete Impeccable treatments:
 
 | Theme           | Appearance                                                  |
 | --------------- | ----------------------------------------------------------- |
