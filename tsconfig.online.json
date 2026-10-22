@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node", "vite/client"] },
+  "include": [
+    "server",
+    "src/online",
+    "src/engine",
+    "src/contracts",
+    "vite.online.config.ts"
+  ]
+}

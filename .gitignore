@@ -62,3 +62,6 @@ test-results/
 
 # Local visual-direction sketches; committed briefs record the accepted scope.
 .impeccable/mocks/decision/
+
+# Online development server bundle
+dist-online/
