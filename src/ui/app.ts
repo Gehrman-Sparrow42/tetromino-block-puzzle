@@ -5,6 +5,7 @@ import type {
   UserSettings,
   MarathonOptions,
 } from "../contracts/game-contract";
+import { controlProfileKey } from "../contracts/game-contract";
 import { createInitialState, applyCommand } from "../engine/engine";
 import {
   loadSettings,
@@ -104,7 +105,7 @@ export function startApp(root: HTMLDivElement) {
           </aside>
           <aside class="next-rail" aria-label="Upcoming pieces">
             <button class="icon-button pause-button" data-action="pause" aria-label="Pause game">Ⅱ</button>
-            <div class="next-strip"><span>Next</span>${Array.from({ length: 5 }, (_, i) => `<canvas id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}</div>
+            <div class="next-strip"><span>Next</span>${Array.from({ length: 1 }, (_, i) => `<canvas id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}</div>
           </aside>
           <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
           <div class="control-deck" aria-label="Game controls">
@@ -160,9 +161,9 @@ export function startApp(root: HTMLDivElement) {
       );
     } else pad.removeAttribute("style");
     const groupForAction = {
-      MOVE_LEFT: "pad",
-      MOVE_RIGHT: "pad",
-      SOFT_DROP: "pad",
+      MOVE_LEFT: "left",
+      MOVE_RIGHT: "right",
+      SOFT_DROP: "down",
       HARD_DROP: "hardDrop",
       HOLD: "hold",
       ROTATE_CW: "rotateCW",
@@ -182,6 +183,9 @@ export function startApp(root: HTMLDivElement) {
         height: `${rect.height}px`,
       });
       const group = groupForAction[action as keyof typeof groupForAction];
+      button.hidden = !!geometry.groupHidden?.[group];
+      if (group === "hold")
+        root.querySelector<HTMLElement>(".hold-panel")!.hidden = button.hidden;
       if (geometry.groupOpacity)
         button.style.setProperty(
           "--control-opacity",
@@ -270,9 +274,9 @@ export function startApp(root: HTMLDivElement) {
         ? 0
         : viewport.height - geometry.height;
     const groupForAction = {
-      MOVE_LEFT: "pad",
-      MOVE_RIGHT: "pad",
-      SOFT_DROP: "pad",
+      MOVE_LEFT: "left",
+      MOVE_RIGHT: "right",
+      SOFT_DROP: "down",
       HARD_DROP: "hardDrop",
       HOLD: "hold",
       ROTATE_CW: "rotateCW",
@@ -302,6 +306,12 @@ export function startApp(root: HTMLDivElement) {
       `<div class="control-preview-board" style="left:${offset + board.x * scale}px;top:${board.y * scale}px;width:${board.width * scale}px;height:${board.height * scale}px"></div>` +
       padPreview +
       Object.entries(geometry.buttons)
+        .filter(
+          ([action]) =>
+            !geometry.groupHidden?.[
+              groupForAction[action as keyof typeof groupForAction]
+            ],
+        )
         .map(([action, rect]) => {
           const opacity =
             geometry.groupOpacity?.[
@@ -511,7 +521,7 @@ export function startApp(root: HTMLDivElement) {
         "controlLayout",
         "Layout",
         [
-          ["gamepad", "Connected buttons"],
+          ["gamepad", "Buttons"],
           ["thumbs", "Thumb"],
           ["mirror", "Left-handed"],
           ["floating", "Floating"],
@@ -542,8 +552,7 @@ export function startApp(root: HTMLDivElement) {
       <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
       ${range("controlScale", "Size", 0.85, 2, 0.01, "Control size")}
       ${range("controlOpacity", "Opacity", 0.08, 0.6, 0.01, "Control opacity")}
-      ${range("controlSpread", "Spacing", 0, 1, 0.01, "Control spacing")}
-      ${range("controlHeight", "Height", 0, 1, 0.01, "Control height")}
+      ${range("boardScale", "Board size", 0.5, 1, 0.01, "Board size")}
       <button type="button" class="secondary-button" data-action="reset-controls">Reset controls</button>
       ${select(
         "controlScheme",
@@ -580,7 +589,7 @@ export function startApp(root: HTMLDivElement) {
       <p>Fill a horizontal row to clear it. The game ends when the stack reaches the top.</p>
       <p>Marathon: endless, faster every 10 lines.<br>Sprint 40: clear 40 lines.<br>Ultra 120: score in 2 minutes.</p>
       <h3>Touch</h3><p>← / → move · ↓ soft drop · ⇓ hard drop<br>↶ / ↷ rotate · ⇄ hold</p>
-      <p>Hold swaps once per piece. Next shows five upcoming pieces.</p>
+      <p>Hold swaps once per piece. Next shows the upcoming piece.</p>
       <h3>Keyboard</h3><p>Arrows move · Z / X rotate · C / Shift hold<br>Space drops · P / Escape pauses</p>
       <h3>Swipes</h3><p>Enable in Settings. Tap rotates; swipe sideways moves, down drops, up holds.</p>
       <h3>Scoring</h3><p>Clear several rows together, combos and T-spins for extra points. Consecutive four-line clears and T-spins earn a bonus.</p>
@@ -700,7 +709,7 @@ export function startApp(root: HTMLDivElement) {
       getTheme(settings.theme),
     );
     state.nextQueue
-      .slice(0, 5)
+      .slice(0, 1)
       .forEach((type, i) =>
         drawPreview(
           el<HTMLCanvasElement>(`next-${i}`),
@@ -753,14 +762,13 @@ export function startApp(root: HTMLDivElement) {
       case "reset-controls":
         settings = {
           ...settings,
-          controlLayout: DEFAULT_SETTINGS.controlLayout,
-          gamepadPreset: DEFAULT_SETTINGS.gamepadPreset,
           padMode: DEFAULT_SETTINGS.padMode,
           controlScale: DEFAULT_SETTINGS.controlScale,
           controlOpacity: DEFAULT_SETTINGS.controlOpacity,
           controlSpread: DEFAULT_SETTINGS.controlSpread,
           controlHeight: DEFAULT_SETTINGS.controlHeight,
           gamepadLayouts: { portrait: {}, landscape: {} },
+          boardScale: 1,
         };
         saveSettings(settings);
         applySettings();
@@ -772,6 +780,7 @@ export function startApp(root: HTMLDivElement) {
           "controlOpacity",
           "controlSpread",
           "controlHeight",
+          "boardScale",
         ] as const) {
           const input = dialog.querySelector<
             HTMLInputElement | HTMLSelectElement
@@ -825,6 +834,15 @@ export function startApp(root: HTMLDivElement) {
       return;
     }
     if (!input.closest("#settings-form")) return;
+    const priorKey = controlProfileKey(settings);
+    const profiles = {
+      ...settings.controlProfiles,
+      [priorKey]: {
+        layouts: structuredClone(settings.gamepadLayouts),
+        boardScale: settings.boardScale ?? 1,
+      },
+    };
+
     if (input instanceof HTMLInputElement && input.type === "checkbox")
       settings = { ...settings, [input.name]: input.checked };
     else if (
@@ -838,8 +856,18 @@ export function startApp(root: HTMLDivElement) {
     )
       settings = { ...settings, [input.name]: input.value };
     else settings = { ...settings, [input.name]: Number(input.value) };
-    if (input.name === "gamepadPreset" || input.name === "controlLayout")
-      settings.gamepadLayouts = { portrait: {}, landscape: {} };
+    settings.controlProfiles = profiles;
+    if (input.name === "gamepadPreset" || input.name === "controlLayout") {
+      const profile = profiles[controlProfileKey(settings)];
+      settings.gamepadLayouts = structuredClone(
+        profile?.layouts ?? { portrait: {}, landscape: {} },
+      );
+      settings.boardScale = profile?.boardScale ?? 1;
+      const boardInput = dialog.querySelector<HTMLInputElement>(
+        '[name="boardScale"]',
+      );
+      if (boardInput) boardInput.value = String(settings.boardScale);
+    }
     if (!saveSettings(settings)) el("storage-notice").hidden = false;
     applySettings();
   }

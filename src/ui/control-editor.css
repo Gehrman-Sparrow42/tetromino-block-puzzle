@@ -170,3 +170,43 @@
 .control-editor-target[data-blocked] {
   outline-style: solid;
 }
+/* Each direction is an independent target, including in the Buttons layout. */
+.game-screen .movement-pad {
+  display: contents !important;
+}
+.game-screen .pad-outline {
+  display: none !important;
+}
+.game-screen .movement-pad .control {
+  border: 1px solid rgb(var(--control-rgb) / 0.4) !important;
+  border-radius: 20% !important;
+  background: rgb(var(--control-rgb) / var(--control-opacity)) !important;
+}
+.control-editor-selection select {
+  min-height: 40px;
+  max-width: 65%;
+  color: var(--text);
+  background: var(--panel);
+}
+.control-editor-tools input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  justify-self: start;
+}
+.control-editor-tools label {
+  min-height: 40px;
+}
+.control-editor-tools input[type="range"] {
+  height: 40px;
+}
+.control-editor-tools {
+  max-height: 45dvh;
+  overflow-y: auto;
+}
+.control-preview i[data-preview-command="MOVE_LEFT"],
+.control-preview i[data-preview-command="MOVE_RIGHT"],
+.control-preview i[data-preview-command="SOFT_DROP"] {
+  border: 1px solid rgb(var(--control-rgb) / 0.4) !important;
+  border-radius: 20% !important;
+  background: rgb(var(--control-rgb) / var(--control-opacity)) !important;
+}

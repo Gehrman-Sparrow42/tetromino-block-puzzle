@@ -84,6 +84,9 @@ export type ThemeId = (typeof THEME_IDS)[number];
 export type ControlLayoutId = "gamepad" | "thumbs" | "mirror" | "floating";
 export const GAMEPAD_CONTROL_IDS = [
   "pad",
+  "left",
+  "down",
+  "right",
   "hardDrop",
   "rotateCW",
   "rotateCCW",
@@ -97,6 +100,7 @@ export interface GamepadControlPlacement {
   y: number;
   size: number;
   opacity: number;
+  hidden?: boolean;
 }
 export type GamepadLayouts = Record<
   ControlOrientation,
@@ -120,6 +124,11 @@ export interface UserSettings {
   controlSpread: number;
   controlHeight: number;
   gamepadLayouts: GamepadLayouts;
+  boardScale?: number;
+  controlProfiles?: Record<
+    string,
+    { layouts: GamepadLayouts; boardScale: number }
+  >;
 }
 export interface PersonalBestStats {
   marathonHighScore: number;
@@ -130,4 +139,15 @@ export interface PersonalBestStats {
   ultra120HighScore: number;
   gamesPlayed: number;
   migratedLegacyHighScore: boolean;
+}
+
+export const EDITABLE_CONTROL_IDS = GAMEPAD_CONTROL_IDS.filter(
+  (id) => id !== "pad",
+);
+export function controlProfileKey(
+  settings: Pick<UserSettings, "controlLayout" | "gamepadPreset">,
+): string {
+  return settings.controlLayout === "gamepad"
+    ? `gamepad:${settings.gamepadPreset}`
+    : settings.controlLayout;
 }

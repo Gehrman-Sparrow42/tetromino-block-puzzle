@@ -1,4 +1,12 @@
-# Remake verification - 2026-10-21
+# Remake verification - 2026-10-22
+
+## Per-preset customization — 2.9.0
+
+- Buttons Balanced/Compact/Mirrored, Thumb, Left-handed and Floating store separate orientation maps and board-size settings. Existing active edits migrate to the selected profile. All seven buttons are independently editable; hidden buttons remain selectable for re-enabling and no longer occupy gameplay hitboxes or board-fitting obstacles.
+- Direction buttons are separate. Controls may overlap, including during Dynamic repositioning; screen bounds and board/rail clearance still apply. One Next preview is shown while the internal engine queue remains unchanged. The redundant Spacing and Height settings are removed from the UI, with legacy fields retained for compatibility.
+- Manual board size is 50–100% of the naturally fitted board, using the same square-cell, centered fitter in both orientations. A landscape regression covers the height-limited case.
+- Reduced verification: 29 focused storage/geometry tests, strict TypeScript/Vite, and one comprehensive phone-browser flow pass. The browser flow covers profile recall/reload, seven editor choices, sizing, hiding/re-enabling, actual overlapping placement, one Next, and compact-screen rail containment at 50% board size. Android debug assembly and APK signature verification pass. Full suites and a fresh lint/independent review were not run.
+- A brief installed offline API35/WebView124 check passes on the final APK: seven editor controls, board-size editing, hiding Down, one Next preview, a hard drop saved as one placed piece, and zero WebView errors. This is an emulator check, not physical-phone comfort verification.
 
 ## Dynamic placement across layouts — 2.8.0
 

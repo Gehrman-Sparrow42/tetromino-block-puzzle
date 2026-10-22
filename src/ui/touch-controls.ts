@@ -73,25 +73,19 @@ export class TouchControls {
         if (!this.enabled() || this.settings().padMode !== "dynamic") return;
         const target = event.target as Element;
         if (target.closest("button, #board, .left-rail, .next-rail")) return;
-        const movement = ["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"];
-        const pad = root.querySelector<HTMLElement>("[data-movement-pad]");
-        const connected = this.settings().controlLayout === "gamepad";
-        const groups: { nodes: HTMLElement[]; actions: string[] }[] = [
-          {
-            nodes:
-              connected && pad
-                ? [pad]
-                : movement.map((a) => this.buttons.get(a)!),
-            actions: movement,
-          },
-          ...["HARD_DROP", "HOLD", "ROTATE_CW", "ROTATE_CCW"]
-            .map((a) => this.buttons.get(a))
-            .filter((n): n is HTMLButtonElement => !!n)
-            .map((n) => ({
-              nodes: [n],
-              actions: [n.dataset.command!],
-            })),
-        ];
+        const groups = [
+          "MOVE_LEFT",
+          "SOFT_DROP",
+          "MOVE_RIGHT",
+          "HARD_DROP",
+          "HOLD",
+          "ROTATE_CW",
+          "ROTATE_CCW",
+        ]
+          .map((action) => ({ node: this.buttons.get(action), action }))
+          .filter((item) => item.node && !item.node.hidden)
+          .map((item) => ({ nodes: [item.node!], actions: [item.action] }));
+        if (!groups.length) return;
         const bounds = (nodes: HTMLElement[]) => {
           const rs = nodes.map((n) => n.getBoundingClientRect());
           const left = Math.min(...rs.map((r) => r.left)),
@@ -136,7 +130,7 @@ export class TouchControls {
         const members = group.actions.map((a) => this.buttons.get(a)!);
         const obstacles = [
           ...root.querySelectorAll<HTMLElement>(
-            "#board, .left-rail, .next-rail, .control-deck [data-command]",
+            "#board, .left-rail, .next-rail",
           ),
         ].filter((n) => !members.includes(n as HTMLButtonElement));
         const proposed = group.nodes.map((n) => {

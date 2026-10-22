@@ -4,7 +4,7 @@ import type {
   GamepadControlPlacement,
   UserSettings,
 } from "../contracts/game-contract";
-import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
+import { EDITABLE_CONTROL_IDS } from "../contracts/game-contract";
 import {
   canPlaceGamepadGroup,
   clampGamepadResize,
@@ -20,12 +20,18 @@ import "./control-editor.css";
 
 const NAMES: Record<GamepadControlId, string> = {
   pad: "Movement buttons",
+  left: "Left",
+  down: "Down",
+  right: "Right",
   hardDrop: "Hard drop",
   rotateCW: "Rotate clockwise",
   rotateCCW: "Rotate counterclockwise",
   hold: "Hold",
 };
 const PATHS: Record<Exclude<GamepadControlId, "pad">, string> = {
+  left: '<path d="M36 24H12m12-12L12 24l12 12"/>',
+  right: '<path d="M12 24h24M24 12l12 12-12 12"/>',
+  down: '<path d="M24 12v24M12 24l12 12 12-12"/>',
   hardDrop: '<path d="m13 10 11 10 11-10m-22 11 11 10 11-10M12 38h24"/>',
   rotateCW: '<path d="M36 18a14 14 0 1 0 1 13M36 7v12H24"/>',
   rotateCCW: '<path d="M12 18a14 14 0 1 1-1 13M12 7v12h12"/>',
@@ -61,7 +67,7 @@ export class ControlEditor {
   private readonly selectionLabel: HTMLElement;
   private readonly orientationLabel: HTMLElement;
   private orientation: ControlOrientation;
-  private selected: GamepadControlId = "pad";
+  private selected: GamepadControlId = "left";
   private drag: Drag | null = null;
   private destroyed = false;
   private scale = 1;
@@ -93,7 +99,9 @@ export class ControlEditor {
       <div class="control-editor-hint"><span data-editor-feedback aria-live="polite">Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
       <div class="control-editor-stage"><div class="control-editor-frame"><div class="control-editor-board" aria-hidden="true"></div><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">Hold<br>Score<br>Lines<br>Level<br>Time</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">Pause<br>Next</div></div></div>
       <footer class="control-editor-tools">
-        <div class="control-editor-selection"><strong data-editor-selection></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
+        <div class="control-editor-selection"><select name="editorSelection" aria-label="Button">${EDITABLE_CONTROL_IDS.map((id) => `<option value="${id}">${NAMES[id]}</option>`).join("")}</select><strong data-editor-selection hidden></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
+        <label><span>Enabled</span><input name="editorControlEnabled" type="checkbox" checked></label>
+        <label><span>Board size</span><input name="editorBoardScale" type="range" min="0.5" max="1" step="0.01" value="${this.settings.boardScale ?? 1}"></label>
         <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="2" step="0.05"></label>
         <label><span>Opacity</span><input name="editorControlOpacity" type="range" min="0.08" max="0.6" step="0.01"></label>
       </footer>`;
@@ -112,19 +120,14 @@ export class ControlEditor {
     this.orientationLabel = this.wrapper.querySelector(
       "[data-editor-orientation]",
     )!;
-    for (const id of GAMEPAD_CONTROL_IDS) {
+    for (const id of EDITABLE_CONTROL_IDS) {
       const target = document.createElement("button");
       target.type = "button";
       target.className = `control-editor-target control-editor-target-${id}`;
       target.dataset.editorControl = id;
       target.setAttribute("aria-label", NAMES[id]);
       target.setAttribute("aria-pressed", String(id === this.selected));
-      target.innerHTML =
-        id === "pad"
-          ? this.settings.controlLayout === "gamepad"
-            ? `<svg viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M2 2H298V98H198V198H102V98H2Z"/><path d="m58 36-18 14 18 14m184-28 18 14-18 14m-106 85 14 18 14-18"/></svg>`
-            : `<svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M2 2H94V98H2ZM104 2H196V98H104ZM206 2H298V98H206Z"/><path d="m56 36-18 14 18 14m188-28 18 14-18 14m-108 8 14 18 14-18"/></svg>`
-          : `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">${PATHS[id]}</svg>`;
+      target.innerHTML = `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">${PATHS[id]}</svg>`;
       this.stage.querySelector(".control-editor-frame")!.append(target);
       this.targets.set(id, target);
       target.addEventListener(
@@ -155,6 +158,43 @@ export class ControlEditor {
       });
     }
     root.append(this.wrapper);
+    this.wrapper
+      .querySelector<HTMLSelectElement>('[name="editorSelection"]')!
+      .addEventListener(
+        "change",
+        (event) =>
+          this.select(
+            (event.target as HTMLSelectElement).value as GamepadControlId,
+          ),
+        { signal: this.abort.signal },
+      );
+    this.wrapper
+      .querySelector<HTMLInputElement>('[name="editorControlEnabled"]')!
+      .addEventListener(
+        "change",
+        (event) => {
+          this.settings.gamepadLayouts[this.orientation][this.selected] = {
+            ...this.placement(this.selected),
+            hidden: !(event.target as HTMLInputElement).checked,
+          };
+          this.render();
+          this.updateFields();
+        },
+        { signal: this.abort.signal },
+      );
+    this.wrapper
+      .querySelector<HTMLInputElement>('[name="editorBoardScale"]')!
+      .addEventListener(
+        "input",
+        (event) => {
+          this.settings.boardScale = (
+            event.target as HTMLInputElement
+          ).valueAsNumber;
+          this.render();
+        },
+        { signal: this.abort.signal },
+      );
+
     this.wrapper
       .querySelector('[data-editor-action="cancel"]')!
       .addEventListener("click", () => this.cancel(), {
@@ -211,7 +251,7 @@ export class ControlEditor {
     this.observer.observe(this.stage);
     this.render();
     this.updateFields();
-    this.targets.get("pad")!.focus({ preventScroll: true });
+    this.targets.get("left")!.focus({ preventScroll: true });
   }
 
   cancel(): void {
@@ -250,7 +290,9 @@ export class ControlEditor {
   }
 
   private placement(id: GamepadControlId): GamepadControlPlacement {
-    const saved = this.settings.gamepadLayouts[this.orientation][id];
+    const map = this.settings.gamepadLayouts[this.orientation];
+    const saved =
+      map[id] ?? (["left", "down", "right"].includes(id) ? map.pad : undefined);
     const geometry = this.geometry();
     const stageHeight = geometry.playAreaHeight ?? geometry.height;
     const rect = geometry.groups![id];
@@ -259,6 +301,7 @@ export class ControlEditor {
       y: (rect.y + rect.height / 2) / stageHeight,
       size: saved?.size ?? 1,
       opacity: saved?.opacity ?? this.settings.controlOpacity,
+      hidden: saved?.hidden ?? false,
     };
   }
 
@@ -271,6 +314,12 @@ export class ControlEditor {
 
   private updateFields(): void {
     const placement = this.placement(this.selected);
+    this.wrapper.querySelector<HTMLSelectElement>(
+      '[name="editorSelection"]',
+    )!.value = this.selected;
+    this.wrapper.querySelector<HTMLInputElement>(
+      '[name="editorControlEnabled"]',
+    )!.checked = !placement.hidden;
     this.selectionLabel.textContent =
       this.selected === "pad" && this.settings.padMode === "dynamic"
         ? "Movement buttons home"
@@ -341,6 +390,7 @@ export class ControlEditor {
     this.stage.dataset.padMode = this.settings.padMode;
     for (const [id, target] of this.targets) {
       const rect = geometry.groups![id];
+      target.hidden = !!geometry.groupHidden?.[id];
       Object.assign(target.style, {
         left: `${rect.x}px`,
         top: `${rect.y}px`,
@@ -425,7 +475,9 @@ export class ControlEditor {
     if (event.key === "Tab") {
       event.stopPropagation();
       const focusable = [
-        ...this.wrapper.querySelectorAll<HTMLElement>("button, input"),
+        ...this.wrapper.querySelectorAll<HTMLElement>(
+          "button:not([hidden]), input, select",
+        ),
       ];
       const index = focusable.indexOf(document.activeElement as HTMLElement);
       const next = event.shiftKey

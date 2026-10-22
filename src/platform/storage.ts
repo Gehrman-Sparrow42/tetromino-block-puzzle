@@ -5,7 +5,11 @@ import type {
   GamepadLayouts,
 } from "../contracts/game-contract";
 import { validateSnapshot } from "../engine/engine";
-import { THEME_IDS, GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
+import {
+  THEME_IDS,
+  GAMEPAD_CONTROL_IDS,
+  controlProfileKey,
+} from "../contracts/game-contract";
 
 export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   soundEnabled: true,
@@ -24,6 +28,8 @@ export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   controlOpacity: 0.18,
   controlSpread: 0.65,
   controlHeight: 0.3,
+  boardScale: 1,
+  controlProfiles: {},
   gamepadLayouts: Object.freeze({
     portrait: Object.freeze({}),
     landscape: Object.freeze({}),
@@ -112,6 +118,7 @@ export function normalizeGamepadLayouts(value: unknown): GamepadLayouts {
         y: bounded(placement.y, 0.5, 0, 1),
         size: bounded(placement.size, 1, 0.75, 2),
         opacity: bounded(placement.opacity, 0.18, 0.08, 0.6),
+        ...(placement.hidden === true ? { hidden: true } : {}),
       };
     }
   }
@@ -124,6 +131,48 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
     typeof value[key] === "boolean"
       ? (value[key] as boolean)
       : (defaults[key] as boolean);
+  const profiles: NonNullable<UserSettings["controlProfiles"]> = {};
+  if (value.controlProfiles && typeof value.controlProfiles === "object") {
+    for (const key of [
+      "gamepad:balanced",
+      "gamepad:compact",
+      "gamepad:mirrored",
+      "thumbs",
+      "mirror",
+      "floating",
+    ]) {
+      const profile = (value.controlProfiles as Record<string, unknown>)[key];
+      if (profile && typeof profile === "object") {
+        const p = profile as Record<string, unknown>;
+        profiles[key] = {
+          layouts: normalizeGamepadLayouts(p.layouts),
+          boardScale: bounded(p.boardScale, 1, 0.5, 1),
+        };
+      }
+    }
+  }
+  const key = controlProfileKey({
+    controlLayout:
+      value.controlLayout === "thumbs" ||
+      value.controlLayout === "mirror" ||
+      value.controlLayout === "floating"
+        ? value.controlLayout
+        : "gamepad",
+    gamepadPreset:
+      value.gamepadPreset === "compact" || value.gamepadPreset === "mirrored"
+        ? value.gamepadPreset
+        : "balanced",
+  });
+  const layouts = normalizeGamepadLayouts(
+    value.gamepadLayouts ?? profiles[key]?.layouts,
+  );
+  const boardScale = bounded(
+    value.boardScale,
+    profiles[key]?.boardScale ?? 1,
+    0.5,
+    1,
+  );
+  profiles[key] = { layouts, boardScale };
   return {
     soundEnabled: bool("soundEnabled"),
     soundVolume: bounded(value.soundVolume, defaults.soundVolume, 0, 1),
@@ -154,7 +203,9 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
     ),
     controlSpread: bounded(value.controlSpread, defaults.controlSpread, 0, 1),
     controlHeight: bounded(value.controlHeight, defaults.controlHeight, 0, 1),
-    gamepadLayouts: normalizeGamepadLayouts(value.gamepadLayouts),
+    gamepadLayouts: layouts,
+    boardScale,
+    controlProfiles: profiles,
   };
 }
 

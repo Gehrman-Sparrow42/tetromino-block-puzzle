@@ -39,7 +39,7 @@ describe("settings and scores", () => {
       for (const padMode of ["fixed", "dynamic"] as const) {
         const prefs = { ...storage.loadSettings(), gamepadPreset, padMode };
         expect(storage.saveSettings(prefs)).toBe(true);
-        expect(storage.loadSettings()).toEqual(prefs);
+        expect(storage.loadSettings()).toMatchObject(prefs);
       }
     }
   });
@@ -76,7 +76,10 @@ describe("settings and scores", () => {
       opacity: 0.1,
     };
     storage.saveSettings(settings);
-    expect(storage.loadSettings()).toEqual(settings);
+    expect(storage.loadSettings()).toMatchObject({
+      ...settings,
+      controlProfiles: expect.any(Object),
+    });
     const normalized = storage.normalizeGamepadLayouts({
       portrait: {
         pad: { x: -1, y: 8, size: 50, opacity: 0 },
@@ -105,6 +108,7 @@ describe("settings and scores", () => {
     );
     expect(storage.loadSettings()).toEqual({
       ...storage.DEFAULT_SETTINGS,
+      controlProfiles: expect.any(Object),
       soundEnabled: false,
       soundVolume: 0.7,
       controlScheme: "hybrid",
@@ -141,7 +145,10 @@ describe("settings and scores", () => {
       controlHeight: -Infinity,
       controlSpread: NaN,
     });
-    expect(storage.loadSettings()).toEqual(storage.DEFAULT_SETTINGS);
+    expect(storage.loadSettings()).toMatchObject({
+      ...storage.DEFAULT_SETTINGS,
+      controlProfiles: expect.any(Object),
+    });
   });
 
   it("round-trips all themes and control presets", () => {
@@ -162,14 +169,20 @@ describe("settings and scores", () => {
           controlHeight: 0.6,
         };
         expect(storage.saveSettings(settings)).toBe(true);
-        expect(storage.loadSettings()).toEqual(settings);
+        expect(storage.loadSettings()).toMatchObject({
+          ...settings,
+          controlProfiles: expect.any(Object),
+        });
       }
     }
   });
 
   it("normalizes finite bounds, invalid fields and corrupted JSON", () => {
     data.set("tetromino_v2_settings", "{broken");
-    expect(storage.loadSettings()).toEqual(storage.DEFAULT_SETTINGS);
+    expect(storage.loadSettings()).toMatchObject({
+      ...storage.DEFAULT_SETTINGS,
+      controlProfiles: expect.any(Object),
+    });
     data.set(
       "tetromino_v2_settings",
       JSON.stringify({
@@ -192,7 +205,10 @@ describe("settings and scores", () => {
       soundVolume: NaN,
       dasMs: Infinity,
     });
-    expect(storage.loadSettings()).toEqual(storage.DEFAULT_SETTINGS);
+    expect(storage.loadSettings()).toMatchObject({
+      ...storage.DEFAULT_SETTINGS,
+      controlProfiles: expect.any(Object),
+    });
   });
 
   it("migrates legacy score without removing it or lowering an existing record", () => {
@@ -345,4 +361,45 @@ describe("resume and unavailable storage", () => {
     expect(storage.saveRun(state)).toBe(false);
     expect(storage.loadRun()?.status).toBe("paused");
   });
+});
+
+it("preserves six independent profiles and migrates the old map only into its selected profile", () => {
+  const legacy = {
+    ...storage.DEFAULT_SETTINGS,
+    controlLayout: "thumbs",
+    gamepadLayouts: {
+      portrait: { hold: { x: 0.8, y: 0.8, size: 1.5, opacity: 0.3 } },
+      landscape: {},
+    },
+  };
+  data.set("tetromino_v2_settings", JSON.stringify(legacy));
+  const s = storage.loadSettings();
+  expect(s.controlProfiles!.thumbs.layouts.portrait.hold!.size).toBe(1.5);
+  expect(s.controlProfiles!["gamepad:balanced"]).toBeUndefined();
+  for (const key of [
+    "gamepad:balanced",
+    "gamepad:compact",
+    "gamepad:mirrored",
+    "thumbs",
+    "mirror",
+    "floating",
+  ])
+    s.controlProfiles![key] = {
+      layouts: {
+        portrait: {
+          left: { x: 0.2, y: 0.8, size: 1.2, opacity: 0.3, hidden: true },
+        },
+        landscape: {},
+      },
+      boardScale: 0.7,
+    };
+  s.gamepadLayouts = s.controlProfiles!.thumbs.layouts;
+  s.boardScale = 0.7;
+  storage.saveSettings(s);
+  const reloaded = storage.loadSettings();
+  expect(Object.keys(reloaded.controlProfiles!)).toHaveLength(6);
+  expect(
+    reloaded.controlProfiles!["gamepad:compact"].layouts.portrait.left!.hidden,
+  ).toBe(true);
+  expect(reloaded.boardScale).toBe(0.7);
 });

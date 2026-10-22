@@ -1,4 +1,4 @@
-import { GAMEPAD_CONTROL_IDS } from "../contracts/game-contract";
+import { EDITABLE_CONTROL_IDS } from "../contracts/game-contract";
 import type {
   ControlOrientation,
   GamepadControlId,
@@ -14,6 +14,8 @@ export type ControlAction =
   | "ROTATE_CW"
   | "ROTATE_CCW"
   | "HOLD";
+
+type LegacyControlId = "pad" | "hardDrop" | "hold" | "rotateCW" | "rotateCCW";
 
 export interface ControlRect {
   x: number;
@@ -39,6 +41,8 @@ export interface ControlGeometry {
   orientation?: ControlOrientation;
   minimumRailHeight?: number;
   baseButtonSize?: number;
+  boardScale?: number;
+  groupHidden?: Partial<Record<GamepadControlId, boolean>>;
   buttons: Record<
     ControlAction,
     { x: number; y: number; width: number; height: number }
@@ -47,16 +51,15 @@ export interface ControlGeometry {
 
 /** Controls in play-area coordinates, shared by the board, rails and previews. */
 export function controlObstacles(
-  height: number,
+  _height: number,
   controls: ControlGeometry,
-  layout: UserSettings["controlLayout"],
+  _layout: UserSettings["controlLayout"],
 ): ControlRect[] {
-  if (layout === "gamepad") return Object.values(controls.groups!);
-  const deckTop = height - controls.height;
-  return Object.values(controls.buttons).map((rect) => ({
-    ...rect,
-    y: rect.y + deckTop,
-  }));
+  if (controls.groups)
+    return EDITABLE_CONTROL_IDS.filter((id) => !controls.groupHidden?.[id]).map(
+      (id) => controls.groups![id],
+    );
+  return Object.values(controls.buttons);
 }
 
 /** Full, centered board starts at the top; side rails and every preset stay clear. */
@@ -106,7 +109,8 @@ export function computeBoardGeometry(
     )
       best = size;
   }
-  return { x: (width - best) / 2, y: 0, width: best, height: best * 2 };
+  const size = best * (controls.boardScale ?? 1);
+  return { x: (width - size) / 2, y: 0, width: size, height: size * 2 };
 }
 
 /** Rails stop before control targets even when a custom group moves upward. */
@@ -124,7 +128,7 @@ export function computeRailGeometry(
     height: Math.max(
       0,
       Math.min(
-        board.height,
+        height,
         ...obstacles
           .filter(
             (rect) => rect.x < x + SIDE_RAIL_WIDTH && rect.x + rect.width > x,
@@ -240,15 +244,6 @@ export function computeControlGeometry(
   );
 }
 
-function separated(a: ControlRect, b: ControlRect): boolean {
-  return (
-    a.x + a.width + 8 <= b.x ||
-    b.x + b.width + 8 <= a.x ||
-    a.y + a.height + 8 <= b.y ||
-    b.y + b.height + 8 <= a.y
-  );
-}
-
 function availableRailHeight(geometry: ControlGeometry): number {
   const stageHeight = geometry.playAreaHeight ?? geometry.height;
   const board = computeBoardGeometry(
@@ -257,12 +252,7 @@ function availableRailHeight(geometry: ControlGeometry): number {
     geometry,
     "gamepad",
   );
-  const rails = computeRailGeometry(
-    board,
-    stageHeight,
-    geometry,
-    "gamepad",
-  );
+  const rails = computeRailGeometry(board, stageHeight, geometry, "gamepad");
   return Math.min(rails.left.height, rails.right.height);
 }
 
@@ -278,8 +268,7 @@ export function clampGamepadResize(
     48,
     Math.round(geometry.baseButtonSize! * placement.size),
   );
-  const width =
-    id === "pad" ? cell * 3 + (connected ? 0 : 16) : cell;
+  const width = id === "pad" ? cell * 3 + (connected ? 0 : 16) : cell;
   const height = cell * (id === "pad" && connected ? 2 : 1);
   const halfWidth = width / geometry.width / 2;
   const halfHeight = height / stageHeight / 2;
@@ -309,13 +298,7 @@ export function canPlaceGamepadGroup(
     availableRailHeight({
       ...geometry,
       groups: { ...geometry.groups!, [id]: rect },
-    }) >= (geometry.minimumRailHeight ?? 0) &&
-    GAMEPAD_CONTROL_IDS.every(
-      (other) =>
-        other === id ||
-        !geometry.groups?.[other] ||
-        separated(rect, geometry.groups[other]),
-    )
+    }) >= (geometry.minimumRailHeight ?? 0)
   );
 }
 
@@ -370,7 +353,7 @@ function computeGamepadGeometry(
     width: baseCell * (id === "pad" ? 3 : 1),
     height: baseCell * (id === "pad" ? 2 : 1),
   });
-  const defaults: Record<GamepadControlId, ControlRect> = {
+  const defaults: Record<LegacyControlId, ControlRect> = {
     pad: rect("pad", padX, h - bottom - 2 * padSize),
     hardDrop: rect("hardDrop", actionX, lowerY - actionSize - gap),
     hold: rect("hold", actionX + actionSize + gap, lowerY - actionSize - gap),
@@ -393,167 +376,128 @@ function computeGamepadGeometry(
 function resolveControlGroups(
   w: number,
   h: number,
-  deckHeight: number,
+  _deckHeight: number,
   bottom: number,
   baseCell: number,
   facing: ControlOrientation,
   connected: boolean,
-  defaults: Record<GamepadControlId, ControlRect>,
+  defaults: Record<LegacyControlId, ControlRect>,
   settings: UserSettings,
 ): ControlGeometry {
   const custom = settings.gamepadLayouts?.[facing] ?? {};
-  const padGap = connected ? 0 : 8;
-  const padRows = connected ? 2 : 1;
-  const cells = Object.fromEntries(
-    GAMEPAD_CONTROL_IDS.map((id) => [
-      id,
-      Math.round(
-        bounded(
-          baseCell * bounded(custom[id]?.size ?? 1, 1, 0.75, 2),
-          baseCell,
-          48,
-          Math.min(
-            id === "pad" ? Math.floor((w - 2 * padGap) / 3) : w,
-            Math.floor(h / (id === "pad" ? padRows : 1)),
-          ),
+  // Migrate the old movement-group edit visually without changing the saved map.
+  const oldPad = custom.pad;
+  const padCell = oldPad
+    ? Math.max(48, Math.round(baseCell * oldPad.size))
+    : baseCell;
+  const padWidth = connected ? padCell * 3 : padCell * 3 + 16;
+  const padHeight = connected ? padCell * 2 : padCell;
+  const pad = oldPad
+    ? {
+        x: Math.max(
+          0,
+          Math.min(w - padWidth, Math.round(oldPad.x * w - padWidth / 2)),
         ),
-      ),
-    ]),
-  ) as Record<GamepadControlId, number>;
-  const opacity = Object.fromEntries(
-    GAMEPAD_CONTROL_IDS.map((id) => [
-      id,
-      bounded(custom[id]?.opacity ?? settings.controlOpacity, 0.18, 0.08, 0.6),
-    ]),
-  ) as Record<GamepadControlId, number>;
-  const groups = Object.fromEntries(
-    GAMEPAD_CONTROL_IDS.map((id) => {
-      const p = custom[id];
-      const r = {
-        ...defaults[id],
-        width: id === "pad" ? cells.pad * 3 + 2 * padGap : cells[id],
-        height: cells[id] * (id === "pad" ? padRows : 1),
-      };
-      return [
-        id,
-        p
-          ? {
-              ...r,
-              x: Math.round(bounded(p.x, 0.5, 0, 1) * w - r.width / 2),
-              y: Math.round(bounded(p.y, 0.5, 0, 1) * h - r.height / 2),
-            }
-          : r,
-      ];
-    }),
-  ) as Record<GamepadControlId, ControlRect>;
-  for (const id of GAMEPAD_CONTROL_IDS) {
-    const r = groups[id];
-    groups[id] = {
-      ...r,
-      x: Math.max(0, Math.min(w - r.width, r.x)),
-      y: Math.max(0, Math.min(h - r.height, r.y)),
-    };
-  }
-  // Reject invalid legacy edits in place. Never search for spare space or move
-  // unrelated groups when an editor changes one control. New edits are checked
-  // with canPlaceGamepadGroup before being stored.
-  const rejected = new Set<GamepadControlId>();
-  for (let pass = 0; pass < GAMEPAD_CONTROL_IDS.length; pass++) {
-    let changed = false;
-    for (const id of GAMEPAD_CONTROL_IDS) {
-      if (!custom[id] || rejected.has(id)) continue;
-      if (
-        !GAMEPAD_CONTROL_IDS.every(
-          (other) => other === id || separated(groups[id], groups[other]),
-        )
-      ) {
-        groups[id] = defaults[id];
-        rejected.add(id);
-        changed = true;
+        y: Math.max(
+          0,
+          Math.min(h - padHeight, Math.round(oldPad.y * h - padHeight / 2)),
+        ),
+        width: padWidth,
+        height: padHeight,
       }
-    }
-    if (!changed) break;
+    : defaults.pad;
+  const step = padCell + (connected ? 0 : 8);
+  const base: Record<GamepadControlId, ControlRect> = {
+    ...defaults,
+    left: { x: pad.x, y: pad.y, width: padCell, height: padCell },
+    right: { x: pad.x + step * 2, y: pad.y, width: padCell, height: padCell },
+    down: {
+      x: pad.x + step,
+      y: pad.y + (connected ? padCell : 0),
+      width: padCell,
+      height: padCell,
+    },
+  };
+  const opacity = {} as Record<GamepadControlId, number>;
+  const hidden: Partial<Record<GamepadControlId, boolean>> = {};
+  const groups = { ...base };
+  for (const id of EDITABLE_CONTROL_IDS) {
+    const p = custom[id];
+    const inherited = ["left", "down", "right"].includes(id)
+      ? oldPad
+      : undefined;
+    const cell = p
+      ? Math.min(
+          w,
+          h,
+          Math.max(48, Math.round(baseCell * bounded(p.size, 1, 0.75, 2))),
+        )
+      : base[id].width;
+    groups[id] = p
+      ? {
+          x: Math.max(0, Math.min(w - cell, Math.round(p.x * w - cell / 2))),
+          y: Math.max(0, Math.min(h - cell, Math.round(p.y * h - cell / 2))),
+          width: cell,
+          height: cell,
+        }
+      : base[id];
+    opacity[id] = bounded(
+      p?.opacity ?? inherited?.opacity ?? settings.controlOpacity,
+      0.18,
+      0.08,
+      0.6,
+    );
+    hidden[id] = p?.hidden ?? inherited?.hidden ?? false;
   }
-  const deckTop = connected ? 0 : h - deckHeight;
-  const shift = (rect: ControlRect): ControlRect => ({
-    ...rect,
-    y: rect.y - deckTop,
-  });
+  opacity.pad = settings.controlOpacity;
   const createGeometry = (
     placements: Record<GamepadControlId, ControlRect>,
-  ): ControlGeometry => {
-    const pad = placements.pad;
-    const s = (pad.width - 2 * padGap) / 3;
-    return {
-      width: w,
-      height: deckHeight,
-      playAreaHeight: h,
-      buttonSize: s,
-      baseButtonSize: baseCell,
-      bottomPadding: bottom,
-      overlay: connected || settings.controlLayout === "floating",
-      orientation: facing,
-      ...(connected ? { pad } : {}),
-      groups: placements,
-      groupOpacity: opacity,
-      buttons: {
-        MOVE_LEFT: { x: pad.x, y: pad.y - deckTop, width: s, height: s },
-        MOVE_RIGHT: {
-          x: pad.x + 2 * (s + padGap),
-          y: pad.y - deckTop,
-          width: s,
-          height: s,
-        },
-        SOFT_DROP: {
-          x: pad.x + s + padGap,
-          y: pad.y - deckTop + (connected ? s : 0),
-          width: s,
-          height: s,
-        },
-        HARD_DROP: shift(placements.hardDrop),
-        ROTATE_CW: shift(placements.rotateCW),
-        ROTATE_CCW: shift(placements.rotateCCW),
-        HOLD: shift(placements.hold),
-      },
-    };
-  };
-  // Preserve saved maps, but never let an old custom placement remove access to
-  // Pause or run information. The default arrangement defines the achievable
-  // floor on very short screens; portrait and landscape use their actual tools.
+  ): ControlGeometry => ({
+    width: w,
+    height: h,
+    playAreaHeight: h,
+    buttonSize: baseCell,
+    baseButtonSize: baseCell,
+    bottomPadding: bottom,
+    overlay: true,
+    orientation: facing,
+    groups: placements,
+    groupOpacity: opacity,
+    groupHidden: hidden,
+    boardScale: settings.boardScale ?? 1,
+    buttons: {
+      MOVE_LEFT: placements.left,
+      SOFT_DROP: placements.down,
+      MOVE_RIGHT: placements.right,
+      HARD_DROP: placements.hardDrop,
+      HOLD: placements.hold,
+      ROTATE_CW: placements.rotateCW,
+      ROTATE_CCW: placements.rotateCCW,
+    },
+  });
   const minimum = Math.min(
     facing === "portrait" ? 256 : 220,
-    availableRailHeight(createGeometry(defaults)),
+    availableRailHeight(createGeometry(base)),
   );
-  const pending = new Set(
-    GAMEPAD_CONTROL_IDS.filter((id) => !!custom[id] && !rejected.has(id)),
-  );
-  const collisionCount = (placements: Record<GamepadControlId, ControlRect>) =>
-    GAMEPAD_CONTROL_IDS.reduce(
-      (total, id, index) =>
-        total +
-        GAMEPAD_CONTROL_IDS.slice(index + 1).filter(
-          (other) => !separated(placements[id], placements[other]),
-        ).length,
-      0,
-    );
+  // Overlap between controls is intentional. Only recover old edits that would
+  // make the board/status inaccessible; retain their stored positions untouched.
+  const pending = new Set(EDITABLE_CONTROL_IDS.filter((id) => !!custom[id]));
   while (
-    (availableRailHeight(createGeometry(groups)) < minimum ||
-      collisionCount(groups) > 0) &&
+    availableRailHeight(createGeometry(groups)) < minimum &&
     pending.size
   ) {
     let best = [...pending][0]!;
     let bestHeight = -Infinity;
     for (const id of pending) {
-      const candidate = { ...groups, [id]: defaults[id] };
-      const candidateHeight =
-        availableRailHeight(createGeometry(candidate)) -
-        collisionCount(candidate) * 10000;
-      if (candidateHeight > bestHeight) {
+      const fit = availableRailHeight(
+        createGeometry({ ...groups, [id]: base[id] }),
+      );
+      if (fit > bestHeight) {
         best = id;
-        bestHeight = candidateHeight;
+        bestHeight = fit;
       }
     }
-    groups[best] = defaults[best];
+    groups[best] = base[best];
     pending.delete(best);
   }
   return { ...createGeometry(groups), minimumRailHeight: minimum };
