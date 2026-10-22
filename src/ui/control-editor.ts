@@ -20,6 +20,7 @@ import "./control-editor.css";
 
 const NAMES: Record<GamepadControlId, string> = {
   pad: "Movement buttons",
+  board: "Board",
   left: "Left",
   down: "Down",
   right: "Right",
@@ -29,6 +30,7 @@ const NAMES: Record<GamepadControlId, string> = {
   hold: "Hold",
 };
 const PATHS: Record<Exclude<GamepadControlId, "pad">, string> = {
+  board: "",
   left: '<path d="M36 24H12m12-12L12 24l12 12"/>',
   right: '<path d="M12 24h24M24 12l12 12-12 12"/>',
   down: '<path d="M24 12v24M12 24l12 12 12-12"/>',
@@ -97,9 +99,9 @@ export class ControlEditor {
         <button type="button" data-editor-action="done">Done</button>
       </header>
       <div class="control-editor-hint"><span data-editor-feedback aria-live="polite">Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
-      <div class="control-editor-stage"><div class="control-editor-frame"><div class="control-editor-board" aria-hidden="true"></div><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">Hold<br>Score<br>Lines<br>Level<br>Time</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">Pause<br>Next</div></div></div>
+      <div class="control-editor-stage"><div class="control-editor-frame"><button type="button" class="control-editor-board" data-editor-control="board" aria-label="Board"></button><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">Hold<br>Score<br>Lines<br>Level<br>Time</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">Pause<br>Next</div></div></div>
       <footer class="control-editor-tools">
-        <div class="control-editor-selection"><select name="editorSelection" aria-label="Button">${EDITABLE_CONTROL_IDS.map((id) => `<option value="${id}">${NAMES[id]}</option>`).join("")}</select><strong data-editor-selection hidden></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
+        <div class="control-editor-selection"><select name="editorSelection" aria-label="Button">${(["board", ...EDITABLE_CONTROL_IDS] as GamepadControlId[]).map((id) => `<option value="${id}">${NAMES[id]}</option>`).join("")}</select><strong data-editor-selection hidden></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
         <label><span>Enabled</span><input name="editorControlEnabled" type="checkbox" checked></label>
         <label><span>Board size</span><input name="editorBoardScale" type="range" min="0.5" max="1" step="0.01" value="${this.settings.boardScale ?? 1}"></label>
         <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="2" step="0.05"></label>
@@ -157,6 +159,33 @@ export class ControlEditor {
         signal: this.abort.signal,
       });
     }
+    const boardTarget = this.stage.querySelector<HTMLButtonElement>(
+      ".control-editor-board",
+    )!;
+    this.targets.set("board", boardTarget);
+    boardTarget.addEventListener(
+      "pointerdown",
+      (event) => this.startDrag(event, "board"),
+      { signal: this.abort.signal },
+    );
+    boardTarget.addEventListener(
+      "pointermove",
+      (event) => this.moveDrag(event),
+      { signal: this.abort.signal },
+    );
+    boardTarget.addEventListener(
+      "pointerup",
+      (event) => this.endDrag(event, false),
+      { signal: this.abort.signal },
+    );
+    boardTarget.addEventListener(
+      "pointercancel",
+      (event) => this.endDrag(event, true),
+      { signal: this.abort.signal },
+    );
+    boardTarget.addEventListener("focus", () => this.select("board"), {
+      signal: this.abort.signal,
+    });
     root.append(this.wrapper);
     this.wrapper
       .querySelector<HTMLSelectElement>('[name="editorSelection"]')!
@@ -295,7 +324,15 @@ export class ControlEditor {
       map[id] ?? (["left", "down", "right"].includes(id) ? map.pad : undefined);
     const geometry = this.geometry();
     const stageHeight = geometry.playAreaHeight ?? geometry.height;
-    const rect = geometry.groups![id];
+    const rect =
+      id === "board"
+        ? computeBoardGeometry(
+            geometry.width,
+            stageHeight,
+            geometry,
+            this.settings.controlLayout,
+          )
+        : geometry.groups![id];
     return {
       x: (rect.x + rect.width / 2) / geometry.width,
       y: (rect.y + rect.height / 2) / stageHeight,
@@ -307,13 +344,21 @@ export class ControlEditor {
 
   private select(id: GamepadControlId): void {
     this.selected = id;
-    for (const [key, target] of this.targets)
+    for (const [key, target] of this.targets) {
       target.setAttribute("aria-pressed", String(key === id));
+      target.style.zIndex =
+        key === "board" ? (id === "board" ? "4" : "0") : "3";
+    }
     this.updateFields();
   }
 
   private updateFields(): void {
     const placement = this.placement(this.selected);
+    this.sizeInput.disabled = this.selected === "board";
+    this.opacityInput.disabled = this.selected === "board";
+    this.wrapper.querySelector<HTMLInputElement>(
+      '[name="editorControlEnabled"]',
+    )!.disabled = this.selected === "board";
     this.wrapper.querySelector<HTMLSelectElement>(
       '[name="editorSelection"]',
     )!.value = this.selected;
@@ -381,7 +426,7 @@ export class ControlEditor {
           .style,
         {
           left: `${rect.x}px`,
-          top: "0px",
+          top: `${rect.y}px`,
           width: `${rect.width}px`,
           height: `${rect.height}px`,
         },
@@ -389,7 +434,7 @@ export class ControlEditor {
     }
     this.stage.dataset.padMode = this.settings.padMode;
     for (const [id, target] of this.targets) {
-      const rect = geometry.groups![id];
+      const rect = id === "board" ? board : geometry.groups![id];
       target.hidden = !!geometry.groupHidden?.[id];
       Object.assign(target.style, {
         left: `${rect.x}px`,
@@ -521,6 +566,28 @@ export class ControlEditor {
     placement: GamepadControlPlacement,
   ): boolean {
     const before = this.geometry();
+    if (id === "board") {
+      const viewport = this.getViewport();
+      const rect = computeBoardGeometry(
+        viewport.width,
+        viewport.height,
+        before,
+        this.settings.controlLayout,
+      );
+      this.settings.gamepadLayouts[this.orientation].board = {
+        ...placement,
+        x: Math.max(
+          rect.width / 2 / viewport.width,
+          Math.min(1 - rect.width / 2 / viewport.width, placement.x),
+        ),
+        y: Math.max(
+          rect.height / 2 / viewport.height,
+          Math.min(1 - rect.height / 2 / viewport.height, placement.y),
+        ),
+      };
+      this.render();
+      return true;
+    }
     const map = this.settings.gamepadLayouts[this.orientation];
     const previous = map[id];
     map[id] = placement;

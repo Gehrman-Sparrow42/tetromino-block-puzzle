@@ -39,7 +39,7 @@ export interface ControlGeometry {
   groupOpacity?: Record<GamepadControlId, number>;
   overlay?: boolean;
   orientation?: ControlOrientation;
-  minimumRailHeight?: number;
+  boardPosition?: { x: number; y: number };
   baseButtonSize?: number;
   boardScale?: number;
   groupHidden?: Partial<Record<GamepadControlId, boolean>>;
@@ -67,75 +67,38 @@ export function computeBoardGeometry(
   width: number,
   height: number,
   controls: ControlGeometry,
-  layout: UserSettings["controlLayout"],
+  _layout: UserSettings["controlLayout"],
 ): ControlRect {
-  const obstacles = controlObstacles(height, controls, layout);
-  const railSpace = SIDE_RAIL_SPACE;
-  const gap = 8;
-  const maxWidth = Math.max(0, width - railSpace * 2);
-  // Changes in obstacle intersection occur only at their horizontal edges.
-  const candidates = [
-    maxWidth,
-    height / 2,
-    ...obstacles.flatMap((rect) => [
-      width - 2 * (rect.x + rect.width + gap),
-      2 * (rect.x - gap) - width,
-      Math.max(0, rect.y - gap) / 2,
-      width - 2 * (rect.x + rect.width + gap + SIDE_RAIL_SPACE),
-      2 * (rect.x - gap - SIDE_RAIL_SPACE) - width,
-    ]),
-  ];
-  let best = 0;
-  for (const candidate of candidates) {
-    const size = Math.max(0, Math.min(maxWidth, height / 2, candidate));
-    const left = (width - size) / 2;
-    const right = left + size;
-    if (
-      size > best &&
-      obstacles.every(
-        (rect) =>
-          right + gap <= rect.x ||
-          left >= rect.x + rect.width + gap ||
-          size * 2 + gap <= rect.y,
-      ) &&
-      [left - SIDE_RAIL_SPACE, right + SIDE_RAIL_GUTTER].every((x) =>
-        obstacles.every(
-          (rect) =>
-            x + SIDE_RAIL_WIDTH <= rect.x ||
-            x >= rect.x + rect.width ||
-            Math.min(size * 2, width > height ? 220 : 256) + gap <= rect.y,
-        ),
-      )
-    )
-      best = size;
-  }
-  const size = best * (controls.boardScale ?? 1);
-  return { x: (width - size) / 2, y: 0, width: size, height: size * 2 };
+  const size =
+    Math.max(0, Math.min(width - SIDE_RAIL_SPACE * 2, height / 2)) *
+    (controls.boardScale ?? 1);
+  const x = controls.boardPosition
+    ? controls.boardPosition.x * width - size / 2
+    : (width - size) / 2;
+  const y = controls.boardPosition
+    ? controls.boardPosition.y * height - size
+    : 0;
+  return {
+    x: Math.max(0, Math.min(width - size, x)),
+    y: Math.max(0, Math.min(height - size * 2, y)),
+    width: size,
+    height: size * 2,
+  };
 }
 
-/** Rails stop before control targets even when a custom group moves upward. */
+/** Side information follows the board while staying within the viewport. */
 export function computeRailGeometry(
   board: ControlRect,
   height: number,
   controls: ControlGeometry,
-  layout: UserSettings["controlLayout"],
+  _layout: UserSettings["controlLayout"],
 ): { left: ControlRect; right: ControlRect } {
-  const obstacles = controlObstacles(height, controls, layout);
+  const y = Math.max(0, Math.min(height - Math.min(height, 300), board.y));
   const rail = (x: number): ControlRect => ({
-    x,
-    y: 0,
+    x: Math.max(0, Math.min(controls.width - SIDE_RAIL_WIDTH, x)),
+    y,
     width: SIDE_RAIL_WIDTH,
-    height: Math.max(
-      0,
-      Math.min(
-        height,
-        ...obstacles
-          .filter(
-            (rect) => rect.x < x + SIDE_RAIL_WIDTH && rect.x + rect.width > x,
-          )
-          .map((rect) => rect.y - 8),
-      ),
-    ),
+    height: height - y,
   });
   return {
     left: rail(board.x - SIDE_RAIL_SPACE),
@@ -244,18 +207,6 @@ export function computeControlGeometry(
   );
 }
 
-function availableRailHeight(geometry: ControlGeometry): number {
-  const stageHeight = geometry.playAreaHeight ?? geometry.height;
-  const board = computeBoardGeometry(
-    geometry.width,
-    stageHeight,
-    geometry,
-    "gamepad",
-  );
-  const rails = computeRailGeometry(board, stageHeight, geometry, "gamepad");
-  return Math.min(rails.left.height, rails.right.height);
-}
-
 /** A resize may move only its own center inward to fit the screen edge. */
 export function clampGamepadResize(
   geometry: ControlGeometry,
@@ -294,11 +245,7 @@ export function canPlaceGamepadGroup(
     rect.x >= 0 &&
     rect.y >= 0 &&
     rect.x + rect.width <= geometry.width &&
-    rect.y + rect.height <= stageHeight &&
-    availableRailHeight({
-      ...geometry,
-      groups: { ...geometry.groups!, [id]: rect },
-    }) >= (geometry.minimumRailHeight ?? 0)
+    rect.y + rect.height <= stageHeight
   );
 }
 
@@ -409,6 +356,7 @@ function resolveControlGroups(
   const step = padCell + (connected ? 0 : 8);
   const base: Record<GamepadControlId, ControlRect> = {
     ...defaults,
+    board: { x: 0, y: 0, width: 0, height: 0 },
     left: { x: pad.x, y: pad.y, width: padCell, height: padCell },
     right: { x: pad.x + step * 2, y: pad.y, width: padCell, height: padCell },
     down: {
@@ -465,6 +413,9 @@ function resolveControlGroups(
     groupOpacity: opacity,
     groupHidden: hidden,
     boardScale: settings.boardScale ?? 1,
+    boardPosition: custom.board
+      ? { x: custom.board.x, y: custom.board.y }
+      : undefined,
     buttons: {
       MOVE_LEFT: placements.left,
       SOFT_DROP: placements.down,
@@ -475,30 +426,5 @@ function resolveControlGroups(
       ROTATE_CCW: placements.rotateCCW,
     },
   });
-  const minimum = Math.min(
-    facing === "portrait" ? 256 : 220,
-    availableRailHeight(createGeometry(base)),
-  );
-  // Overlap between controls is intentional. Only recover old edits that would
-  // make the board/status inaccessible; retain their stored positions untouched.
-  const pending = new Set(EDITABLE_CONTROL_IDS.filter((id) => !!custom[id]));
-  while (
-    availableRailHeight(createGeometry(groups)) < minimum &&
-    pending.size
-  ) {
-    let best = [...pending][0]!;
-    let bestHeight = -Infinity;
-    for (const id of pending) {
-      const fit = availableRailHeight(
-        createGeometry({ ...groups, [id]: base[id] }),
-      );
-      if (fit > bestHeight) {
-        best = id;
-        bestHeight = fit;
-      }
-    }
-    groups[best] = base[best];
-    pending.delete(best);
-  }
-  return { ...createGeometry(groups), minimumRailHeight: minimum };
+  return createGeometry(groups);
 }

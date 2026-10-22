@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
-  test(`dynamic relocation and direct actions: ${layout}`, async ({
+  test(`fixed placements and direct actions: ${layout}`, async ({
     page,
   }, info) => {
     test.skip(info.project.name !== "phone");
@@ -26,8 +26,7 @@ for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.mouse.up();
     await page.locator('[data-editor-action="done"]').click();
     await expect(page.locator('[name="controlLayout"]')).toHaveValue(layout);
-    await expect(page.locator('[name="padMode"]')).toBeVisible();
-    await page.locator('[name="padMode"]').selectOption("dynamic");
+    await expect(page.locator('[name="padMode"]')).toHaveCount(0);
     await page.locator('#dialog [data-action="close"]').last().click();
     await page.locator('[data-mode="marathon"]').click();
     await page.locator('[data-action="start-marathon"]').click();
@@ -50,15 +49,10 @@ for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
         }
       return points;
     });
-    let moved = false;
-    for (const point of candidates) {
+    for (const point of candidates.slice(0, 3)) {
       await page.touchscreen.tap(point.x, point.y);
-      if (JSON.stringify(await positions()) !== JSON.stringify(home)) {
-        moved = true;
-        break;
-      }
+      expect(await positions()).toEqual(home);
     }
-    expect(moved).toBe(true);
     await page.locator('.control-deck [data-command="ROTATE_CW"]').tap();
     await page.locator('.control-deck [data-command="HARD_DROP"]').tap();
     await page.locator(".pause-button").tap();

@@ -84,6 +84,7 @@ export type ThemeId = (typeof THEME_IDS)[number];
 export type ControlLayoutId = "gamepad" | "thumbs" | "mirror" | "floating";
 export const GAMEPAD_CONTROL_IDS = [
   "pad",
+  "board",
   "left",
   "down",
   "right",
@@ -142,7 +143,7 @@ export interface PersonalBestStats {
 }
 
 export const EDITABLE_CONTROL_IDS = GAMEPAD_CONTROL_IDS.filter(
-  (id) => id !== "pad",
+  (id) => id !== "pad" && id !== "board",
 );
 export function controlProfileKey(
   settings: Pick<UserSettings, "controlLayout" | "gamepadPreset">,

@@ -193,7 +193,7 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
       value.gamepadPreset === "compact" || value.gamepadPreset === "mirrored"
         ? value.gamepadPreset
         : "balanced",
-    padMode: value.padMode === "dynamic" ? "dynamic" : "fixed",
+    padMode: "fixed",
     controlScale: bounded(value.controlScale, defaults.controlScale, 0.85, 2),
     controlOpacity: bounded(
       value.controlOpacity,

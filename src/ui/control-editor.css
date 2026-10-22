@@ -210,3 +210,19 @@
   border-radius: 20% !important;
   background: rgb(var(--control-rgb) / var(--control-opacity)) !important;
 }
+.game-screen .control-deck {
+  z-index: 3;
+}
+.control-editor-board {
+  padding: 0;
+  touch-action: none;
+  cursor: move;
+  border-radius: 0;
+}
+.control-editor-board[aria-pressed="true"] {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+.control-editor-board:focus-visible {
+  outline: 3px solid var(--accent);
+}

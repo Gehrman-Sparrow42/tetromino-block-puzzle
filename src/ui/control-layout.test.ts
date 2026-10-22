@@ -223,7 +223,7 @@ function legacySettings(overrides: Partial<UserSettings> = {}): UserSettings {
     ...overrides,
   });
 }
-it("preserves centered 10x20 fitting and control clearance across safe-area sized viewports", () => {
+it("preserves centered 10x20 board sizing across safe-area sized viewports", () => {
   for (const controlLayout of [
     "gamepad",
     "thumbs",
@@ -246,13 +246,6 @@ it("preserves centered 10x20 fitting and control clearance across safe-area size
         expect(b.height).toBe(b.width * 2);
         expect(b.x + b.width / 2).toBe(w! / 2);
         expect(b.y).toBe(0);
-        for (const c of controlObstacles(h!, g, controlLayout))
-          expect(
-            b.x + b.width <= c.x ||
-              c.x + c.width <= b.x ||
-              b.y + b.height <= c.y ||
-              c.y + c.height <= b.y,
-          ).toBe(true);
       }
 });
 
@@ -264,11 +257,43 @@ it("scales the fitted landscape board after its height and obstacle constraints"
   expect(b.width).toBe(a.width * 0.5);
   expect(b.height).toBe(a.height * 0.5);
   expect(b.x + b.width / 2).toBe(853 / 2);
-  for (const c of controlObstacles(308, half, "gamepad"))
-    expect(
-      b.x + b.width <= c.x ||
-        c.x + c.width <= b.x ||
-        b.y + b.height <= c.y ||
-        c.y + c.height <= b.y,
-    ).toBe(true);
+});
+
+it("keeps unrestricted controls on the board without resizing or relocating the board", () => {
+  const settings = prefs();
+  const original = computeControlGeometry(384, 849, settings);
+  const board = computeBoardGeometry(384, 849, original, "gamepad");
+  settings.gamepadLayouts.portrait.left = {
+    x: 0.5,
+    y: 0.15,
+    size: 2,
+    opacity: 0.3,
+  };
+  const edited = computeControlGeometry(384, 849, settings);
+  expect(edited.groups!.left.y).toBe(67);
+  expect(canPlaceGamepadGroup(original, "left", edited.groups!.left)).toBe(
+    true,
+  );
+  expect(computeBoardGeometry(384, 849, edited, "gamepad")).toEqual(board);
+});
+it("moves and clamps the board independently of control positions", () => {
+  const settings = prefs({ boardScale: 0.5 });
+  settings.gamepadLayouts.portrait.board = {
+    x: 0.7,
+    y: 0.65,
+    size: 1,
+    opacity: 0.6,
+  };
+  const g = computeControlGeometry(384, 849, settings);
+  const board = computeBoardGeometry(384, 849, g, "gamepad");
+  expect(board.x + board.width / 2).toBeCloseTo(384 * 0.7);
+  expect(board.y + board.height / 2).toBeCloseTo(849 * 0.65);
+  settings.gamepadLayouts.portrait.board.x = 1;
+  const edge = computeBoardGeometry(
+    384,
+    849,
+    computeControlGeometry(384, 849, settings),
+    "gamepad",
+  );
+  expect(edge.x + edge.width).toBe(384);
 });

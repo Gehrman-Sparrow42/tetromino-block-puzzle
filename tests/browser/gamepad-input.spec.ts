@@ -249,7 +249,7 @@ for (const viewport of [
   { width: 360, height: 600 },
   { width: 853, height: 384 },
 ]) {
-  test(`dynamic positioning leaves board gestures reachable ${viewport.width}x${viewport.height}`, async ({
+  test(`legacy dynamic preferences keep fixed buttons and board gestures reachable ${viewport.width}x${viewport.height}`, async ({
     page,
   }, info) => {
     test.skip(info.project.name !== "phone");
@@ -285,22 +285,11 @@ for (const viewport of [
     );
     expect((await saved(page)).active.rotation).toBe(1);
     await resume(page);
-    if (viewport.width === 360) {
-      const home = (await page.locator("[data-movement-pad]").boundingBox())!;
-      const zone = (await page
-        .locator("[data-dynamic-pad-zone]")
-        .boundingBox())!;
-      expect(zone.width).toBeGreaterThan(home.width);
-      await page.touchscreen.tap(
-        zone.x + home.width / 2 - 12,
-        zone.y + zone.height - 8,
-      );
-      const moved = (await page.locator("[data-movement-pad]").boundingBox())!;
-      expect(
-        Math.abs(moved.x - home.x) + Math.abs(moved.y - home.y),
-      ).toBeGreaterThan(8);
-      await tap(page, "MOVE_LEFT");
-      expect((await saved(page)).active.x).toBe(state.active!.x - 1);
-    }
+    const left = page.locator('.control-deck [data-command="MOVE_LEFT"]');
+    const home = await left.boundingBox();
+    await page.touchscreen.tap(10, viewport.height - 5);
+    expect(await left.boundingBox()).toEqual(home);
+    await tap(page, "MOVE_LEFT");
+    expect((await saved(page)).active.x).toBe(state.active!.x - 1);
   });
 }

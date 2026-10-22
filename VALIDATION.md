@@ -1,5 +1,12 @@
 # Remake verification - 2026-10-22
 
+## Fixed controls and movable board — 2.10.0
+
+- Removed the Fixed/Dynamic selector and empty-space repositioning. Existing Dynamic settings normalize to Fixed. Controls stay at saved editor positions during play.
+- Buttons may overlay the board, rails or other controls; only viewport bounds limit editor placement. Button edits no longer shrink or move the board. Gameplay controls receive pointer input above the board canvas.
+- Board is selectable and draggable in the editor. Its normalized position persists independently per profile/orientation; manual size and square cells remain. Side information follows and clamps to the viewport.
+- Minimal verification: 31 focused geometry/persistence tests and nine focused browser cases pass, including saved board/button positions, actual button activation over the canvas, unchanged board bounds after button edits, and inert empty-space taps. TypeScript/Vite, Capacitor sync, Android assembly and APK signature verification pass. Full suites, fresh lint/review and installed-native smoke were not rerun for this version.
+
 ## Per-preset customization — 2.9.0
 
 - Buttons Balanced/Compact/Mirrored, Thumb, Left-handed and Floating store separate orientation maps and board-size settings. Existing active edits migrate to the selected profile. All seven buttons are independently editable; hidden buttons remain selectable for re-enabling and no longer occupy gameplay hitboxes or board-fitting obstacles.

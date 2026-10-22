@@ -109,7 +109,7 @@ export function startApp(root: HTMLDivElement) {
           </aside>
           <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
           <div class="control-deck" aria-label="Game controls">
-            <div class="dynamic-pad-zone" data-dynamic-pad-zone hidden></div><div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
+            <div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
           </div>
         </div>
       </section>
@@ -220,31 +220,9 @@ export function startApp(root: HTMLDivElement) {
       rail.style.setProperty("--rail-height", `${rect.height}px`);
       Object.assign(rail.style, {
         left: `${rect.x}px`,
-        top: "0px",
+        top: `${rect.y}px`,
         width: `${rect.width}px`,
         height: `${rect.height}px`,
-      });
-    }
-    const zone = deck.querySelector<HTMLElement>("[data-dynamic-pad-zone]")!;
-    zone.hidden =
-      settings.controlLayout !== "gamepad" || settings.padMode !== "dynamic";
-    if (geometry.pad) {
-      const overlapsBoardHorizontally =
-        geometry.pad.x < boardRect.x + boardRect.width &&
-        geometry.pad.x + geometry.pad.width > boardRect.x;
-      const sidePad =
-        !overlapsBoardHorizontally && orientation() === "landscape";
-      const onLeft = geometry.pad.x + geometry.pad.width / 2 < width / 2;
-      const zoneLeft =
-        sidePad && !onLeft ? boardRect.x + boardRect.width + 8 : 0;
-      const zoneRight =
-        sidePad && onLeft ? Math.max(0, boardRect.x - 8) : width;
-      const top = sidePad ? 0 : boardRect.y + boardRect.height + 8;
-      Object.assign(zone.style, {
-        left: `${zoneLeft}px`,
-        top: `${top}px`,
-        width: `${Math.max(0, zoneRight - zoneLeft)}px`,
-        height: `${Math.max(0, height - top)}px`,
       });
     }
     drawControlPreview();
@@ -298,7 +276,7 @@ export function startApp(root: HTMLDivElement) {
     const railPreview = Object.entries(rails)
       .map(
         ([side, rect]) =>
-          `<div class="control-reference-rail" style="left:${offset + rect.x * scale}px;top:0;width:${rect.width * scale}px;height:${rect.height * scale}px;font-size:${9 * scale}px">${side === "left" ? "Hold<br>Score<br>Lines<br>Level<br>Time" : "Pause<br>Next"}</div>`,
+          `<div class="control-reference-rail" style="left:${offset + rect.x * scale}px;top:${rect.y * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px;font-size:${9 * scale}px">${side === "left" ? "Hold<br>Score<br>Lines<br>Level<br>Time" : "Pause<br>Next"}</div>`,
       )
       .join("");
     preview.innerHTML =
@@ -341,8 +319,6 @@ export function startApp(root: HTMLDivElement) {
       const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
       if (row) row.hidden = settings.controlLayout !== "gamepad";
     }
-    const note = dialog.querySelector<HTMLElement>("[data-dynamic-note]");
-    if (note) note.hidden = settings.padMode !== "dynamic";
     for (const name of ["controlSpread"]) {
       const row = dialog.querySelector(`[name="${name}"]`)?.closest("label");
       if (row) row.hidden = settings.controlLayout === "gamepad";
@@ -538,16 +514,6 @@ export function startApp(root: HTMLDivElement) {
         ],
         "Gamepad preset",
       )}
-      ${select(
-        "padMode",
-        "Movement",
-        [
-          ["fixed", "Fixed"],
-          ["dynamic", "Dynamic"],
-        ],
-        "Control placement",
-      )}
-      <p class="control-mode-note" data-dynamic-note>Tap empty space near a control group to move it.</p>
       <div class="control-preview" aria-hidden="true"></div>
       <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
       ${range("controlScale", "Size", 0.85, 2, 0.01, "Control size")}

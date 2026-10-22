@@ -39,7 +39,10 @@ describe("settings and scores", () => {
       for (const padMode of ["fixed", "dynamic"] as const) {
         const prefs = { ...storage.loadSettings(), gamepadPreset, padMode };
         expect(storage.saveSettings(prefs)).toBe(true);
-        expect(storage.loadSettings()).toMatchObject(prefs);
+        expect(storage.loadSettings()).toMatchObject({
+          ...prefs,
+          padMode: "fixed",
+        });
       }
     }
   });

@@ -17,7 +17,6 @@ export class TouchControls {
   private soft = new Set<string>();
   private activeActions = new Map<string, string>();
   private buttons = new Map<string, HTMLButtonElement>();
-  private restorePad: (() => void) | null = null;
   private disposers: (() => void)[] = [];
   private gesture: { id: number; x: number; y: number; at: number } | null =
     null;
@@ -66,114 +65,6 @@ export class TouchControls {
           }
         }) as EventListener);
       });
-    const area = root.querySelector<HTMLElement>(".play-area");
-    const homes = new Map<HTMLElement, { left: string; top: string }>();
-    if (area)
-      this.listen(area, "pointerdown", ((event: PointerEvent) => {
-        if (!this.enabled() || this.settings().padMode !== "dynamic") return;
-        const target = event.target as Element;
-        if (target.closest("button, #board, .left-rail, .next-rail")) return;
-        const groups = [
-          "MOVE_LEFT",
-          "SOFT_DROP",
-          "MOVE_RIGHT",
-          "HARD_DROP",
-          "HOLD",
-          "ROTATE_CW",
-          "ROTATE_CCW",
-        ]
-          .map((action) => ({ node: this.buttons.get(action), action }))
-          .filter((item) => item.node && !item.node.hidden)
-          .map((item) => ({ nodes: [item.node!], actions: [item.action] }));
-        if (!groups.length) return;
-        const bounds = (nodes: HTMLElement[]) => {
-          const rs = nodes.map((n) => n.getBoundingClientRect());
-          const left = Math.min(...rs.map((r) => r.left)),
-            top = Math.min(...rs.map((r) => r.top));
-          return {
-            left,
-            top,
-            width: Math.max(...rs.map((r) => r.right)) - left,
-            height: Math.max(...rs.map((r) => r.bottom)) - top,
-          };
-        };
-        groups.sort((a, b) => {
-          const distance = (g: typeof a) => {
-            const r = bounds(g.nodes);
-            return Math.hypot(
-              event.clientX - r.left - r.width / 2,
-              event.clientY - r.top - r.height / 2,
-            );
-          };
-          return distance(a) - distance(b);
-        });
-        const group = groups[0]!;
-        if (
-          [...this.activeActions.values()].some((a) =>
-            group.actions.includes(a),
-          )
-        )
-          return;
-        const r = bounds(group.nodes),
-          viewport = area.getBoundingClientRect();
-        if (r.width > viewport.width || r.height > viewport.height) return;
-        const left = Math.max(
-          viewport.left,
-          Math.min(viewport.right - r.width, event.clientX - r.width / 2),
-        );
-        const top = Math.max(
-          viewport.top,
-          Math.min(viewport.bottom - r.height, event.clientY - r.height / 4),
-        );
-        const dx = left - r.left,
-          dy = top - r.top;
-        const members = group.actions.map((a) => this.buttons.get(a)!);
-        const obstacles = [
-          ...root.querySelectorAll<HTMLElement>(
-            "#board, .left-rail, .next-rail",
-          ),
-        ].filter((n) => !members.includes(n as HTMLButtonElement));
-        const proposed = group.nodes.map((n) => {
-          const q = n.getBoundingClientRect();
-          return {
-            left: q.left + dx,
-            top: q.top + dy,
-            right: q.right + dx,
-            bottom: q.bottom + dy,
-          };
-        });
-        if (
-          obstacles.some((n) => {
-            const q = n.getBoundingClientRect();
-            return (
-              q.width &&
-              q.height &&
-              proposed.some(
-                (p) =>
-                  p.left < q.right + 8 &&
-                  p.right + 8 > q.left &&
-                  p.top < q.bottom + 8 &&
-                  p.bottom + 8 > q.top,
-              )
-            );
-          })
-        )
-          return;
-        event.preventDefault();
-        for (const node of group.nodes) {
-          if (!homes.has(node))
-            homes.set(node, { left: node.style.left, top: node.style.top });
-          node.style.left = `${parseFloat(node.style.left) + dx}px`;
-          node.style.top = `${parseFloat(node.style.top) + dy}px`;
-        }
-        this.restorePad = () => {
-          for (const [node, home] of homes) {
-            node.style.left = home.left;
-            node.style.top = home.top;
-          }
-          homes.clear();
-        };
-      }) as EventListener);
     const canvas = root.querySelector<HTMLCanvasElement>("#board")!;
     this.listen(canvas, "pointerdown", ((event: PointerEvent) => {
       if (!this.enabled() || this.settings().controlScheme !== "hybrid") return;
@@ -306,8 +197,6 @@ export class TouchControls {
     this.gesture = null;
   }
   releaseAll() {
-    this.restorePad?.();
-    this.restorePad = null;
     this.held.clear();
     this.activeActions.clear();
     this.gesture = null;

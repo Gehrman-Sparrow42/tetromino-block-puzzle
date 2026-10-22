@@ -33,26 +33,19 @@ async function closeSettings(page: Page) {
   await page.locator('#dialog [data-action="close"]').last().click();
 }
 
-test("dynamic connected buttons reposition without moving and reset their home on pause", async ({
+test("fixed buttons stay put on empty taps and release on pause", async ({
   page,
 }) => {
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
-  await page.locator('[name="padMode"]').selectOption("dynamic");
+  await expect(page.locator('[name="padMode"]')).toHaveCount(0);
   await closeSettings(page);
   await startMarathon(page);
-  const pad = page.locator("[data-movement-pad]");
+  const pad = page.locator('.control-deck [data-command="MOVE_LEFT"]');
   const home = (await pad.boundingBox())!;
-  const zone = (await page.locator("[data-dynamic-pad-zone]").boundingBox())!;
-  await page.mouse.click(
-    zone.x + home.width / 2 - 12,
-    zone.y + zone.height - 8,
-  );
+  await page.mouse.click(10, await page.evaluate(() => innerHeight - 5));
   await expect(page.locator(".control-deck .pressed")).toHaveCount(0);
-  const moved = (await pad.boundingBox())!;
-  expect(
-    Math.abs(moved.x - home.x) + Math.abs(moved.y - home.y),
-  ).toBeGreaterThan(8);
+  expect(await pad.boundingBox()).toEqual(home);
   const left = (await page
     .locator('[data-command="MOVE_LEFT"]')
     .boundingBox())!;
@@ -861,34 +854,42 @@ test("editor and settings preview preserve gameplay coordinates and reject overl
   await page.locator('[data-editor-action="cancel"]').click();
 });
 
-test("gamepad preset and movement mode persist and preset clears custom maps only", async ({
+test("gamepad profiles persist and legacy dynamic mode normalizes to fixed", async ({
   page,
 }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "tetromino_v2_settings",
+      JSON.stringify({ padMode: "dynamic" }),
+    ),
+  );
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
+  await expect(page.locator('[name="padMode"]')).toHaveCount(0);
   await openControlEditor(page);
-  await dragEditorControl(page, "pad", 0, -30);
+  await dragEditorControl(page, "left", 0, -30);
   await page.locator('[data-editor-action="done"]').click();
   await setRange(page, "controlOpacity", 0.3);
-  await page.locator('[name="padMode"]').selectOption("dynamic");
   await page.locator('[name="gamepadPreset"]').selectOption("mirrored");
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
   );
   expect(saved).toMatchObject({
     gamepadPreset: "mirrored",
-    padMode: "dynamic",
+    padMode: "fixed",
     controlOpacity: 0.3,
     gamepadLayouts: { portrait: {}, landscape: {} },
   });
-  await page.reload();
-  await page.locator('#home [data-action="settings"]').click();
-  await expect(page.locator('[name="padMode"]')).toHaveValue("dynamic");
-  await expect(page.locator('[name="gamepadPreset"]')).toHaveValue("mirrored");
-  await page.locator('[name="padMode"]').selectOption("fixed");
-  await page.reload();
-  await page.locator('#home [data-action="settings"]').click();
-  await expect(page.locator('[name="padMode"]')).toHaveValue("fixed");
+  expect(
+    saved.controlProfiles["gamepad:balanced"].layouts.portrait.left,
+  ).toBeDefined();
+  await page.locator('[name="gamepadPreset"]').selectOption("balanced");
+  const restored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
+  );
+  expect(restored.gamepadLayouts.portrait.left).toEqual(
+    saved.controlProfiles["gamepad:balanced"].layouts.portrait.left,
+  );
 });
 
 test("landscape side information stays inside rails at maximum control settings", async ({
