@@ -6,7 +6,13 @@ import type {
   MarathonOptions,
 } from "../contracts/game-contract";
 import { controlProfileKey } from "../contracts/game-contract";
-import { createInitialState, applyCommand } from "../engine/engine";
+import {
+  createInitialState,
+  applyCommand,
+  canRewardedContinue,
+  applyRewardedContinue,
+} from "../engine/engine";
+import { createRewardedAds } from "../platform/rewarded-ads";
 import {
   loadSettings,
   saveSettings,
@@ -65,6 +71,8 @@ const control = (command: string, label: string) =>
 const padOutline = `<svg class="pad-outline" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2H298V98H198V198H102V98H2Z"/></svg>`;
 
 export function startApp(root: HTMLDivElement) {
+  const rewardedAds = createRewardedAds();
+  let rewardRequest: AbortController | null = null;
   let settings = loadSettings(),
     stats = loadStats(),
     state = loadRun();
@@ -337,6 +345,8 @@ export function startApp(root: HTMLDivElement) {
       el("storage-notice").hidden = false;
   }
   function home() {
+    if (modal === "continue") finishRun();
+    cancelRewardRequest();
     controls.releaseAll();
     screen = "home";
     closeModal();
@@ -422,11 +432,13 @@ export function startApp(root: HTMLDivElement) {
     draw();
   }
   function newRun(mode: GameMode) {
+    cancelRewardRequest();
     state = createInitialState(
       mode,
       crypto.getRandomValues(new Uint32Array(1))[0],
       mode === "marathon" ? pendingMarathon : undefined,
     );
+    state.rewardRunId = crypto.randomUUID();
     recorded = false;
     feedbackUntil = 0;
     flashRows = [];
@@ -572,8 +584,76 @@ export function startApp(root: HTMLDivElement) {
       </div><button class="primary-button" data-action="close">Close</button>`,
     );
   }
+  function cancelRewardRequest() {
+    rewardRequest?.abort();
+    rewardRequest = null;
+  }
+  function offerContinue(message = "") {
+    showModal(
+      "continue",
+      `${sheetHead("Continue?", false)}<p>Clear the bottom 2 rows and continue once this Marathon. This run will not update personal bests.</p><p role="status" data-reward-status>${message}</p><button class="primary-button" data-action="watch-ad" ${rewardRequest ? "disabled" : ""}>${rewardRequest ? "Waiting for ad…" : message ? "Try again" : rewardedAds.isTest ? "Test ad · clear 2 rows" : "Watch ad · clear 2 rows"}</button><button class="secondary-button" data-action="end-run">End run</button>`,
+    );
+  }
+  async function requestContinue() {
+    if (
+      !state ||
+      rewardRequest ||
+      modal !== "continue" ||
+      !canRewardedContinue(state)
+    )
+      return;
+    const run = state;
+    run.rewardRunId ??= crypto.randomUUID();
+    const request = new AbortController();
+    rewardRequest = request;
+    offerContinue();
+    try {
+      const result = await rewardedAds.requestContinue(
+        run.rewardRunId,
+        request.signal,
+      );
+      if (
+        request.signal.aborted ||
+        rewardRequest !== request ||
+        state !== run ||
+        modal !== "continue"
+      )
+        return;
+      rewardRequest = null;
+      if (result.earned && applyRewardedContinue(run)) {
+        feedbackUntil = 0;
+        flashRows = [];
+        previous = 0;
+        persist();
+        pause();
+        draw();
+      } else offerContinue("Ad not completed. Try again or end the run.");
+    } catch {
+      if (
+        request.signal.aborted ||
+        rewardRequest !== request ||
+        state !== run ||
+        modal !== "continue"
+      )
+        return;
+      rewardRequest = null;
+      offerContinue("Ad unavailable. Try again or end the run.");
+    }
+  }
   function terminal() {
+    if (!state || recorded || modal === "continue") return;
+    if (rewardedAds.enabled && canRewardedContinue(state)) {
+      controls.releaseAll();
+      clearRun();
+      playSound("over", settings);
+      offerContinue();
+      return;
+    }
+    finishRun();
+  }
+  function finishRun() {
     if (!state || recorded) return;
+    cancelRewardRequest();
     recorded = true;
     controls.releaseAll();
     stats = recordResult(state);
@@ -709,7 +789,8 @@ export function startApp(root: HTMLDivElement) {
     ) {
       closeModal();
       if (screen === "game" && state?.status === "paused") pause();
-    } else if (modal === "pause" || modal === "result") home();
+    } else if (modal === "continue") finishRun();
+    else if (modal === "pause" || modal === "result") home();
     else if (screen === "game") pause();
     else void exitApp();
   }
@@ -723,6 +804,12 @@ export function startApp(root: HTMLDivElement) {
       return;
     }
     switch (target.dataset.action) {
+      case "watch-ad":
+        void requestContinue();
+        break;
+      case "end-run":
+        finishRun();
+        break;
       case "resume":
         resume();
         break;
@@ -859,7 +946,7 @@ export function startApp(root: HTMLDivElement) {
     if (event.key !== "Tab") return;
     const focusable = Array.from(
       dialog.querySelectorAll<HTMLElement>(
-        'button,input,select,summary,[tabindex="0"]',
+        'button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,[tabindex="0"]',
       ),
     );
     const first = focusable[0],
@@ -904,6 +991,10 @@ export function startApp(root: HTMLDivElement) {
   observer.observe(root.querySelector<HTMLElement>(".play-area")!);
   window.addEventListener("resize", layoutControls);
   applySettings();
+  if (state && !state.rewardRunId) {
+    state.rewardRunId = crypto.randomUUID();
+    persist();
+  }
   updateResume();
   requestAnimationFrame(frame);
 }

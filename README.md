@@ -4,6 +4,8 @@ Online Survival groundwork and a separate phone/PC browser playtest are availabl
 
 An offline, ad-free falling-tetromino game for Android and the browser. This Android remake is the current version on `main`. The original Tetromino Block Puzzle is preserved on [`saved/original`](https://github.com/Gehrman-Sparrow42/tetromino-block-puzzle/tree/saved/original).
 
+Optional rewarded-continue preparation is available for a future Android build, with live ads disabled. See [Rewarded ads](docs/REWARDED_ADS.md) for the game flow, local test preview, verification backend and remaining SDK integration.
+
 ## Play
 
 - **Marathon:** endless play with a selectable starting level and progressive or fixed speed.

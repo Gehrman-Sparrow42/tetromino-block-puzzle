@@ -21,7 +21,10 @@
     "online:playtest:build": "npm run typecheck && vite build --config vite.playtest.config.ts",
     "online:lan": "npm run online:playtest:build && npm run online:server",
     "online:test:browser": "playwright test --config playwright.online.config.ts",
-    "online:test": "vitest run --config vitest.online.config.ts"
+    "online:test": "vitest run --config vitest.online.config.ts",
+    "rewards:build": "npm run online:typecheck && vite build --config vite.rewards.config.ts",
+    "rewards:server": "npm run rewards:build && node dist-rewards/main.js",
+    "rewards:test": "vitest run --config vitest.online.config.ts server/rewards src/platform/rewarded-ads.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",

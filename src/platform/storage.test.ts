@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createInitialState } from "../engine/engine";
+import {
+  applyCommand,
+  applyRewardedContinue,
+  createInitialState,
+} from "../engine/engine";
 import { THEME_IDS } from "../contracts/game-contract";
 
 let data: Map<string, string>;
@@ -21,6 +25,32 @@ beforeEach(async () => {
 });
 
 describe("settings and scores", () => {
+  it("persists assisted resume metadata and counts its final result without records", () => {
+    const run = createInitialState("marathon", 42);
+    run.rewardRunId = "resume-test-42";
+    run.board[2].fill("J");
+    run.board[3].fill("J");
+    applyCommand(run, { type: "HOLD" });
+    expect(applyRewardedContinue(run)).toBe(true);
+    expect(storage.saveRun(run)).toBe(true);
+    const restored = storage.loadRun()!;
+    expect(restored).toEqual(run);
+    expect(applyRewardedContinue(restored)).toBe(false);
+    restored.status = "gameover";
+    restored.active = null;
+    restored.score = 99999;
+    restored.lines = 200;
+    restored.level = 21;
+    const result = storage.recordResult(restored);
+    expect(result.gamesPlayed).toBe(1);
+    expect(result.marathonHighScore).toBe(0);
+    expect(result.marathonMaxLines).toBe(0);
+    restored.marathonOptions = { startingLevel: 1, speedMode: "fixed" };
+    restored.level = 1;
+    const fixedResult = storage.recordResult(restored);
+    expect(fixedResult.marathonFixedHighScore).toBe(0);
+    expect(fixedResult.marathonFixedMaxLines).toBe(0);
+  });
   it("defaults legacy pad settings safely and round-trips new presets and pad modes", () => {
     data.set(
       "tetromino_v2_settings",

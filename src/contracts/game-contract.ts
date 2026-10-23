@@ -50,6 +50,11 @@ export interface GameStateSnapshot {
   prngState: number;
   board: (TetrominoType | null)[][];
   active: ActivePiece | null;
+  /** The already-consumed piece whose spawn caused a block-out. */
+  blockedPiece?: TetrominoType;
+  /** Legacy runs omit these fields. Assisted Marathon runs never set records. */
+  continuesUsed?: number;
+  rewardRunId?: string;
   hold: TetrominoType | null;
   holdUsedThisTurn: boolean;
   bag: TetrominoType[];

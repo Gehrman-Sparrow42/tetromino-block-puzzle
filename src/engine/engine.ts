@@ -99,10 +99,54 @@ function spawn(state: GameStateSnapshot, type?: TetrominoType): void {
   };
   state.gravityTimerMs = 0;
   if (!fits(state, state.active)) {
+    state.blockedPiece = selected;
     state.active = null;
     state.status = "gameover";
     state.softDropActive = false;
-  } else ghost(state);
+  } else {
+    delete state.blockedPiece;
+    ghost(state);
+  }
+}
+
+/** Probe on a validated copy so failed offers and rewards never alter the run. */
+function rewardedContinueCandidate(
+  state: GameStateSnapshot,
+): GameStateSnapshot | null {
+  if (
+    state.mode !== "marathon" ||
+    state.status !== "gameover" ||
+    (state.continuesUsed ?? 0) !== 0
+  )
+    return null;
+  const candidate = validateSnapshot(state);
+  if (!candidate) return null;
+  candidate.board.splice(ROWS - 2, 2);
+  candidate.board.unshift(
+    Array<TetrominoType | null>(COLS).fill(null),
+    Array<TetrominoType | null>(COLS).fill(null),
+  );
+  candidate.status = "paused";
+  spawn(candidate, candidate.blockedPiece);
+  if (candidate.status !== "paused" || !candidate.active) return null;
+  candidate.continuesUsed = 1;
+  candidate.gravityTimerMs = 0;
+  candidate.softDropActive = false;
+  candidate.lastEvent = null;
+  return candidate;
+}
+
+export function canRewardedContinue(state: GameStateSnapshot): boolean {
+  return rewardedContinueCandidate(state) !== null;
+}
+
+/** Apply only after a rewarded-ad provider confirms completion. Resume is manual. */
+export function applyRewardedContinue(state: GameStateSnapshot): boolean {
+  const candidate = rewardedContinueCandidate(state);
+  if (!candidate) return false;
+  Object.assign(state, candidate);
+  delete state.blockedPiece;
+  return true;
 }
 
 export function createInitialState(
@@ -418,6 +462,16 @@ export function validateSnapshot(value: unknown): GameStateSnapshot | null {
     )
       return null;
     if (!number(s.seed, 1, 0xffffffff) || !number(s.prngState, 1, 0xffffffff))
+      return null;
+    if (
+      ("continuesUsed" in s && !number(s.continuesUsed, 0, 1)) ||
+      ("rewardRunId" in s &&
+        (typeof s.rewardRunId !== "string" ||
+          !/^[A-Za-z0-9_-]{1,128}$/.test(s.rewardRunId))) ||
+      ("blockedPiece" in s &&
+        (s.status !== "gameover" || !type(s.blockedPiece))) ||
+      (s.mode !== "marathon" && (s.continuesUsed ?? 0) !== 0)
+    )
       return null;
     if (
       "marathonOptions" in s &&

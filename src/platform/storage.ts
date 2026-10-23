@@ -264,6 +264,10 @@ export function recordResult(state: GameStateSnapshot): PersonalBestStats {
   if (!valid || (valid.status !== "gameover" && valid.status !== "victory"))
     return stats;
   stats.gamesPlayed = Math.min(Number.MAX_SAFE_INTEGER, stats.gamesPlayed + 1);
+  if ((valid.continuesUsed ?? 0) > 0) {
+    write(KEYS.stats, JSON.stringify(stats));
+    return stats;
+  }
   if (valid.mode === "marathon") {
     if (valid.marathonOptions?.speedMode === "fixed") {
       stats.marathonFixedHighScore = Math.max(
