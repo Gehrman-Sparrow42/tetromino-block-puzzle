@@ -24,7 +24,7 @@ Controls always stay at their saved editor positions during play. The Fixed/Dyna
 
 Optional hybrid controls add swipe movement and tap rotation on the board. Keyboard: arrows to move/soft drop, Z/X to rotate, C or Shift to hold, Space to hard drop, P/Escape to pause. Hiding an on-screen button does not disable its keyboard shortcut.
 
-Thirteen themes change the interface, board, previews and pieces. Settings → Theme opens an in-app list with theme names and color swatches, avoiding the device-native popup; selection applies immediately and is saved. Settings → Theme includes the original Ink, LCD, Neon and Paper plus nine complete Impeccable treatments:
+Seventeen themes change the interface, board, previews and pieces. A fresh installation starts with **Ink, LCD, Paper and Classic Arcade** unlocked. Settings → Theme shows owned themes and previews for locked themes; one completed rewarded ad unlocks the chosen theme for offline use on that installation. The previously selected theme is retained on upgrade. Live ads remain disabled until the native SDK and verification service are configured; unavailable ads never grant an unlock. The catalogue includes the original four themes and thirteen Impeccable treatments:
 
 | Theme           | Appearance                                                  |
 | --------------- | ----------------------------------------------------------- |
@@ -37,8 +37,12 @@ Thirteen themes change the interface, board, previews and pieces. Settings → T
 | Design Annual   | Near-white, periwinkle and precise inset blocks             |
 | Data Field      | Black and ivory with seven static piece patterns            |
 | Classic Arcade  | Dark blue and bright solid arcade colors                    |
+| Amber Terminal  | Warm amber monochrome with seven printed piece identities   |
+| Glacier         | Cool light surfaces and crystalline block facets            |
+| Fired Clay      | Terracotta, grout and glazed tiles                          |
+| Blueprint       | Navy drafting surfaces with hollow, braced blocks           |
 
-Movement Score, Data Field and LCD have distinct internal patterns for all seven piece types. The nine new themes include locally bundled fonts, menu/settings treatments and control shapes; gameplay and control placement stay consistent. No theme uses strobing. The compact HUD and hold/next strip leave more space for the board.
+Movement Score, Data Field, Amber Terminal and LCD have distinct internal patterns for all seven piece types. The additional themes include locally bundled fonts, menu/settings treatments and control shapes; gameplay and control placement stay consistent. No theme uses strobing. The compact HUD and hold/next strip leave more space for the board.
 
 Settings also include sound and volume, haptics, ghost, reduced motion, hybrid gestures, and repeat speed. Records, appearance, controls and one resumable run are stored locally. Existing settings migrate with defaults for the new appearance/control options. There are no accounts, ads, analytics, remote assets or online leaderboards. The Android package does not request internet permission; optional haptics use vibration permission. Clearing app data or uninstalling removes saved progress.
 

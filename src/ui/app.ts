@@ -1,3 +1,10 @@
+import "./theme-unlocks.css";
+import { isThemeId, type ThemeId } from "../contracts/theme-catalog";
+import {
+  loadThemeAccess,
+  isThemeUnlocked,
+  grantThemeUnlock,
+} from "../platform/theme-access";
 import type {
   GameCommand,
   GameMode,
@@ -76,6 +83,14 @@ export function startApp(root: HTMLDivElement) {
   let settings = loadSettings(),
     stats = loadStats(),
     state = loadRun();
+  const themeAccess = loadThemeAccess(settings.theme);
+  if (!isThemeUnlocked(themeAccess, settings.theme)) {
+    settings = { ...settings, theme: "ink" };
+    saveSettings(settings);
+  }
+  let themePreview: ThemeId | null = null;
+  let themeRequest: AbortController | null = null;
+  let themeGeneration = 0;
   let screen: "home" | "game" = "home",
     modal = "",
     previous = 0,
@@ -362,6 +377,7 @@ export function startApp(root: HTMLDivElement) {
         `${MODE_NAMES[state.mode]} · ${num(state.score)}`;
   }
   function showModal(type: string, content: string) {
+    if (type !== "theme-unlock") cancelThemePreview();
     controls.releaseAll();
     lastFocus = document.activeElement as HTMLElement;
     modal = type;
@@ -372,6 +388,7 @@ export function startApp(root: HTMLDivElement) {
     dialog.focus();
   }
   function closeModal() {
+    cancelThemePreview();
     modal = "";
     layer.hidden = true;
     root.querySelector<HTMLElement>(".shell")!.inert = false;
@@ -477,7 +494,7 @@ export function startApp(root: HTMLDivElement) {
       );
     } else newRun(mode);
   }
-  function showSettings() {
+  function showSettings(themePickerOpen = false) {
     if (state?.status === "playing") {
       applyCommand(state, { type: "PAUSE" });
       persist();
@@ -503,14 +520,16 @@ export function startApp(root: HTMLDivElement) {
     showModal(
       "settings",
       `${sheetHead("Settings")}<form id="settings-form">
-      <details class="theme-picker">
+      <details class="theme-picker" ${themePickerOpen ? "open" : ""}>
         <summary><span>Theme</span><strong data-current-theme>${THEMES[settings.theme].name}</strong></summary>
         <fieldset class="theme-options"><legend>Choose theme</legend>
         ${Object.values(THEMES)
-          .map(
-            (theme) =>
-              `<label class="theme-choice"><input type="radio" name="theme" value="${theme.id}" ${settings.theme === theme.id ? "checked" : ""}><span class="theme-swatches" aria-hidden="true"><i style="background:${theme.css["--bg"]}"></i><i style="background:${theme.css["--accent"]}"></i><i style="background:${theme.pieces.T}"></i></span><span>${theme.name}</span></label>`,
-          )
+          .map((theme) => {
+            const swatches = `<span class="theme-swatches" aria-hidden="true"><i style="background:${theme.css["--bg"]}"></i><i style="background:${theme.css["--accent"]}"></i><i style="background:${theme.pieces.T}"></i></span>`;
+            return isThemeUnlocked(themeAccess, theme.id)
+              ? `<label class="theme-choice"><input type="radio" name="theme" value="${theme.id}" ${settings.theme === theme.id ? "checked" : ""}>${swatches}<span>${theme.name}</span></label>`
+              : `<button type="button" class="theme-choice theme-locked" data-action="preview-theme" data-theme-id="${theme.id}" aria-label="Preview ${theme.name}">${swatches}<span class="theme-choice-name">${theme.name}</span><span class="theme-preview-label">Preview</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></button>`;
+          })
           .join("")}
         </fieldset>
       </details>
@@ -563,6 +582,79 @@ export function startApp(root: HTMLDivElement) {
     );
     syncControlFields();
     drawControlPreview();
+  }
+  function cancelThemePreview() {
+    themeGeneration++;
+    themeRequest?.abort();
+    themeRequest = null;
+    if (themePreview) {
+      themePreview = null;
+      applyTheme(settings.theme);
+      draw();
+    }
+  }
+  function previewTheme(id: ThemeId, message = "") {
+    if (themePreview !== id) cancelThemePreview();
+    themePreview = id;
+    applyTheme(id);
+    showModal(
+      "theme-unlock",
+      `${sheetHead(`Unlock ${THEMES[id].name}`, false)}
+      <p>Watch 1 ad to unlock. Stays available offline.</p>
+      <p class="theme-unlock-status" role="status">${message || (!rewardedAds.enabled ? "Ads unavailable. You can still use the four free themes." : "")}</p>
+      <button class="primary-button" data-action="unlock-theme" ${!rewardedAds.enabled || themeRequest ? "disabled" : ""}>${themeRequest ? "Waiting for ad…" : !rewardedAds.enabled ? "Ads unavailable" : rewardedAds.isTest ? "Test ad · unlock" : "Watch ad · unlock"}</button>
+      <button class="secondary-button" data-action="cancel-theme">Back</button>`,
+    );
+    draw();
+  }
+  async function unlockTheme() {
+    if (
+      !rewardedAds.enabled ||
+      themeRequest ||
+      !themePreview ||
+      modal !== "theme-unlock"
+    )
+      return;
+    const target = themePreview;
+    const generation = themeGeneration;
+    const request = new AbortController();
+    themeRequest = request;
+    previewTheme(target);
+    const current = () =>
+      !request.signal.aborted &&
+      themeRequest === request &&
+      themeGeneration === generation &&
+      themePreview === target &&
+      modal === "theme-unlock";
+    try {
+      const result = await rewardedAds.requestThemeUnlock(
+        themeAccess.profileId,
+        target,
+        request.signal,
+      );
+      if (!current()) return;
+      themeRequest = null;
+      if (!result.earned) {
+        previewTheme(target, "Ad not completed. Try again or go back.");
+        return;
+      }
+      if (!grantThemeUnlock(themeAccess, target)) {
+        previewTheme(
+          target,
+          "Unlock could not be saved. Check storage and try again.",
+        );
+        return;
+      }
+      settings = { ...settings, theme: target };
+      if (!saveSettings(settings)) el("storage-notice").hidden = false;
+      themePreview = null;
+      applySettings();
+      showSettings(true);
+    } catch {
+      if (!current()) return;
+      themeRequest = null;
+      previewTheme(target, "Ad unavailable. Try again or go back.");
+    }
   }
   function showRecords(current: PersonalBestStats) {
     showModal(
@@ -756,13 +848,13 @@ export function startApp(root: HTMLDivElement) {
       state,
       settings.ghostEnabled,
       now < feedbackUntil - 300 ? flashRows : [],
-      getTheme(settings.theme),
+      getTheme(themePreview ?? settings.theme),
     );
     drawPreview(
       el<HTMLCanvasElement>("hold"),
       state.hold,
       state.holdUsedThisTurn,
-      getTheme(settings.theme),
+      getTheme(themePreview ?? settings.theme),
     );
     state.nextQueue
       .slice(0, 1)
@@ -771,11 +863,15 @@ export function startApp(root: HTMLDivElement) {
           el<HTMLCanvasElement>(`next-${i}`),
           type,
           false,
-          getTheme(settings.theme),
+          getTheme(themePreview ?? settings.theme),
         ),
       );
   }
   function back() {
+    if (modal === "theme-unlock") {
+      showSettings(true);
+      return;
+    }
     if (modal === "controls") {
       controlEditor?.cancel();
       return;
@@ -804,6 +900,16 @@ export function startApp(root: HTMLDivElement) {
       return;
     }
     switch (target.dataset.action) {
+      case "preview-theme":
+        if (isThemeId(target.dataset.themeId))
+          previewTheme(target.dataset.themeId);
+        break;
+      case "unlock-theme":
+        void unlockTheme();
+        break;
+      case "cancel-theme":
+        showSettings(true);
+        break;
       case "watch-ad":
         void requestContinue();
         break;
@@ -898,6 +1004,11 @@ export function startApp(root: HTMLDivElement) {
     }
     if (!input.closest("#settings-form")) return;
     if (
+      input.name === "theme" &&
+      (!isThemeId(input.value) || !isThemeUnlocked(themeAccess, input.value))
+    )
+      return;
+    if (
       input instanceof HTMLInputElement &&
       input.type === "radio" &&
       !input.checked
@@ -972,7 +1083,10 @@ export function startApp(root: HTMLDivElement) {
     previous = 0;
   };
   void setupLifecycle({ onPause: backgroundPause, onBack: back });
-  window.addEventListener("pagehide", backgroundPause);
+  window.addEventListener("pagehide", () => {
+    cancelThemePreview();
+    backgroundPause();
+  });
   function frame(now: number) {
     const dt = previous ? Math.min(100, Math.max(0, now - previous)) : 0;
     previous = now;

@@ -10,6 +10,16 @@ for (const mode of ["light", "dark", "forced"] as const) {
       colorScheme: mode === "light" ? "light" : "dark",
       forcedColors: mode === "forced" ? "active" : "none",
     });
+    await page.addInitScript((ids) => {
+      localStorage.setItem(
+        "afterblock_theme_access_v1",
+        JSON.stringify({
+          version: 1,
+          profileId: "a".repeat(48),
+          unlocked: ids,
+        }),
+      );
+    }, THEME_IDS);
     await page.goto("/");
     await page.locator('#home [data-action="settings"]').click();
     await expect(page.locator('select[name="theme"]')).toHaveCount(0);
@@ -19,7 +29,7 @@ for (const mode of ["light", "dark", "forced"] as const) {
     await expect(
       page.getByRole("group", { name: "Choose theme" }),
     ).toBeVisible();
-    await expect(page.getByRole("radio")).toHaveCount(13);
+    await expect(page.getByRole("radio")).toHaveCount(THEME_IDS.length);
     for (const id of THEME_IDS) {
       const radio = page.getByRole("radio", {
         name: THEMES[id].name,

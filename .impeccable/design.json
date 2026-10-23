@@ -380,6 +380,34 @@
       }
     ],
     "themeVariants": {
+      "amber": {
+        "displayName": "Amber Terminal",
+        "canvasStyle": "phosphor",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.amber"
+      },
+      "glacier": {
+        "displayName": "Glacier",
+        "canvasStyle": "crystal",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.glacier"
+      },
+      "clay": {
+        "displayName": "Fired Clay",
+        "canvasStyle": "glaze",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.clay"
+      },
+      "blueprint": {
+        "displayName": "Blueprint",
+        "canvasStyle": "draft",
+        "source": "src/ui/themes.ts",
+        "cssSource": "src/ui/styles.css",
+        "paletteSource": "src/ui/themes.ts#THEMES.blueprint"
+      },
       "basalt": {
         "displayName": "Basalt",
         "canvasStyle": "facet",

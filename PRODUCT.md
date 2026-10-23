@@ -20,7 +20,7 @@ Provide a complete falling-tetromino game with familiar core rules, responsive c
 
 - Offline personal play on Android, with a browser build for local play and verification.
 - Touch controls support simultaneous thumb input, held movement and optional board gestures. Gamepad uses a three-way left/right/down movement pad with a neutral center and no up button, plus separate rotation, hard-drop and hold actions. Keyboard controls remain available in the browser.
-- Settings let the user choose a theme and control preset. The Gamepad editor supports dragging, per-group sizing and background opacity, staged save/cancel, and separate portrait/landscape placement. Other presets retain their shared spacing and height controls.
+- Settings let the user choose a theme and control preset. Four themes are free on a fresh installation; other themes can be previewed and unlocked individually with one rewarded ad, then used offline. Upgrades retain the previously selected theme. Unlocks are local to the installation, with no account-based restore. The Gamepad editor supports dragging, per-group sizing and background opacity, staged save/cancel, and separate portrait/landscape placement.
 - Runs, records and preferences are stored locally; backgrounding pauses play and reopening restores a paused run.
 
 ## Capabilities and Constraints

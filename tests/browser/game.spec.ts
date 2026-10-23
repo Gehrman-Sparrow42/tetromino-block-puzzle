@@ -384,6 +384,18 @@ test("pause key toggles without closing Settings", async ({ page }) => {
 test("themes change chrome and canvas immediately and persist", async ({
   page,
 }) => {
+  await page.addInitScript((ids) => {
+    if (!localStorage.getItem("afterblock_theme_access_v1")) {
+      localStorage.setItem(
+        "afterblock_theme_access_v1",
+        JSON.stringify({
+          version: 1,
+          profileId: "palette-test-profile",
+          unlocked: ids,
+        }),
+      );
+    }
+  }, THEME_IDS);
   await page.goto("/");
   await startMarathon(page);
   await pausedRun(page);
@@ -411,10 +423,11 @@ test("themes change chrome and canvas immediately and persist", async ({
   }
   expect(new Set(pixels).size).toBe(THEME_IDS.length);
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "classic");
+  const lastTheme = THEME_IDS[THEME_IDS.length - 1];
+  await expect(page.locator("html")).toHaveAttribute("data-theme", lastTheme);
   await page.locator('#home [data-action="settings"]').click();
   await expect(
-    page.locator('input[name="theme"][value="classic"]'),
+    page.locator(`input[name="theme"][value="${lastTheme}"]`),
   ).toBeChecked();
 });
 

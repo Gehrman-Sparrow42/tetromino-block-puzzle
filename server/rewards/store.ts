@@ -1,8 +1,16 @@
 import { createHash, randomBytes } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import {
+  isThemeId,
+  isStarterTheme,
+  type ThemeId,
+} from "../../src/contracts/theme-catalog";
 import type { AdmobReward } from "./ssv";
 
 interface Attempt {
+  placement: "continue" | "theme";
+  profile_id: string | null;
+  theme_id: ThemeId | null;
   id: string;
   run_id: string;
   token_hash: string;
@@ -20,10 +28,44 @@ export class RewardStore {
       CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY, run_id TEXT NOT NULL, token_hash TEXT NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL, status TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS attempts_run ON attempts(run_id);
       CREATE TABLE IF NOT EXISTS grants(run_id TEXT PRIMARY KEY, attempt_id TEXT UNIQUE NOT NULL, transaction_id TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);`);
+    // Additive migration preserves existing continue attempts, tokens and grants.
+    const columns = this.db.prepare("PRAGMA table_info(attempts)").all() as {
+      name: string;
+    }[];
+    for (const [name, definition] of [
+      ["placement", "TEXT NOT NULL DEFAULT 'continue'"],
+      ["profile_id", "TEXT"],
+      ["theme_id", "TEXT"],
+    ])
+      if (!columns.some((column) => column.name === name))
+        this.db.exec(`ALTER TABLE attempts ADD COLUMN ${name} ${definition}`);
+  }
+  createTheme(profileId: string, themeId: ThemeId, now = Date.now()) {
+    if (
+      !/^[A-Za-z0-9_-]{1,128}$/.test(profileId) ||
+      !isThemeId(themeId) ||
+      isStarterTheme(themeId)
+    )
+      throw new Error("Invalid theme target");
+    // ':' cannot occur in a continue run ID or profile ID; scopes cannot collide.
+    return this.createScoped(
+      `theme:${profileId}:${themeId}`,
+      now,
+      profileId,
+      themeId,
+    );
   }
   create(runId: string, now = Date.now()) {
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(runId))
       throw new Error("Invalid run ID");
+    return this.createScoped(runId, now);
+  }
+  private createScoped(
+    runId: string,
+    now: number,
+    profileId?: string,
+    themeId?: ThemeId,
+  ) {
     this.db
       .prepare("DELETE FROM attempts WHERE expires < ? AND status = 'pending'")
       .run(now - 3_600_000);
@@ -46,9 +88,22 @@ export class RewardStore {
       token = randomBytes(32).toString("base64url");
     const expiresAt = now + 15 * 60_000;
     this.db
-      .prepare("INSERT INTO attempts VALUES(?,?,?,?,?, 'pending')")
-      .run(id, runId, hash(token), now, expiresAt);
-    return { id, token, rows: 2, expiresAt };
+      .prepare(
+        "INSERT INTO attempts (id,run_id,token_hash,created,expires,status,placement,profile_id,theme_id) VALUES(?,?,?,?,?,'pending',?,?,?)",
+      )
+      .run(
+        id,
+        runId,
+        hash(token),
+        now,
+        expiresAt,
+        themeId ? "theme" : "continue",
+        profileId ?? null,
+        themeId ?? null,
+      );
+    return themeId
+      ? { id, token, placement: "theme", profileId, themeId, expiresAt }
+      : { id, token, rows: 2, expiresAt };
   }
   verify(reward: AdmobReward, now = Date.now()) {
     this.db.exec("BEGIN IMMEDIATE");
@@ -95,8 +150,16 @@ export class RewardStore {
       .prepare("SELECT * FROM attempts WHERE id = ? AND token_hash = ?")
       .get(id, hash(token)) as unknown as Attempt | undefined;
     if (!attempt) return null;
+    const target =
+      attempt.placement === "theme"
+        ? {
+            placement: "theme",
+            profileId: attempt.profile_id,
+            themeId: attempt.theme_id,
+          }
+        : { placement: "continue", rows: 2, runId: attempt.run_id };
     if (attempt.status === "pending" && attempt.expires < now)
-      return { status: "expired", rows: 2, runId: attempt.run_id };
+      return { status: "expired", ...target };
     if (claim) {
       if (attempt.status === "pending")
         throw new Error("Reward has not been verified");
@@ -106,8 +169,7 @@ export class RewardStore {
     }
     return {
       status: claim ? "claimed" : attempt.status,
-      rows: 2,
-      runId: attempt.run_id,
+      ...target,
     };
   }
   close() {

@@ -26,7 +26,11 @@ export interface ThemePalette {
     | "segment"
     | "plate"
     | "data"
-    | "solid";
+    | "solid"
+    | "phosphor"
+    | "crystal"
+    | "glaze"
+    | "draft";
 }
 
 /** Keep the complete shell palette together so switching themes never leaves stale tokens. */
@@ -86,6 +90,114 @@ function palette(
 }
 
 export const THEMES: Record<ThemeId, ThemePalette> = {
+  amber: palette(
+    "amber",
+    "Amber Terminal",
+    "phosphor",
+    [
+      "#21180c",
+      "#302312",
+      "#3c2c16",
+      "#ffe0a0",
+      "#dbb77d",
+      "#967243",
+      "#ffc65e",
+      "#2c1d08",
+      "255 198 94",
+      "#b78c4f",
+    ],
+    ["#271c0d", "#3a2b15", "#d9b778", "#ffc65e60"],
+    [
+      "#ffc65e",
+      "#ffc65e",
+      "#ffc65e",
+      "#ffc65e",
+      "#ffc65e",
+      "#ffc65e",
+      "#ffc65e",
+    ],
+  ),
+  glacier: palette(
+    "glacier",
+    "Glacier",
+    "crystal",
+    [
+      "#eaf3f7",
+      "#dceaf0",
+      "#f7fcff",
+      "#173a4c",
+      "#436270",
+      "#809fab",
+      "#205a73",
+      "#f7fcff",
+      "32 90 115",
+      "#638b9d",
+    ],
+    ["#f0f9fc", "#d1e5ed", "#547a8a", "#3b8cab45"],
+    [
+      "#3e8298",
+      "#ac9149",
+      "#8679a9",
+      "#528b7b",
+      "#ae6b79",
+      "#5278a9",
+      "#b17b50",
+    ],
+  ),
+  clay: palette(
+    "clay",
+    "Fired Clay",
+    "glaze",
+    [
+      "#ead7c4",
+      "#ddc4ad",
+      "#f6e9d9",
+      "#442a23",
+      "#694a3c",
+      "#a17a62",
+      "#833c2c",
+      "#fff0df",
+      "131 60 44",
+      "#865a43",
+    ],
+    ["#edddca", "#d8bea5", "#815c47", "#a9483345"],
+    [
+      "#4a7b7c",
+      "#b58c38",
+      "#8c657d",
+      "#688154",
+      "#a94c39",
+      "#58708b",
+      "#b46f3c",
+    ],
+  ),
+  blueprint: palette(
+    "blueprint",
+    "Blueprint",
+    "draft",
+    [
+      "#102b45",
+      "#173750",
+      "#1e425c",
+      "#e3f5fa",
+      "#aed1df",
+      "#6594ac",
+      "#9fe5f3",
+      "#103149",
+      "159 229 243",
+      "#7db9cc",
+    ],
+    ["#12334e", "#214b66", "#b3dbe9", "#9fe5f350"],
+    [
+      "#90dbed",
+      "#eddb9b",
+      "#c5bce7",
+      "#addbc3",
+      "#ecaeb2",
+      "#accbf0",
+      "#edc09e",
+    ],
+  ),
   basalt: palette(
     "basalt",
     "Basalt",
@@ -480,6 +592,8 @@ export function applyTheme(
   const theme = getTheme(id);
   root.dataset.theme = theme.id;
   root.style.colorScheme = [
+    "glacier",
+    "clay",
     "paper",
     "lcd",
     "workshop",

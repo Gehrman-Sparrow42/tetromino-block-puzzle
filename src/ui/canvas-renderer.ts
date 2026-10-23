@@ -143,6 +143,52 @@ function designedBlock(
     edge = size * 0.68;
   ctx.lineWidth = Math.max(0.6, size * 0.04);
   switch (theme.blockStyle) {
+    case "phosphor":
+      ctx.strokeStyle = theme.board.background;
+      printPattern(ctx, type, size);
+      ctx.globalAlpha = opacity * 0.45;
+      ctx.strokeRect(a * 0.6, a * 0.6, size - a * 1.2, size - a * 1.2);
+      break;
+    case "crystal":
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = opacity * 0.42;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(size, 0);
+      ctx.lineTo(size * 0.3, size * 0.42);
+      ctx.lineTo(0, size);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = theme.board.text;
+      ctx.globalAlpha = opacity * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(size * 0.3, size * 0.42);
+      ctx.lineTo(size, size);
+      ctx.stroke();
+      break;
+    case "glaze":
+      ctx.strokeStyle = theme.board.text;
+      ctx.globalAlpha = opacity * 0.5;
+      ctx.strokeRect(a * 0.65, a * 0.65, size - a * 1.3, size - a * 1.3);
+      ctx.fillStyle = "#fff0df";
+      ctx.globalAlpha = opacity * 0.5;
+      ctx.fillRect(a * 1.4, a * 1.4, size * 0.4, size * 0.09);
+      ctx.fillRect(a * 1.4, a * 2.3, size * 0.09, size * 0.15);
+      break;
+    case "draft":
+      ctx.fillStyle = theme.board.background;
+      ctx.fillRect(a * 0.6, a * 0.6, size - a * 1.2, size - a * 1.2);
+      ctx.strokeStyle = theme.pieces[type];
+      ctx.strokeRect(a * 0.6, a * 0.6, size - a * 1.2, size - a * 1.2);
+      ctx.globalAlpha = opacity * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(a, size - a);
+      ctx.lineTo(size - a, a);
+      ctx.moveTo(a, a);
+      ctx.lineTo(a * 2, a);
+      ctx.lineTo(a * 2, a * 2);
+      ctx.stroke();
+      break;
     case "facet":
       ctx.fillStyle = "#ffffff";
       ctx.globalAlpha = opacity * 0.19;

@@ -84,6 +84,10 @@ export const THEME_IDS = [
   "annual",
   "data",
   "classic",
+  "amber",
+  "glacier",
+  "clay",
+  "blueprint",
 ] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 export type ControlLayoutId = "gamepad" | "thumbs" | "mirror" | "floating";

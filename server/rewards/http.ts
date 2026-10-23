@@ -1,3 +1,4 @@
+import { isThemeId, isStarterTheme } from "../../src/contracts/theme-catalog";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RewardStore } from "./store";
@@ -115,6 +116,35 @@ export async function startRewardsServer(options: RewardsServerOptions) {
         } catch {
           reply(400, { error: "Invalid JSON" });
           return;
+        }
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          const target = value as Record<string, unknown>;
+          if (target.placement === "theme") {
+            if (
+              typeof target.profileId !== "string" ||
+              !/^[A-Za-z0-9_-]{1,128}$/.test(target.profileId) ||
+              !isThemeId(target.themeId) ||
+              isStarterTheme(target.themeId)
+            ) {
+              reply(400, { error: "Invalid theme target" });
+              return;
+            }
+            try {
+              reply(201, store.createTheme(target.profileId, target.themeId));
+            } catch {
+              reply(409, {
+                error: "Theme already rewarded or attempt limit reached",
+              });
+            }
+            return;
+          }
+          if (
+            target.placement !== undefined &&
+            target.placement !== "continue"
+          ) {
+            reply(400, { error: "Invalid placement" });
+            return;
+          }
         }
         const runId =
           value && typeof value === "object" && !Array.isArray(value)

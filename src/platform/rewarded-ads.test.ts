@@ -137,3 +137,85 @@ it("never redeems an ad dismissed without earning", async () => {
     unregister();
   }
 });
+
+it("binds theme receipts to exact placement, profile and theme; retries earned impressions after cancellation", async () => {
+  vi.stubGlobal("location", { href: "http://localhost/" });
+  vi.stubEnv("VITE_REWARDED_ADS_ENABLED", "true");
+  vi.stubEnv("VITE_REWARDS_API_URL", "https://rewards.example");
+  const show = vi.fn(async () => true);
+  const unregister = registerRewardedAdDriver({ show });
+  const offer = {
+    id: "a".repeat(32),
+    token: "b".repeat(43),
+    placement: "theme",
+    profileId: "profile",
+    themeId: "neon",
+  };
+  const response = (value: unknown) => ({ ok: true, json: async () => value });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(response(offer))
+    .mockRejectedValueOnce(new DOMException("Aborted", "AbortError"));
+  vi.stubGlobal("fetch", fetcher);
+  const provider = createRewardedAds();
+  try {
+    await expect(
+      provider.requestThemeUnlock(
+        "profile",
+        "neon",
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow("Aborted");
+    for (const receipt of [
+      { status: "claimed", rows: 2, runId: "profile" },
+      {
+        status: "claimed",
+        placement: "theme",
+        profileId: "other",
+        themeId: "neon",
+      },
+      {
+        status: "claimed",
+        placement: "theme",
+        profileId: "profile",
+        themeId: "ocean",
+      },
+    ]) {
+      fetcher
+        .mockResolvedValueOnce(response({ status: "verified" }))
+        .mockResolvedValueOnce(response(receipt));
+      await expect(
+        provider.requestThemeUnlock(
+          "profile",
+          "neon",
+          new AbortController().signal,
+        ),
+      ).rejects.toThrow("Invalid reward receipt");
+    }
+    fetcher
+      .mockResolvedValueOnce(response({ status: "verified" }))
+      .mockResolvedValueOnce(
+        response({
+          status: "claimed",
+          placement: "theme",
+          profileId: "profile",
+          themeId: "neon",
+        }),
+      );
+    await expect(
+      provider.requestThemeUnlock(
+        "profile",
+        "neon",
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({ earned: true });
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
+      placement: "theme",
+      profileId: "profile",
+      themeId: "neon",
+    });
+  } finally {
+    unregister();
+  }
+});

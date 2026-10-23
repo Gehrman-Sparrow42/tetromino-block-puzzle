@@ -63,7 +63,16 @@ describe("themes", () => {
       expect(applyTheme(id, root as unknown as HTMLElement)).toBe(THEMES[id]);
       expect(root.dataset.theme).toBe(id);
       expect(root.style.colorScheme).toBe(
-        ["lcd", "paper", "workshop", "score", "folio", "annual"].includes(id)
+        [
+          "lcd",
+          "paper",
+          "workshop",
+          "score",
+          "folio",
+          "annual",
+          "glacier",
+          "clay",
+        ].includes(id)
           ? "light"
           : "dark",
       );
@@ -147,7 +156,7 @@ describe("themed canvas rendering", () => {
 
   it("renders distinct static patterns for all seven Score and Data pieces", () => {
     vi.stubGlobal("window", { devicePixelRatio: 1 });
-    for (const theme of [THEMES.score, THEMES.data]) {
+    for (const theme of [THEMES.score, THEMES.data, THEMES.amber]) {
       const patterns = new Set<string>();
       for (const type of Object.keys(theme.pieces) as TetrominoType[]) {
         const paths: unknown[][] = [];

@@ -641,7 +641,11 @@ html:is(
   [data-theme="gate"],
   [data-theme="annual"],
   [data-theme="data"],
-  [data-theme="classic"]
+  [data-theme="classic"],
+  [data-theme="amber"],
+  [data-theme="glacier"],
+  [data-theme="clay"],
+  [data-theme="blueprint"]
 ) {
   font-family: "Familjen Grotesk", sans-serif;
   --title-face: "Familjen Grotesk", sans-serif;
@@ -741,6 +745,118 @@ html:is(
 }
 
 /* Basalt: pale chalk on slate, asymmetric stone-cut keys. */
+/* Amber: warm terminal panels; printed pieces retain all seven identities. */
+html[data-theme="amber"] {
+  --chrome-radius: 2px;
+  --key-radius: 3px;
+  --title-weight: 600;
+  --title-case: uppercase;
+  --title-size: 34px;
+  --label-case: uppercase;
+  --label-spacing: 0.045em;
+  & .mode-list {
+    gap: 0;
+  }
+  & .mode-card {
+    border-width: 0 0 1px;
+    background: transparent;
+  }
+  & .mode-card:hover {
+    background: var(--surface);
+  }
+  & .sheet-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  & .game-hud strong {
+    font-weight: 700;
+  }
+}
+
+/* Glacier: cold porcelain-white fields and sharply cut crystalline pieces. */
+html[data-theme="glacier"] {
+  --chrome-radius: 3px 12px 3px 12px;
+  --key-radius: 3px 10px 3px 10px;
+  --title-weight: 500;
+  --title-size: 40px;
+  --menu-fill: var(--panel);
+  & .mode-card {
+    border-color: var(--board-border);
+  }
+  & .mode-card:hover {
+    background: var(--surface);
+  }
+  & .primary-button {
+    border: 1px solid var(--accent);
+  }
+  & .sheet-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+}
+
+/* Fired Clay: warm grout, substantial glazed surfaces, softly worn corners. */
+html[data-theme="clay"] {
+  --chrome-radius: 14px 8px 14px 8px;
+  --key-radius: 14px;
+  --title-weight: 700;
+  --title-size: 40px;
+  --menu-fill: var(--panel);
+  & .mode-card {
+    border-color: var(--border);
+  }
+  & .mode-card strong {
+    font-weight: 700;
+  }
+  & .mode-card:hover {
+    background: var(--surface);
+  }
+  & .sheet h2 {
+    font-weight: 600;
+  }
+  & .control-preview {
+    background: var(--surface);
+  }
+}
+
+/* Blueprint: ruled technical panels and hollow, diagonally drafted tiles. */
+html[data-theme="blueprint"] {
+  --chrome-radius: 0px;
+  --key-radius: 2px;
+  --title-weight: 600;
+  --title-case: uppercase;
+  --title-size: 34px;
+  --label-case: uppercase;
+  --label-spacing: 0.04em;
+  --menu-fill: transparent;
+  & .mode-list {
+    gap: 0;
+    border-top: 1px solid var(--border);
+  }
+  & .mode-card {
+    border-width: 0 0 1px;
+  }
+  & .mode-card:hover {
+    background: var(--panel);
+  }
+  & .sheet-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  & .secondary-button {
+    background: transparent;
+  }
+  & .primary-button {
+    border: 1px solid var(--accent);
+  }
+}
+
+/* Long uppercase mode names must fit the shared 48px game rail. */
+html:is([data-theme="amber"], [data-theme="blueprint"]) #mode-label {
+  font-size: 8px;
+  letter-spacing: 0;
+}
+
 html[data-theme="basalt"] {
   --chrome-radius: 12px 5px 12px 5px;
   --key-radius: 12px 5px 12px 5px;

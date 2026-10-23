@@ -1,0 +1,39 @@
+.theme-locked {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.theme-choice-name {
+  flex: 1;
+}
+.theme-preview-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.theme-locked svg {
+  flex: none;
+  color: var(--muted);
+}
+.theme-locked:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.theme-unlock-status:empty {
+  display: none;
+}
+.theme-unlock-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (forced-colors: active) {
+  .theme-locked {
+    color: ButtonText;
+    background: ButtonFace;
+    border: 1px solid ButtonText;
+  }
+  .theme-preview-label,
+  .theme-locked svg {
+    color: ButtonText;
+  }
+}

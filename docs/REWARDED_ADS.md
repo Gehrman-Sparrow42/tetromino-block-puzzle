@@ -1,6 +1,16 @@
-# Rewarded continue preparation
+# Rewarded continues and theme unlocks
 
-The game and verification backend are ready for an opt-in Marathon continue. Live advertising is **disabled by default**. This change does not install or initialize an advertising SDK, add publisher IDs, change Android permissions, deploy hosting, or publish a new APK.
+The game and verification backend support opt-in Marathon continues and permanent-on-installation theme unlocks. Live advertising is **disabled by default**. This change does not install or initialize an advertising SDK, add publisher IDs, change Android permissions, deploy hosting, or publish a new APK.
+
+## Theme unlocks
+
+A fresh installation gets **Ink, LCD, Paper and Classic Arcade**. The other thirteen themes, including Amber Terminal, Glacier, Fired Clay and Blueprint, are available through Settings → Theme → Preview. One completed rewarded ad unlocks the selected theme, applies it, and saves ownership for offline use. An upgrade retains the previously selected nonstarter theme; it does not unlock the entire catalogue.
+
+Preview changes the shell and Canvas temporarily. Back, cancellation or failure restores the owned selection. Ads unavailable is a disabled action, never a simulated production grant. Unlocks are saved before selection changes; if storage fails, retry can redeem the same in-session reward. Clearing app/browser data or uninstalling removes the local profile and unlocks. There is no account, cross-device restore or anti-tamper guarantee for client-owned cosmetics.
+
+Theme attempts use `POST /v1/rewards/attempts` with `{ "placement": "theme", "profileId": "installation-id", "themeId": "amber" }`. The server binds the issued attempt to that exact theme and profile, rejects starter/unknown IDs, and permits one grant per profile/theme pair. Theme offers and receipts include `placement: "theme"`, `profileId` and `themeId`; they do not contain a row-clear reward. Claim request bodies cannot choose or change the target. A continue receipt cannot unlock a theme. The database migration adds scope fields without resetting existing continue grants.
+
+The existing AdMob reward-item label **continue** and amount **1** remain compatible for both placements; the business reward comes from the server-issued attempt, not that label or client input. Call `requestThemeUnlock(profileId, themeId, signal)` through the same registered native driver. A driver must pass each attempt's `customData` to the SDK before showing its ad. For a no-network development preview, use `?rewardedAds=test`; completing/canceling its explicitly labelled Test ad exercises either placement.
 
 ## Player flow
 

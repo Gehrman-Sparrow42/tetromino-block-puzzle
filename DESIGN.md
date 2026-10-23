@@ -1,6 +1,6 @@
 ---
 name: "Afterblock"
-description: "Thirteen selectable visual systems around one stable phone-first falling-block game."
+description: "Seventeen selectable visual systems around one stable phone-first falling-block game."
 colors:
   basalt-bg: "#17252c"
   basalt-surface: "#233840"
@@ -123,50 +123,54 @@ components:
 
 ## Overview
 
-**Creative North Star: "One game, thirteen complete worlds"**
+**Creative North Star: "One game, seventeen complete worlds"**
 
-Afterblock keeps the board and thumb controls dominant while each selectable theme carries a complete material treatment through menus, sheets, the board and piece previews. The user approved all nine new worlds alongside the four existing themes. This is a family of visual systems rather than a single palette with interchangeable accent colors.
+Afterblock keeps the board and thumb controls dominant while each selectable theme carries a complete material treatment through menus, sheets, the board and piece previews. The user approved the original nine new worlds alongside the four existing themes; four additional material studies extend that family. This is a family of visual systems rather than a single palette with interchangeable accent colors.
 
 The theme registry and stylesheet are the authority for exact appearance; the Canvas renderer is the authority for tiles and ghosts. Short functional English labels, locally bundled typefaces for the new worlds and a shared phone-first geometry keep the experience coherent. Theme changes alter appearance without moving gameplay controls.
 
 **Key Characteristics:**
 
-- Thirteen complete shell and board palettes.
-- Nine new worlds with local type, distinct corners and Canvas materials.
+- Seventeen complete shell and board palettes.
+- Thirteen new worlds with local type, distinct corners and Canvas materials.
 - Shared safe areas, compact status rows and configurable translucent controls.
-- Static pattern identities in Movement Score, Data Field and LCD.
+- Static pattern identities in Movement Score, Data Field, Amber Terminal and LCD.
 
 ## Colors
 
 ### Primary
 
-Each theme owns its action accent and paired action ink. Night Sleeve and Design Annual use text-on-background primary buttons instead of their accent pair; Data Field is deliberately ivory-on-black. The normative frontmatter uses Basalt as its compact reference palette; its `basalt-<role>` keys preserve the exact source strings. The complete thirteen-theme palette registry remains in `src/ui/themes.ts`, referenced by the sidecar variant index rather than duplicated here.
+Each theme owns its action accent and paired action ink. Night Sleeve and Design Annual use text-on-background primary buttons instead of their accent pair; Data Field is deliberately ivory-on-black. The normative frontmatter uses Basalt as its compact reference palette; its `basalt-<role>` keys preserve the exact source strings. The complete seventeen-theme palette registry remains in `src/ui/themes.ts`, referenced by the sidecar variant index rather than duplicated here.
 
 ### Neutral
 
 `bg`, `surface` and `panel` define the shell layers; `text`, `muted`, `border` and `board-border` carry reading hierarchy and rules. `control-rgb` supplies the translucent control color. Canvas roles are `board-bg`, `board-grid`, `board-ghost` and `board-flash`; `piece-I` through `piece-L` retain piece identity. The source registry additionally defines the legacy palettes' explicit paused overlays and board text. New paused overlays are derived by appending `d9` to board background; their board text follows shell text.
 
-| Theme                      | Palette character                      | Canvas material                                    |
-| -------------------------- | -------------------------------------- | -------------------------------------------------- |
-| Basalt (`basalt`)          | Chalk green on slate                   | Light upper facets and darker lower cuts           |
-| Workshop (`workshop`)      | Cream, navy and red                    | Inset outline and narrow white highlight           |
-| Night Sleeve (`sleeve`)    | Matte charcoal, ivory and coral        | Fine ivory inset perimeter                         |
-| Movement Score (`score`)   | Warm paper, ink and coral              | Seven static printed marks                         |
-| Botanical Folio (`folio`)  | Cream stock, green and berry           | Three-sided inset line and small corner cutout     |
-| Gate Board (`gate`)        | Navy, pale data and amber              | Horizontal split and inset perimeter               |
-| Design Annual (`annual`)   | Near-white, black and periwinkle       | Inset square with a small dark registration square |
-| Data Field (`data`)        | Black and ivory                        | Seven static printed marks in ivory tiles          |
-| Classic Arcade (`classic`) | Blue-black and saturated arcade colors | Uninterrupted bright tile fills                    |
-| Ink (`ink`)                | Blue-black and mint                    | Light top and dark bottom edge                     |
-| LCD (`lcd`)                | Green phosphor monochrome              | Seven light cutout identities in dark tiles        |
-| Neon (`neon`)              | Violet-black and luminous colors       | Inset dark fill and bounded colored glow           |
-| Paper (`paper`)            | Warm neutral stock and muted colors    | Flat fill and dark perimeter                       |
+| Theme                      | Palette character                      | Canvas material                                                |
+| -------------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| Basalt (`basalt`)          | Chalk green on slate                   | Light upper facets and darker lower cuts                       |
+| Workshop (`workshop`)      | Cream, navy and red                    | Inset outline and narrow white highlight                       |
+| Night Sleeve (`sleeve`)    | Matte charcoal, ivory and coral        | Fine ivory inset perimeter                                     |
+| Movement Score (`score`)   | Warm paper, ink and coral              | Seven static printed marks                                     |
+| Botanical Folio (`folio`)  | Cream stock, green and berry           | Three-sided inset line and small corner cutout                 |
+| Gate Board (`gate`)        | Navy, pale data and amber              | Horizontal split and inset perimeter                           |
+| Design Annual (`annual`)   | Near-white, black and periwinkle       | Inset square with a small dark registration square             |
+| Data Field (`data`)        | Black and ivory                        | Seven static printed marks in ivory tiles                      |
+| Classic Arcade (`classic`) | Blue-black and saturated arcade colors | Uninterrupted bright tile fills                                |
+| Ink (`ink`)                | Blue-black and mint                    | Light top and dark bottom edge                                 |
+| LCD (`lcd`)                | Green phosphor monochrome              | Seven light cutout identities in dark tiles                    |
+| Neon (`neon`)              | Violet-black and luminous colors       | Inset dark fill and bounded colored glow                       |
+| Amber Terminal (`amber`)   | Warm amber on brown-black              | Seven dark printed identities inside amber phosphor tiles      |
+| Glacier (`glacier`)        | Cold white and blue-gray               | Triangular crystal faces with precise diagonal cuts            |
+| Fired Clay (`clay`)        | Terracotta, warm grout and cream       | Glazed perimeter and small reflected highlights                |
+| Blueprint (`blueprint`)    | Navy drafting field and pale cyan      | Hollow outlined tiles, diagonal braces and corner registration |
+| Paper (`paper`)            | Warm neutral stock and muted colors    | Flat fill and dark perimeter                                   |
 
 **The Complete World Rule.** Switch the full shell and Canvas palette together; do not leave tokens from the previous theme behind.
 
 ## Typography
 
-**Display Font:** Familjen Grotesk for seven new worlds; Newsreader for Movement Score and Botanical Folio. The four legacy themes retain Segoe UI with system sans-serif fallbacks. Local font files and their licenses live in `src/ui/fonts/`.
+**Display Font:** Familjen Grotesk for eleven new worlds; Newsreader for Movement Score and Botanical Folio. The four legacy themes retain Segoe UI with system sans-serif fallbacks. Local font files and their licenses live in `src/ui/fonts/`.
 
 **Body Font:** Familjen Grotesk for every new theme; Segoe UI for the legacy themes. Control symbols use their existing system sans-serif fallback independently of display type.
 
@@ -193,13 +197,13 @@ At viewport heights up to 650px, home spacing and mode padding compress. Side ra
 
 ## Elevation & Depth
 
-The nine new worlds use borders, palette layers and Canvas material marks rather than floating sheets: their sheet shadow is `none` and modal backdrop blur is removed. The inherited modal scrim still dims the game. Legacy sheets retain a diffuse shadow and a 5px backdrop blur. Basalt and Movement Score retain their ruled material treatment; the playing screen has no top preview strip. Neon retains its bounded Canvas glow, while Ink retains tile bevels. These are native parts of their respective worlds.
+The thirteen new worlds use borders, palette layers and Canvas material marks rather than floating sheets: their sheet shadow is `none` and modal backdrop blur is removed. The inherited modal scrim still dims the game. Legacy sheets retain a diffuse shadow and a 5px backdrop blur. Basalt and Movement Score retain their ruled material treatment; the playing screen has no top preview strip. Neon retains its bounded Canvas glow, while Ink retains tile bevels. These are native parts of their respective worlds.
 
 Pressed controls use an inset accent outline, and the shared feedback indicator fades over 0.15s. Reduced-motion settings and the operating-system preference disable animations and transitions. Static piece patterns carry identity without animation.
 
 ## Shapes
 
-The frontmatter records the recurring corner vocabulary. Basalt alternates softly cut corners; Workshop uses small squared corners; Night Sleeve and Movement Score combine nearly square chrome with 10px keys. Botanical Folio pairs round chrome with asymmetric keys. Gate Board uses 3px chrome and 6px keys; Design Annual uses square chrome and 2px keys; Data Field is square throughout. Classic Arcade uses round chrome, percentage-rounded keys and circular rotation controls. Legacy shapes remain varied by component: mode/resume cards 14px, sheets 18px, ordinary action buttons 10px and control keys 20%.
+The frontmatter records the recurring corner vocabulary. Basalt alternates softly cut corners; Workshop uses small squared corners; Night Sleeve and Movement Score combine nearly square chrome with 10px keys. Botanical Folio pairs round chrome with asymmetric keys. Gate Board uses 3px chrome and 6px keys; Design Annual uses square chrome and 2px keys; Data Field is square throughout. Classic Arcade uses round chrome, percentage-rounded keys and circular rotation controls. Amber Terminal uses small square corners and ruled menu rows; Glacier uses alternating cut corners; Fired Clay uses soft asymmetric chrome and rounded keys; Blueprint uses square ruled panels and minimally rounded keys. Legacy shapes remain varied by component: mode/resume cards 14px, sheets 18px, ordinary action buttons 10px and control keys 20%.
 
 Tile geometry stays square, clipped inside each cell with a small proportional gap. Signature marks are drawn within that clip; they must remain legible in the small hold/next previews. Ghosts use dashed perimeters and a faint fill, with the LCD dash pattern distinct from the other themes.
 
@@ -231,7 +235,7 @@ The editor uses the selected palette and a full-screen dialog with Cancel/Done, 
 
 ### Board, hold and next
 
-The renderer shares one tile function across the board and previews. Data Field and Movement Score map I to horizontal marks, O to four dots, T to a cross, S and Z to opposing diagonal patterns, J to vertical lines, and L to nested squares. LCD uses its separate seven cutout identities. The preview centers the piece bounds and caps cells at 19px; dimmed hold pieces use 0.4 opacity. Ghost marks use a faint 0.07 fill and dashed outline. Canvas backing resolution follows device pixel ratio capped at 3.
+The renderer shares one tile function across the board and previews. Data Field and Movement Score map I to horizontal marks, O to four dots, T to a cross, S and Z to opposing diagonal patterns, J to vertical lines, and L to nested squares. Amber Terminal shares the seven printed identities with a warm monochrome fill and inset perimeter. LCD uses its separate seven cutout identities. Glacier cuts tiles into crisp crystalline faces, Fired Clay adds contained glaze highlights, and Blueprint uses hollow drafted tiles with diagonal braces. The preview centers the piece bounds and caps cells at 19px; dimmed hold pieces use 0.4 opacity. Ghost marks use a faint 0.07 fill and dashed outline. Canvas backing resolution follows device pixel ratio capped at 3.
 
 **The Same Tile Rule.** Use the same block renderer for board, hold and next previews; keep ghost marks subordinate to solid pieces.
 
@@ -239,18 +243,18 @@ The renderer shares one tile function across the board and previews. Data Field 
 
 ### Do:
 
-- **Do** preserve all thirteen selectable themes and their persisted identifiers.
+- **Do** preserve all seventeen selectable themes and their persisted identifiers.
 - **Do** use the selected theme palette for the shell, board, hold, next, ghost and clear feedback.
 - **Do** preserve the shared control geometry and visible keyboard focus.
 - **Do** bundle new font assets locally with their licenses and preserve offline use.
-- **Do** retain seven static piece patterns in Movement Score, Data Field and LCD.
+- **Do** retain seven static piece patterns in Movement Score, Data Field, Amber Terminal and LCD.
 
 ### Don't:
 
 - **Don't** introduce themed slogans or decorative overlays into play.
 - **Don't** make theme selection reposition gameplay controls.
 - **Don't** replace static piece patterns with color alone in the monochrome worlds.
-- **Don't** impose one corner radius or one display face across all thirteen themes.
+- **Don't** impose one corner radius or one display face across all seventeen themes.
 
 ## Marathon setup
 

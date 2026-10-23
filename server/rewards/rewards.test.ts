@@ -1,5 +1,6 @@
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { generateKeyPairSync, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { startRewardsServer } from "./http";
@@ -195,4 +196,150 @@ describe("reward verification", () => {
       (await fetch(`${base}/v1/rewards/attempts`, { method: "POST" })).status,
     ).toBe(503);
   });
+});
+
+it("migrates old ledgers without losing continue receipts and isolates permanent theme grants", () => {
+  mkdirSync(resolve("artifacts/rewards-tests"), { recursive: true });
+  const path = resolve(
+    `artifacts/rewards-tests/migration-${Date.now()}.sqlite`,
+  );
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE attempts(id TEXT PRIMARY KEY, run_id TEXT NOT NULL, token_hash TEXT NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL, status TEXT NOT NULL);
+    CREATE TABLE grants(run_id TEXT PRIMARY KEY, attempt_id TEXT UNIQUE NOT NULL, transaction_id TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);`);
+  old
+    .prepare("INSERT INTO attempts VALUES(?,?,?,?,?,?)")
+    .run(
+      "old-attempt",
+      "old-run",
+      createHash("sha256").update("old-token").digest("hex"),
+      1,
+      2,
+      "claimed",
+    );
+  old
+    .prepare("INSERT INTO grants VALUES(?,?,?,?)")
+    .run("old-run", "old-attempt", "old-transaction", 1);
+  old.close();
+  let store = new RewardStore(path);
+  expect(store.read("old-attempt", "old-token", true)).toMatchObject({
+    status: "claimed",
+    rows: 2,
+    runId: "old-run",
+  });
+  expect(() => store.create("old-run")).toThrow(/already/);
+  const continued = store.create("legacy");
+  store.verify({
+    attemptId: continued.id,
+    transactionId: "legacy-tx",
+    timestamp: Date.now(),
+  });
+  const a = store.createTheme("profile", "neon"),
+    b = store.createTheme("profile", "amber");
+  for (const attempt of [a, b])
+    store.verify({
+      attemptId: attempt.id,
+      transactionId: attempt.id,
+      timestamp: Date.now(),
+    });
+  store.close();
+  store = new RewardStore(path);
+  cleanup.push(() => store.close());
+  expect(store.read(continued.id, continued.token, true)).toMatchObject({
+    status: "claimed",
+    runId: "legacy",
+    rows: 2,
+  });
+  expect(store.read(a.id, a.token, true)).toEqual({
+    status: "claimed",
+    placement: "theme",
+    profileId: "profile",
+    themeId: "neon",
+  });
+  expect(store.read(a.id, b.token, true)).toBeNull();
+  expect(() => store.createTheme("profile", "neon")).toThrow(/already/);
+  expect(() => store.createTheme("profile", "ink")).toThrow(/Invalid/);
+  expect(() => store.createTheme("profile", "invented" as never)).toThrow(
+    /Invalid/,
+  );
+  expect(() => store.createTheme("profile:forged", "neon")).toThrow(/Invalid/);
+  expect(store.createTheme("another-profile", "neon")).toHaveProperty("id");
+});
+
+it("creates theme attempts through HTTP and ignores forged claim target bodies", async () => {
+  const server = await startRewardsServer({
+    port: 0,
+    databasePath: ":memory:",
+    adUnits: [unit],
+    resolveKey: keys,
+  });
+  cleanup.push(server.close);
+  const base = `http://127.0.0.1:${server.port}`;
+  const create = (body: unknown) =>
+    fetch(`${base}/v1/rewards/attempts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  for (const themeId of ["ink", "unknown"])
+    expect(
+      (await create({ placement: "theme", profileId: "profile", themeId }))
+        .status,
+    ).toBe(400);
+  expect((await create({ placement: "cash", runId: "forged" })).status).toBe(
+    400,
+  );
+  const created = await create({
+    placement: "theme",
+    profileId: "profile",
+    themeId: "neon",
+    runId: "forged",
+  });
+  expect(created.status).toBe(201);
+  const attempt = (await created.json()) as { id: string; token: string };
+  expect(
+    (
+      await fetch(
+        `${base}/v1/rewards/admob/ssv?${callback(attempt.id, { transaction_id: "theme-http" })}`,
+      )
+    ).status,
+  ).toBe(200);
+  const receipt = await fetch(
+    `${base}/v1/rewards/attempts/${attempt.id}/claim`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${attempt.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        placement: "continue",
+        profileId: "other",
+        themeId: "amber",
+      }),
+    },
+  );
+  expect(await receipt.json()).toEqual({
+    status: "claimed",
+    placement: "theme",
+    profileId: "profile",
+    themeId: "neon",
+  });
+  expect(
+    (
+      await create({
+        placement: "theme",
+        profileId: "profile",
+        themeId: "neon",
+      })
+    ).status,
+  ).toBe(409);
+  expect(
+    (
+      await create({
+        placement: "theme",
+        profileId: "profile",
+        themeId: "amber",
+      })
+    ).status,
+  ).toBe(201);
 });

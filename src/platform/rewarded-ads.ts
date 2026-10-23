@@ -1,3 +1,8 @@
+import {
+  isThemeId,
+  isStarterTheme,
+  type ThemeId,
+} from "../contracts/theme-catalog";
 export interface RewardedAdDriver {
   /** Resolves only after the fullscreen ad closes. true requires the SDK earned-reward event. */
   show(options: { customData: string; signal: AbortSignal }): Promise<boolean>;
@@ -5,6 +10,11 @@ export interface RewardedAdDriver {
 export interface RewardedAds {
   readonly enabled: boolean;
   readonly isTest: boolean;
+  requestThemeUnlock(
+    profileId: string,
+    themeId: ThemeId,
+    signal: AbortSignal,
+  ): Promise<{ earned: boolean }>;
   requestContinue(
     runId: string,
     signal: AbortSignal,
@@ -69,10 +79,21 @@ export function createRewardedAds(): RewardedAds {
     import.meta.env.DEV &&
     new URL(location.href).searchParams.get("rewardedAds") === "test"
   ) {
+    let previewBusy = false;
+    const preview = async (signal: AbortSignal) => {
+      if (previewBusy) throw new Error("A rewarded ad is already in progress.");
+      previewBusy = true;
+      try {
+        return await testReward(signal);
+      } finally {
+        previewBusy = false;
+      }
+    };
     return {
       enabled: true,
       isTest: true,
-      requestContinue: (_runId, signal) => testReward(signal),
+      requestContinue: (_runId, signal) => preview(signal),
+      requestThemeUnlock: (_profileId, _themeId, signal) => preview(signal),
     };
   }
   const base = import.meta.env.VITE_REWARDS_API_URL as string | undefined;
@@ -99,11 +120,18 @@ export function createRewardedAds(): RewardedAds {
   const driver = nativeDriver;
   // Keep the receipt credentials when SSV is delayed or a claim response is lost.
   // A retry must redeem the same earned impression, not ask for another ad.
-  let earnedAttempt: { runId: string; id: string; token: string } | undefined;
-  return {
-    enabled,
-    isTest: false,
-    async requestContinue(runId, signal) {
+  const earnedAttempts = new Map<string, { id: string; token: string }>();
+  let busy = false;
+  async function perform(
+    target:
+      | { placement: "continue"; runId: string }
+      | { placement: "theme"; profileId: string; themeId: ThemeId },
+    signal: AbortSignal,
+  ) {
+    if (busy) throw new Error("A rewarded ad is already in progress.");
+    busy = true;
+    const scope = JSON.stringify(target);
+    try {
       if (!enabled || !api || !driver)
         throw new Error("Rewarded ads are not configured.");
       const request = async (
@@ -129,13 +157,12 @@ export function createRewardedAds(): RewardedAds {
         return (await response.json()) as Record<string, unknown>;
       };
       signal.throwIfAborted();
-      if (earnedAttempt?.runId !== runId) {
-        earnedAttempt = undefined;
+      if (!earnedAttempts.has(scope)) {
         const attempt = await request(
           "/v1/rewards/attempts",
           "POST",
           undefined,
-          { runId },
+          target.placement === "continue" ? { runId: target.runId } : target,
         );
         const id = attempt.id,
           token = attempt.token;
@@ -144,14 +171,18 @@ export function createRewardedAds(): RewardedAds {
           !/^[A-Za-z0-9_-]{32}$/.test(id) ||
           typeof token !== "string" ||
           !/^[A-Za-z0-9_-]{43}$/.test(token) ||
-          attempt.rows !== 2
+          (target.placement === "continue"
+            ? attempt.rows !== 2
+            : attempt.placement !== "theme" ||
+              attempt.profileId !== target.profileId ||
+              attempt.themeId !== target.themeId)
         )
           throw new Error("Invalid reward offer.");
         if (!(await driver.show({ customData: id, signal })))
           return { earned: false };
-        earnedAttempt = { runId, id, token };
+        earnedAttempts.set(scope, { id, token });
       }
-      const { id, token } = earnedAttempt;
+      const { id, token } = earnedAttempts.get(scope)!;
       // SSV may arrive after the SDK event. Never turn an ad dismissal into a reward.
       const deadline = Date.now() + 60_000;
       while (!signal.aborted && Date.now() < deadline) {
@@ -168,8 +199,14 @@ export function createRewardedAds(): RewardedAds {
           );
           if (
             receipt.status !== "claimed" ||
-            receipt.rows !== 2 ||
-            receipt.runId !== runId
+            (target.placement === "continue"
+              ? (receipt.placement !== undefined &&
+                  receipt.placement !== "continue") ||
+                receipt.rows !== 2 ||
+                receipt.runId !== target.runId
+              : receipt.placement !== "theme" ||
+                receipt.profileId !== target.profileId ||
+                receipt.themeId !== target.themeId)
           )
             throw new Error("Invalid reward receipt.");
           return { earned: true };
@@ -188,7 +225,26 @@ export function createRewardedAds(): RewardedAds {
           if (signal.aborted) onAbort();
         });
       }
-      throw new Error("Reward confirmation timed out. No rows were changed.");
+      throw new Error(
+        "Reward confirmation timed out. Try again to check this reward.",
+      );
+    } finally {
+      busy = false;
+    }
+  }
+  return {
+    enabled,
+    isTest: false,
+    requestContinue: (runId, signal) =>
+      perform({ placement: "continue", runId }, signal),
+    requestThemeUnlock: (profileId, themeId, signal) => {
+      if (
+        !/^[A-Za-z0-9_-]{1,128}$/.test(profileId) ||
+        !isThemeId(themeId) ||
+        isStarterTheme(themeId)
+      )
+        return Promise.reject(new Error("Invalid theme target."));
+      return perform({ placement: "theme", profileId, themeId }, signal);
     },
   };
 }
