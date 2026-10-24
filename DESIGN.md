@@ -256,6 +256,12 @@ The renderer shares one tile function across the board and previews. Data Field 
 - **Don't** replace static piece patterns with color alone in the monochrome worlds.
 - **Don't** impose one corner radius or one display face across all seventeen themes.
 
+## Story and optional practice
+
+Story uses the existing themed sheet and a compact selected-level detail above a scrollable twelve-level list. Show the line goal and explicit line-range/speed bands; distinguish ready, completed and locked stages with text. The game HUD separates the Story chapter number from current falling speed and shows cleared lines against the target. Result actions offer Next only after progress is saved, with an explicit retry on storage failure. No campaign controls cover the board or alter saved control geometry.
+
+Tutorial is an optional main-menu utility, with Basics and Advanced choices. Each practice screen presents one objective, its own board and touch controls below it. Keep lesson text short, allow reset and exit, and use real engine events to recognize completion. Transient practice never changes the player's saved run, campaign progress or records. Tutorials inherit the selected theme.
+
 ## Marathon setup
 
 Marathon opens a compact setup sheet with Speed (Progressive or Fixed), Starting level (1–15), one short explanatory sentence and Start. Progression remains one level per ten cleared lines up to level 30; Fixed keeps the selected level. The setup stays separate from an existing paused run until Start and any replacement confirmation are accepted. The run stores its own options; legacy runs retain their previous behavior. Fixed results have separate score and line records.

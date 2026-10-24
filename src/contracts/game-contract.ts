@@ -1,6 +1,9 @@
 export type TetrominoType = "I" | "O" | "T" | "S" | "Z" | "J" | "L";
 export type RotationState = 0 | 1 | 2 | 3;
-export type GameMode = "marathon" | "sprint40" | "ultra120";
+export type GameMode = "marathon" | "sprint40" | "ultra120" | "story";
+export interface StoryOptions {
+  storyLevelId: number;
+}
 export interface MarathonOptions {
   startingLevel: number;
   speedMode: "progressive" | "fixed";
@@ -45,6 +48,8 @@ export interface GameStateSnapshot {
   mode: GameMode;
   /** Absent in legacy saves, which progress normally from level one. */
   marathonOptions?: MarathonOptions;
+  /** Required only for Story. level stores the current phase's gravity speed. */
+  storyLevelId?: number;
   status: RunStatus;
   seed: number;
   prngState: number;

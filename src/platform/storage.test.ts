@@ -25,6 +25,22 @@ beforeEach(async () => {
 });
 
 describe("settings and scores", () => {
+  it("counts a Story victory without replacing Sprint, Ultra or Marathon records", () => {
+    const run = createInitialState("story", 47, { storyLevelId: 1 });
+    Object.assign(run, {
+      status: "victory",
+      active: null,
+      lines: 12,
+      level: 2,
+      score: 5000,
+      elapsedMs: 60_000,
+    });
+    const result = storage.recordResult(run);
+    expect(result.gamesPlayed).toBe(1);
+    expect(result.sprint40BestTimeMs).toBeNull();
+    expect(result.marathonHighScore).toBe(0);
+    expect(result.ultra120HighScore).toBe(0);
+  });
   it("persists assisted resume metadata and counts its final result without records", () => {
     const run = createInitialState("marathon", 42);
     run.rewardRunId = "resume-test-42";

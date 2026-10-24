@@ -144,7 +144,7 @@ for (const padMode of ["fixed", "dynamic"] as const) {
   }
 }
 
-test("connected arrows ignore neutral gestures and retain their original command while dragging", async ({
+test("independent arrows ignore neutral gestures and retain their original command while dragging", async ({
   page,
 }, info) => {
   test.skip(info.project.name !== "phone");
@@ -166,14 +166,23 @@ test("connected arrows ignore neutral gestures and retain their original command
   );
   await page.goto("/");
   await page.locator("#resume-card").click();
-  const pad = (await page.locator("[data-movement-pad]").boundingBox())!;
+  const leftHome = (await page
+    .locator('.control-deck [data-command="MOVE_LEFT"]')
+    .boundingBox())!;
+  const rightHome = (await page
+    .locator('.control-deck [data-command="MOVE_RIGHT"]')
+    .boundingBox())!;
   const cdp = await page.context().newCDPSession(page);
-  const finger = { x: pad.x + pad.width / 2, y: pad.y + pad.height / 4, id: 1 };
+  const finger = {
+    x: (leftHome.x + leftHome.width + rightHome.x) / 2,
+    y: leftHome.y + leftHome.height / 2,
+    id: 1,
+  };
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchStart",
     touchPoints: [finger],
   });
-  finger.x += pad.width / 3;
+  finger.x = rightHome.x + rightHome.width / 2;
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchMove",
     touchPoints: [finger],
@@ -193,7 +202,7 @@ test("connected arrows ignore neutral gestures and retain their original command
     type: "touchStart",
     touchPoints: [finger],
   });
-  finger.x += (pad.width * 2) / 3;
+  finger.x = rightHome.x + rightHome.width / 2;
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchMove",
     touchPoints: [finger],
@@ -212,7 +221,7 @@ test("saved custom movement positions keep direct touch hitboxes aligned", async
   test.skip(info.project.name !== "phone");
   await page.setViewportSize({ width: 384, height: 853 });
   const state = createInitialState("marathon", 42);
-  const pad = { x: 0.3, y: 0.8, size: 0.9, opacity: 0.3 };
+  const placement = { x: 0.3, y: 0.8, size: 0.9, opacity: 0.3 };
   await page.addInitScript(
     ({ state, settings }) => {
       localStorage.setItem("tetromino_v2_settings", JSON.stringify(settings));
@@ -223,7 +232,7 @@ test("saved custom movement positions keep direct touch hitboxes aligned", async
       settings: {
         ...DEFAULT_SETTINGS,
         padMode: "dynamic",
-        gamepadLayouts: { portrait: { pad }, landscape: {} },
+        gamepadLayouts: { portrait: { left: placement }, landscape: {} },
         soundEnabled: false,
         hapticsEnabled: false,
       },
@@ -232,13 +241,15 @@ test("saved custom movement positions keep direct touch hitboxes aligned", async
   await page.goto("/");
   await page.locator("#resume-card").click();
   const area = (await page.locator(".play-area").boundingBox())!;
-  const bounds = (await page.locator("[data-movement-pad]").boundingBox())!;
+  const bounds = (await page
+    .locator('.control-deck [data-command="MOVE_LEFT"]')
+    .boundingBox())!;
   expect((bounds.x + bounds.width / 2 - area.x) / area.width).toBeCloseTo(
-    pad.x,
+    placement.x,
     2,
   );
   expect((bounds.y + bounds.height / 2 - area.y) / area.height).toBeCloseTo(
-    pad.y,
+    placement.y,
     2,
   );
   await tap(page, "MOVE_LEFT");

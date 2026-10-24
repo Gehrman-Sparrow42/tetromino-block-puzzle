@@ -284,7 +284,11 @@ export function recordResult(state: GameStateSnapshot): PersonalBestStats {
     }
   } else if (valid.mode === "ultra120") {
     stats.ultra120HighScore = Math.max(stats.ultra120HighScore, valid.score);
-  } else if (valid.status === "victory" && valid.elapsedMs > 0) {
+  } else if (
+    valid.mode === "sprint40" &&
+    valid.status === "victory" &&
+    valid.elapsedMs > 0
+  ) {
     stats.sprint40BestTimeMs = Math.min(
       stats.sprint40BestTimeMs ?? Infinity,
       valid.elapsedMs,

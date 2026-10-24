@@ -1,3 +1,11 @@
+import { startTutorial } from "./tutorial";
+import "./story.css";
+import { STORY_LEVELS, getStoryLevel } from "../engine/story";
+import {
+  loadStoryProgress,
+  isStoryLevelUnlocked,
+  recordStoryCompletion,
+} from "../platform/story-progress";
 import "./theme-unlocks.css";
 import { isThemeId, type ThemeId } from "../contracts/theme-catalog";
 import {
@@ -45,6 +53,7 @@ import { ControlEditor } from "./control-editor";
 import { measureControlViewport } from "./control-viewport";
 
 const MODE_NAMES: Record<GameMode, string> = {
+  story: "Story",
   marathon: "Marathon",
   sprint40: "Sprint 40",
   ultra120: "Ultra 120",
@@ -99,6 +108,8 @@ export function startApp(root: HTMLDivElement) {
   let feedbackUntil = 0,
     flashRows: number[] = [],
     pendingMode: GameMode = "marathon";
+  let pendingStoryLevel = 1;
+  let storyCompletionSaved = false;
   let pendingMarathon: MarathonOptions = {
     startingLevel: 1,
     speedMode: "progressive",
@@ -109,11 +120,12 @@ export function startApp(root: HTMLDivElement) {
         <h1>Afterblock</h1>
         <button id="resume-card" class="resume-card" data-action="resume"><span><strong>Resume</strong><small id="resume-detail"></small></span><span aria-hidden="true">→</span></button>
         <div class="mode-list" aria-label="Choose a game mode">
+          <button class="mode-card" data-action="story-levels"><span><strong>Story</strong><small>12 levels</small></span><span aria-hidden="true">→</span></button>
           <button class="mode-card" data-mode="marathon"><span><strong>Marathon</strong><small>Endless</small></span><span aria-hidden="true">∞</span></button>
           <button class="mode-card" data-mode="sprint40"><span><strong>Sprint 40</strong><small>40 lines</small></span><span aria-hidden="true">→</span></button>
           <button class="mode-card" data-mode="ultra120"><span><strong>Ultra 120</strong><small>2 minutes</small></span><span aria-hidden="true">◷</span></button>
         </div>
-        <nav class="home-links" aria-label="Menu"><button data-action="records">Records</button><button data-action="settings">Settings</button><button data-action="help">Help</button></nav>
+        <nav class="home-links" aria-label="Menu"><button data-action="tutorial">Tutorial</button><button data-action="records">Records</button><button data-action="settings">Settings</button><button data-action="help">Help</button></nav>
       </section>
       <section id="game" class="game-screen" hidden aria-label="Game">
         <div class="play-area">
@@ -122,7 +134,7 @@ export function startApp(root: HTMLDivElement) {
             <div class="rail-stats">
               <div class="hud-score"><span id="mode-label">Marathon</span><strong id="score">0</strong></div>
               <div><span>Lines</span><strong id="lines">0</strong></div>
-              <div><span>Level</span><strong id="level">1</strong></div>
+              <div><span id="speed-label">Level</span><strong id="level">1</strong></div>
               <div><span id="time-label">Time</span><strong id="time">00:00</strong></div>
             </div>
           </aside>
@@ -146,6 +158,7 @@ export function startApp(root: HTMLDivElement) {
     canvas = el<HTMLCanvasElement>("board");
   let lastFocus: HTMLElement | null = null;
   let controlEditor: ControlEditor | null = null;
+  let tutorialHandle: ReturnType<typeof startTutorial> | null = null;
   const orientation = () =>
     window.innerWidth > window.innerHeight
       ? ("landscape" as const)
@@ -374,7 +387,7 @@ export function startApp(root: HTMLDivElement) {
     el("resume-card").hidden = !available;
     if (state)
       el("resume-detail").textContent =
-        `${MODE_NAMES[state.mode]} · ${num(state.score)}`;
+        `${state.mode === "story" ? `Story ${state.storyLevelId}` : MODE_NAMES[state.mode]} · ${num(state.score)}`;
   }
   function showModal(type: string, content: string) {
     if (type !== "theme-unlock") cancelThemePreview();
@@ -431,7 +444,7 @@ export function startApp(root: HTMLDivElement) {
     persist();
     showModal(
       "pause",
-      `${sheetHead("Paused", false)}<div class="sheet-stats"><span>Score<strong>${num(state.score)}</strong></span><span>Lines<strong>${state.lines}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">Resume</button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart</button><button data-action="home">Menu</button></div>`,
+      `${sheetHead(state.mode === "story" ? `Story ${state.storyLevelId} · Paused` : "Paused", false)}<div class="sheet-stats"><span>Score<strong>${num(state.score)}</strong></span><span>Lines<strong>${state.lines}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">Resume</button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart</button><button data-action="home">Menu</button></div>`,
     );
   }
   function resume() {
@@ -449,14 +462,24 @@ export function startApp(root: HTMLDivElement) {
     draw();
   }
   function newRun(mode: GameMode) {
+    if (
+      mode === "story" &&
+      !isStoryLevelUnlocked(loadStoryProgress(), pendingStoryLevel)
+    )
+      return;
     cancelRewardRequest();
     state = createInitialState(
       mode,
       crypto.getRandomValues(new Uint32Array(1))[0],
-      mode === "marathon" ? pendingMarathon : undefined,
+      mode === "marathon"
+        ? pendingMarathon
+        : mode === "story"
+          ? { storyLevelId: pendingStoryLevel }
+          : undefined,
     );
     state.rewardRunId = crypto.randomUUID();
     recorded = false;
+    storyCompletionSaved = false;
     feedbackUntil = 0;
     flashRows = [];
     clearRun();
@@ -464,6 +487,11 @@ export function startApp(root: HTMLDivElement) {
     resume();
   }
   function requestRun(mode: GameMode, configured = false) {
+    if (
+      mode === "story" &&
+      !isStoryLevelUnlocked(loadStoryProgress(), pendingStoryLevel)
+    )
+      return;
     pendingMode = mode;
     if (mode === "marathon" && !configured) {
       if (state?.status === "playing") {
@@ -493,6 +521,89 @@ export function startApp(root: HTMLDivElement) {
         `${sheetHead("Replace saved run?")}<p>Your ${MODE_NAMES[state.mode]} run will be replaced.</p><button class="primary-button" data-action="confirm-new">Start ${MODE_NAMES[mode]}</button><button class="secondary-button" data-action="close">Cancel</button>`,
       );
     } else newRun(mode);
+  }
+  function showTutorialChooser() {
+    if (state?.status === "playing") {
+      controls.releaseAll();
+      applyCommand(state, { type: "PAUSE" });
+      persist();
+    }
+    showModal(
+      "tutorial-chooser",
+      `${sheetHead("Tutorial")}<button class="primary-button" data-action="tutorial-basics">Basics</button><button class="secondary-button" data-action="tutorial-advanced">Advanced</button>`,
+    );
+  }
+  function exitTutorial() {
+    const handle = tutorialHandle;
+    tutorialHandle = null;
+    handle?.destroy();
+    if (modal === "tutorial") {
+      modal = "";
+      root.querySelector<HTMLElement>(".shell")!.inert = false;
+      home();
+    }
+  }
+  function launchTutorial(track: "basics" | "advanced") {
+    if (tutorialHandle) return;
+    controls.releaseAll();
+    if (state?.status === "playing") applyCommand(state, { type: "PAUSE" });
+    persist();
+    closeModal();
+    modal = "tutorial";
+    root.querySelector<HTMLElement>(".shell")!.inert = true;
+    tutorialHandle = startTutorial(root, track, () => settings, exitTutorial);
+  }
+  function showStoryLevels(selected?: number) {
+    if (state?.status === "playing") {
+      controls.releaseAll();
+      applyCommand(state, { type: "PAUSE" });
+      persist();
+    }
+    const progress = loadStoryProgress();
+    const current =
+      STORY_LEVELS.find(
+        (level) =>
+          isStoryLevelUnlocked(progress, level.id) &&
+          !progress.completed[String(level.id)],
+      ) ?? STORY_LEVELS[STORY_LEVELS.length - 1]!;
+    const id = selected ?? current.id;
+    const level = getStoryLevel(id);
+    if (!level || !isStoryLevelUnlocked(progress, id)) return;
+    pendingStoryLevel = id;
+    showModal(
+      "story-levels",
+      `${sheetHead("Story")}
+      <section class="story-detail" aria-label="Selected level">
+        <h3>Level ${level.id} · ${level.title}</h3><p class="story-goal">Clear ${level.targetLines} lines</p>
+        <ol class="story-phases" aria-label="Speed bands">${level.phases.map((phase, i) => `<li><span>Lines ${phase.fromLine}–${(level.phases[i + 1]?.fromLine ?? level.targetLines) - 1}</span><strong>Speed ${phase.speed}</strong></li>`).join("")}</ol>
+        <button class="primary-button" data-action="start-story">${progress.completed[String(id)] ? "Replay" : "Start"} level ${id}</button>
+      </section>
+      <div class="story-level-list" role="group" aria-label="Story levels">${STORY_LEVELS.map(
+        (item) => {
+          const unlocked = isStoryLevelUnlocked(progress, item.id);
+          const completed = !!progress.completed[String(item.id)];
+          return `<button class="story-level" data-action="select-story-level" data-story-level="${item.id}" ${!unlocked ? "disabled" : ""} ${item.id === id ? 'aria-current="true"' : ""}><span><strong>${item.id}. ${item.title}</strong><small>${item.targetLines} lines</small></span><span class="story-level-state">${completed ? "Completed" : !unlocked ? "Locked" : "Ready"}</span></button>`;
+        },
+      ).join("")}</div>`,
+    );
+  }
+  function showStoryResult() {
+    if (!state || state.mode !== "story") return;
+    const won = state.status === "victory";
+    const level = getStoryLevel(state.storyLevelId!);
+    if (!level) return;
+    const next = getStoryLevel(level.id + 1);
+    const title = won
+      ? !next
+        ? "Story complete"
+        : `Level ${level.id} complete`
+      : `Level ${level.id} · Game over`;
+    showModal(
+      "result",
+      `${sheetHead(title, false)}<div class="result-score">${num(state.score)}<span>Score</span></div><div class="sheet-stats"><span>Lines<strong>${state.lines}/${level.targetLines}</strong></span><span>Time<strong>${formatTime(state.elapsedMs)}</strong></span></div>
+      ${won && !storyCompletionSaved ? '<p role="status">Progress could not be saved. Try again to unlock the next level.</p><button class="primary-button" data-action="save-story-result">Save progress</button>' : won && next ? '<button class="primary-button" data-action="next-story-level">Next level</button>' : ""}
+      <button class="secondary-button" data-action="restart">${won ? "Replay" : "Retry"} level ${level.id}</button><div class="split-actions"><button data-action="story-levels">Levels</button><button data-action="home">Menu</button></div>`,
+    );
   }
   function showSettings(themePickerOpen = false) {
     if (state?.status === "playing") {
@@ -667,7 +778,7 @@ export function startApp(root: HTMLDivElement) {
       "help",
       `${sheetHead("Help")}<div class="help-copy">
       <p>Fill a horizontal row to clear it. The game ends when the stack reaches the top.</p>
-      <p>Marathon: endless, faster every 10 lines.<br>Sprint 40: clear 40 lines.<br>Ultra 120: score in 2 minutes.</p>
+      <p>Story: 12 levels with changing speed bands.<br>Marathon: endless, faster every 10 lines.<br>Sprint 40: clear 40 lines.<br>Ultra 120: score in 2 minutes.</p>
       <h3>Touch</h3><p>← / → move · ↓ soft drop · ⇓ hard drop<br>↶ / ↷ rotate · ⇄ hold</p>
       <p>Hold swaps once per piece. Next shows the upcoming piece.</p>
       <h3>Keyboard</h3><p>Arrows move · Z / X rotate · C / Shift hold<br>Space drops · P / Escape pauses</p>
@@ -752,6 +863,11 @@ export function startApp(root: HTMLDivElement) {
     clearRun();
     playSound("over", settings);
     const won = state.status === "victory";
+    if (state.mode === "story") {
+      storyCompletionSaved = won && recordStoryCompletion(state);
+      showStoryResult();
+      return;
+    }
     showModal(
       "result",
       `${sheetHead(won ? "Complete" : "Game over", false)}<div class="result-score">${num(state.score)}<span>Score</span></div><div class="sheet-stats"><span>Lines<strong>${state.lines}</strong></span><span>Level<strong>${state.level}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="restart">Play again</button><button class="secondary-button" data-action="home">Menu</button>`,
@@ -805,6 +921,10 @@ export function startApp(root: HTMLDivElement) {
         pulseHaptic("clear", settings);
       }
     }
+    if (state.mode === "story" && state.level !== level) {
+      el("feedback").textContent = `Speed ${state.level}`;
+      feedbackUntil = performance.now() + 900;
+    }
     if (state.level > level) playSound("level", settings);
     if (state.status === "gameover" || state.status === "victory") terminal();
   }
@@ -814,6 +934,10 @@ export function startApp(root: HTMLDivElement) {
     () => settings,
     () => screen === "game" && modal === "" && state?.status === "playing",
     (key) => {
+      if (tutorialHandle) {
+        if (key === "back") back();
+        return;
+      }
       if (key === "back") back();
       else if (screen === "game" && modal === "pause") resume();
       else if (screen === "game" && !modal) pause();
@@ -822,7 +946,11 @@ export function startApp(root: HTMLDivElement) {
   function draw() {
     if (!state || screen !== "game") return;
     const now = performance.now();
-    el("mode-label").textContent = MODE_NAMES[state.mode];
+    el("mode-label").textContent =
+      state.mode === "story"
+        ? `Story ${state.storyLevelId}`
+        : MODE_NAMES[state.mode];
+    el("speed-label").textContent = state.mode === "story" ? "Speed" : "Level";
     const score = el("score");
     score.textContent =
       state.score < 100000
@@ -834,7 +962,11 @@ export function startApp(root: HTMLDivElement) {
     score.title = num(state.score);
     score.setAttribute("aria-label", `${num(state.score)} points`);
     el("lines").textContent =
-      state.mode === "sprint40" ? `${state.lines}/40` : String(state.lines);
+      state.mode === "story"
+        ? `${state.lines}/${getStoryLevel(state.storyLevelId!)?.targetLines ?? "—"}`
+        : state.mode === "sprint40"
+          ? `${state.lines}/40`
+          : String(state.lines);
     el("level").textContent = String(state.level);
     el("time-label").textContent = state.mode === "ultra120" ? "Left" : "Time";
     el("time").textContent = formatTime(
@@ -868,6 +1000,10 @@ export function startApp(root: HTMLDivElement) {
       );
   }
   function back() {
+    if (tutorialHandle) {
+      exitTutorial();
+      return;
+    }
     if (modal === "theme-unlock") {
       showSettings(true);
       return;
@@ -881,7 +1017,9 @@ export function startApp(root: HTMLDivElement) {
       modal === "help" ||
       modal === "records" ||
       modal === "confirm" ||
-      modal === "marathon-setup"
+      modal === "marathon-setup" ||
+      modal === "story-levels" ||
+      modal === "tutorial-chooser"
     ) {
       closeModal();
       if (screen === "game" && state?.status === "paused") pause();
@@ -891,15 +1029,56 @@ export function startApp(root: HTMLDivElement) {
     else void exitApp();
   }
   root.addEventListener("click", (event) => {
+    if (modal === "tutorial") return;
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
       "button",
     );
-    if (!target) return;
+    if (!target || target.disabled) return;
     if (target.dataset.mode) {
       requestRun(target.dataset.mode as GameMode);
       return;
     }
     switch (target.dataset.action) {
+      case "tutorial":
+        showTutorialChooser();
+        break;
+      case "tutorial-basics":
+        launchTutorial("basics");
+        break;
+      case "tutorial-advanced":
+        launchTutorial("advanced");
+        break;
+      case "story-levels":
+        showStoryLevels();
+        break;
+      case "select-story-level": {
+        const id = Number(target.dataset.storyLevel);
+        if (isStoryLevelUnlocked(loadStoryProgress(), id)) showStoryLevels(id);
+        break;
+      }
+      case "start-story":
+        requestRun("story", true);
+        break;
+      case "next-story-level":
+        if (
+          state?.mode === "story" &&
+          state.status === "victory" &&
+          storyCompletionSaved
+        ) {
+          pendingStoryLevel = state.storyLevelId! + 1;
+          requestRun("story", true);
+        }
+        break;
+      case "save-story-result":
+        if (
+          state?.mode === "story" &&
+          state.status === "victory" &&
+          !storyCompletionSaved
+        ) {
+          storyCompletionSaved = recordStoryCompletion(state);
+          showStoryResult();
+        }
+        break;
       case "preview-theme":
         if (isThemeId(target.dataset.themeId))
           previewTheme(target.dataset.themeId);
@@ -971,7 +1150,8 @@ export function startApp(root: HTMLDivElement) {
         if (screen === "game" && state?.status === "paused") pause();
         break;
       case "restart":
-        requestRun(state?.mode ?? "marathon");
+        if (state?.mode === "story") pendingStoryLevel = state.storyLevelId!;
+        requestRun(state?.mode ?? "marathon", state?.mode === "story");
         break;
       case "confirm-new":
         newRun(pendingMode);
@@ -1074,7 +1254,13 @@ export function startApp(root: HTMLDivElement) {
     }
   });
   const backgroundPause = () => {
+    tutorialHandle?.pause();
     controls.releaseAll();
+    if (tutorialHandle) {
+      persist();
+      previous = 0;
+      return;
+    }
     if (state?.status === "playing") {
       applyCommand(state, { type: "PAUSE" });
       persist();

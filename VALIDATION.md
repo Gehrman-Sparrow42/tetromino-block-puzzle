@@ -126,3 +126,19 @@ Board fitting now requires horizontal centering, including custom control layout
 Added a Marathon setup sheet with Progressive / Fixed and starting levels 1–15. Progressive adds one level every ten lines, capped at 30. Fixed keeps its selected gravity and level after line clears. Existing snapshots without options retain their original level-one progression. Saved configuration is validated and resumes with the run; fixed Marathon records are stored separately.
 
 Verified: 128 unit tests; 42 browser scenarios covering setup, save/resume, restart defaults and cancellation across phone/compact/desktop; TypeScript/Vite and Capacitor sync; Android assembly/lint; APK signature verification. Offline HTML at 360 × 600 starts and saves Fixed level 5 without page errors. Impeccable's detector returned no findings on the changed app UI. The updated APK was built but not installed on a physical phone or emulator during this change.
+
+## Story campaign and optional tutorials — 2.11.0
+
+Added twelve sequential Story levels with goals from 12 to 60 lines and four speed bands per level. The line-span-weighted falling rate increases at every stage, with recovery phases between faster bursts. Campaign progress and per-level records are stored separately; Story victories cannot overwrite Sprint records. Restart/resume retain the selected stage. Failed progress writes offer an explicit retry before Next unlocks.
+
+Added voluntary Basics (five lessons) and Advanced (four lessons) tutorials. Prepared boards use the actual engine and require real actions/clears. Practice preserves saved runs, records and campaign progress, cleans up its input listeners, and pauses on backgrounding. Impeccable guided the compact, themed UI; its mechanical scan reported ten advisory findings and no warnings/errors. Phone and compact-phone screenshots were inspected.
+
+Verified for this change:
+
+- 172 unit tests and 31 online/reward tests pass.
+- Full browser suite: 130 passed, 65 intentionally skipped by viewport scope, zero failures across phone, compact phone and desktop. This includes ten Story cases and twelve tutorial cases. Obsolete browser expectations were updated for the existing seven independent controls, one Next preview, fixed saved positions and permitted board overlap; production control geometry was not changed.
+- Strict TypeScript/Vite production build, Capacitor sync, Android debug assembly and lint pass. Existing toolchain warnings remain; no new Android lint errors.
+- Standalone file smoke passes tutorial movement objectives, Story start, hard drop and pause with no page errors.
+- APK signature verification passes and matches the existing Desktop APK signer. Package `com.berkay.afterblock`, version 2.11.0 (21100), minimum API 24, target API 36. Permission inspection confirms no INTERNET permission.
+
+The new APK was not installed on an emulator or physical phone during this change; no Android device was connected. Browser checks and native build/lint do not establish physical touch comfort. The campaign curve is an initial tested progression and may need tuning from player feedback. Live advertising remains unconfigured and disabled.

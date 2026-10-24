@@ -139,7 +139,7 @@ test("play, hold, pause, resume and settings persist", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("larger board, seven spacious controls and no overlap", async ({
+test("larger board and seven spacious fixed controls fit the viewport", async ({
   page,
 }, info) => {
   await page.goto("/");
@@ -151,7 +151,7 @@ test("larger board, seven spacious controls and no overlap", async ({
   expect(
     Math.abs(board.x + board.width / 2 - (deck.x + deck.width / 2)),
   ).toBeLessThan(1);
-  // The complete board stays above or beside the controls, including its bottom rows.
+  // Board and independent controls each stay within the play area; custom overlap is allowed.
   expect(board.y + board.height).toBeLessThanOrEqual(deck.y + deck.height + 1);
   if (info.project.name === "phone")
     expect(board.width).toBeGreaterThanOrEqual(250);
@@ -175,11 +175,6 @@ test("larger board, seven spacious controls and no overlap", async ({
     );
   expect(rects).toHaveLength(7);
   for (const r of rects) {
-    expect(
-      board.x + board.width <= r.x - 7 ||
-        board.x >= r.x + r.width + 7 ||
-        board.y + board.height <= r.y - 7,
-    ).toBe(true);
     expect(r.width).toBeGreaterThanOrEqual(48);
     expect(r.height).toBeGreaterThanOrEqual(48);
     expect(r.x).toBeGreaterThanOrEqual(0);
@@ -247,7 +242,7 @@ test("side rails fit large scores and keep all previews beside the top-aligned b
         ) || 0,
     );
     expect(board.y).toBeLessThanOrEqual(topInset + 8);
-    await expect(page.locator(".next-rail canvas")).toHaveCount(5);
+    await expect(page.locator(".next-rail canvas")).toHaveCount(1);
     for (const preview of await page.locator(".next-rail canvas").all())
       await expect(preview).toBeVisible();
     const score = page.locator("#score");
@@ -461,11 +456,9 @@ test("control presets, sliders and reset are live and safe", async ({
   for (const preset of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('select[name="controlLayout"]').selectOption(preset);
     await setRange(page, "controlScale", 2);
-    await setRange(page, "controlSpread", 1);
-    await setRange(page, "controlHeight", 1);
     for (const [railSelector, childSelector] of [
       [".left-rail", "#time"],
-      [".next-rail", "#next-4"],
+      [".next-rail", "#next-0"],
     ]) {
       const rail = (await page.locator(railSelector).boundingBox())!;
       const child = (await page.locator(childSelector).boundingBox())!;
@@ -484,24 +477,15 @@ test("control presets, sliders and reset are live and safe", async ({
     for (const r of positions) {
       expect(r.w).toBeGreaterThanOrEqual(48);
       expect(r.h).toBeGreaterThanOrEqual(48);
-      const board = (await page.locator("#board").boundingBox())!;
-      expect(
-        board.x + board.width <= r.x - 7 ||
-          board.x >= r.x + r.w + 7 ||
-          board.y + board.height <= r.y - 7,
-      ).toBe(true);
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.w).toBeLessThanOrEqual(
+        await page.evaluate(() => innerWidth),
+      );
+      expect(r.y + r.h).toBeLessThanOrEqual(
+        await page.evaluate(() => innerHeight),
+      );
     }
-    for (let i = 0; i < positions.length; i++)
-      for (let j = i + 1; j < positions.length; j++) {
-        const a = positions[i],
-          b = positions[j];
-        expect(
-          a.x + a.w <= b.x ||
-            b.x + b.w <= a.x ||
-            a.y + a.h <= b.y ||
-            b.y + b.h <= a.y,
-        ).toBe(true);
-      }
   }
   await setRange(page, "controlOpacity", 0.08);
   expect(
@@ -523,7 +507,7 @@ test("control presets, sliders and reset are live and safe", async ({
     .getByRole("button", { name: "Reset controls", exact: true })
     .click();
   await expect(page.locator('select[name="controlLayout"]')).toHaveValue(
-    "gamepad",
+    "floating",
   );
   expect(await page.locator('input[name="controlScale"]').inputValue()).toBe(
     "1",
@@ -532,11 +516,11 @@ test("control presets, sliders and reset are live and safe", async ({
     JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
   );
   expect(saved.controlOpacity).toBe(0.18);
-  expect(saved.controlLayout).toBe("gamepad");
+  expect(saved.controlLayout).toBe("floating");
   await page.reload();
   await page.locator('#home [data-action="settings"]').click();
   await expect(page.locator('select[name="controlLayout"]')).toHaveValue(
-    "gamepad",
+    "floating",
   );
 });
 
@@ -563,7 +547,6 @@ test("settings preview fits a 320px screen at maximum size", async ({
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
   await setRange(page, "controlScale", 2);
-  await setRange(page, "controlSpread", 1);
   for (const layout of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('select[name="controlLayout"]').selectOption(layout);
     const preview = (await page.locator(".control-preview").boundingBox())!;
@@ -611,7 +594,7 @@ async function dragEditorControl(
   await page.mouse.up();
 }
 
-test("gamepad has three movement zones and saves edited controls without changing the run", async ({
+test("seven independent buttons save edits without changing the run", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 393, height: 851 });
@@ -619,11 +602,19 @@ test("gamepad has three movement zones and saves edited controls without changin
   await startMarathon(page);
   await expect(page.locator("#game")).toHaveAttribute("data-layout", "gamepad");
   const commands = await page
-    .locator("[data-movement-pad] [data-command]")
+    .locator(".control-deck [data-command]")
     .evaluateAll((nodes) =>
       nodes.map((n) => (n as HTMLElement).dataset.command),
     );
-  expect(commands.sort()).toEqual(["MOVE_LEFT", "MOVE_RIGHT", "SOFT_DROP"]);
+  expect(commands.sort()).toEqual([
+    "HARD_DROP",
+    "HOLD",
+    "MOVE_LEFT",
+    "MOVE_RIGHT",
+    "ROTATE_CCW",
+    "ROTATE_CW",
+    "SOFT_DROP",
+  ]);
   const savedRun = await pausedRun(page);
   await page
     .getByRole("dialog")
@@ -631,7 +622,7 @@ test("gamepad has three movement zones and saves edited controls without changin
     .click();
   await openControlEditor(page);
   await expect(page.locator(".shell")).toHaveAttribute("inert", "");
-  await dragEditorControl(page, "pad", 0, -70);
+  await dragEditorControl(page, "left", 0, -70);
   await page.locator('[data-editor-control="hold"]').click();
   await page.locator('[name="editorControlOpacity"]').press("Home");
   await expect(page.locator('[name="editorControlOpacity"]')).toHaveValue(
@@ -665,7 +656,7 @@ test("gamepad has three movement zones and saves edited controls without changin
     JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
   );
   expect(saved.controlLayout).toBe("gamepad");
-  expect(saved.gamepadLayouts.portrait.pad).toBeDefined();
+  expect(saved.gamepadLayouts.portrait.left).toBeDefined();
   expect(saved.gamepadLayouts.portrait.hold).toMatchObject({
     size: 2,
     opacity: 0.1,
@@ -703,7 +694,7 @@ test("control editor cancel, escape and pointer cancellation preserve saved sett
     localStorage.getItem("tetromino_v2_settings"),
   );
   await openControlEditor(page);
-  await dragEditorControl(page, "pad", 0, -60);
+  await dragEditorControl(page, "left", 0, -60);
   await setRange(page, "editorControlOpacity", 0.5);
   await page.keyboard.press("KeyP");
   await expect(page.locator(".control-editor")).toBeVisible();
@@ -713,7 +704,7 @@ test("control editor cancel, escape and pointer cancellation preserve saved sett
     await page.evaluate(() => localStorage.getItem("tetromino_v2_settings")),
   ).toBe(before);
   await openControlEditor(page);
-  const pad = page.locator('[data-editor-control="pad"]');
+  const pad = page.locator('[data-editor-control="left"]');
   const box = (await pad.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -739,7 +730,7 @@ test("control editor keeps portrait and landscape layouts separate and resets on
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
   await openControlEditor(page);
-  await dragEditorControl(page, "pad", 0, -55);
+  await dragEditorControl(page, "left", 0, -55);
   await page.locator('[data-editor-action="done"]').click();
   const portrait = await page.evaluate(
     () =>
@@ -771,7 +762,7 @@ test("control editor keeps portrait and landscape layouts separate and resets on
   expect(reset.landscape).toEqual({});
 });
 
-test("editor and settings preview preserve gameplay coordinates and reject overlaps", async ({
+test("editor and settings preview preserve gameplay coordinates and allow independent placement", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 393, height: 851 });
@@ -803,10 +794,10 @@ test("editor and settings preview preserve gameplay coordinates and reject overl
     height: String(actual.height),
   });
   const gameRects = await page
-    .locator(".movement-pad, .control-deck > .control")
+    .locator(".control-deck .control")
     .evaluateAll((nodes) =>
       nodes.map((n) => ({
-        id: (n as HTMLElement).dataset.command ?? "pad",
+        id: (n as HTMLElement).dataset.command,
         x: parseFloat((n as HTMLElement).style.left),
         y: parseFloat((n as HTMLElement).style.top),
         width: parseFloat((n as HTMLElement).style.width),
@@ -861,7 +852,7 @@ test("editor and settings preview preserve gameplay coordinates and reject overl
   const otherBefore = await page
     .locator('[data-editor-control="rotateCW"]')
     .getAttribute("style");
-  await dragEditorControl(page, "pad", 200, 0);
+  await dragEditorControl(page, "left", 200, 0);
   expect(
     await page
       .locator('[data-editor-control="rotateCW"]')
@@ -882,6 +873,9 @@ test("gamepad profiles persist and legacy dynamic mode normalizes to fixed", asy
   await page.goto("/");
   await page.locator('#home [data-action="settings"]').click();
   await expect(page.locator('[name="padMode"]')).toHaveCount(0);
+  const viewport = page.viewportSize()!;
+  const orientation =
+    viewport.width > viewport.height ? "landscape" : "portrait";
   await openControlEditor(page);
   await dragEditorControl(page, "left", 0, -30);
   await page.locator('[data-editor-action="done"]').click();
@@ -897,14 +891,14 @@ test("gamepad profiles persist and legacy dynamic mode normalizes to fixed", asy
     gamepadLayouts: { portrait: {}, landscape: {} },
   });
   expect(
-    saved.controlProfiles["gamepad:balanced"].layouts.portrait.left,
+    saved.controlProfiles["gamepad:balanced"].layouts[orientation].left,
   ).toBeDefined();
   await page.locator('[name="gamepadPreset"]').selectOption("balanced");
   const restored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("tetromino_v2_settings")!),
   );
-  expect(restored.gamepadLayouts.portrait.left).toEqual(
-    saved.controlProfiles["gamepad:balanced"].layouts.portrait.left,
+  expect(restored.gamepadLayouts[orientation].left).toEqual(
+    saved.controlProfiles["gamepad:balanced"].layouts[orientation].left,
   );
 });
 
@@ -922,11 +916,9 @@ test("landscape side information stays inside rails at maximum control settings"
   for (const preset of ["gamepad", "thumbs", "mirror", "floating"]) {
     await page.locator('[name="controlLayout"]').selectOption(preset);
     await setRange(page, "controlScale", 2);
-    await setRange(page, "controlSpread", 1);
-    await setRange(page, "controlHeight", 1);
     for (const [railSelector, childSelector] of [
       [".left-rail", "#time"],
-      [".next-rail", "#next-4"],
+      [".next-rail", "#next-0"],
     ]) {
       const rail = (await page.locator(railSelector).boundingBox())!;
       const child = (await page.locator(childSelector).boundingBox())!;

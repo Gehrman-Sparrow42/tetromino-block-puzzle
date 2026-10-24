@@ -4,10 +4,12 @@ import type {
   GameMode,
   GameStateSnapshot,
   MarathonOptions,
+  StoryOptions,
   RotationState,
   TetrominoType,
 } from "../contracts/game-contract";
 import { COLS, HIDDEN_ROWS, ROWS, SHAPES, WALL_KICKS } from "./constants";
+import { getStoryLevel, storySpeedForLines } from "./story";
 
 const TYPES: TetrominoType[] = ["I", "J", "L", "O", "S", "T", "Z"];
 const LOCK_MS = 500;
@@ -26,6 +28,10 @@ function validMarathonOptions(value: unknown): value is MarathonOptions {
 }
 
 function levelForLines(state: GameStateSnapshot): number {
+  if (state.mode === "story") {
+    const level = getStoryLevel(state.storyLevelId!);
+    return level ? storySpeedForLines(level, state.lines) : NaN;
+  }
   const options = state.mode === "marathon" ? state.marathonOptions : undefined;
   const startingLevel = options?.startingLevel ?? 1;
   return options?.speedMode === "fixed"
@@ -152,7 +158,7 @@ export function applyRewardedContinue(state: GameStateSnapshot): boolean {
 export function createInitialState(
   mode: GameMode,
   seed: number,
-  options?: MarathonOptions,
+  options?: MarathonOptions | StoryOptions,
 ): GameStateSnapshot {
   if (
     mode === "marathon" &&
@@ -162,6 +168,14 @@ export function createInitialState(
     throw new RangeError(
       "Marathon requires a starting level from 1 to 15 and a fixed or progressive speed mode.",
     );
+  const storyLevel =
+    mode === "story" && options && "storyLevelId" in options
+      ? getStoryLevel(options.storyLevelId)
+      : undefined;
+  if (mode === "story" && !storyLevel)
+    throw new RangeError("Story requires a valid story level ID.");
+  const marathonOptions =
+    mode === "marathon" ? (options as MarathonOptions | undefined) : undefined;
   const normalized = seed >>> 0 || 0x6d2b79f5;
   const state: GameStateSnapshot = {
     version: 2,
@@ -169,13 +183,14 @@ export function createInitialState(
     ...(mode === "marathon"
       ? {
           marathonOptions: {
-            ...(options ?? {
+            ...(marathonOptions ?? {
               startingLevel: 1,
               speedMode: "progressive" as const,
             }),
           },
         }
       : {}),
+    ...(storyLevel ? { storyLevelId: storyLevel.id } : {}),
     status: "playing",
     seed: normalized,
     prngState: normalized,
@@ -189,7 +204,11 @@ export function createInitialState(
     nextQueue: [],
     score: 0,
     lines: 0,
-    level: mode === "marathon" ? (options?.startingLevel ?? 1) : 1,
+    level: storyLevel
+      ? storySpeedForLines(storyLevel, 0)
+      : mode === "marathon"
+        ? (marathonOptions?.startingLevel ?? 1)
+        : 1,
     combo: -1,
     backToBack: false,
     elapsedMs: 0,
@@ -270,7 +289,11 @@ function lock(state: GameStateSnapshot): void {
     perfectClear,
   };
   state.holdUsedThisTurn = false;
-  if (state.mode === "sprint40" && state.lines >= 40) {
+  if (
+    (state.mode === "sprint40" && state.lines >= 40) ||
+    (state.mode === "story" &&
+      state.lines >= getStoryLevel(state.storyLevelId!)!.targetLines)
+  ) {
     state.status = "victory";
     state.active = null;
     state.softDropActive = false;
@@ -457,11 +480,24 @@ export function validateSnapshot(value: unknown): GameStateSnapshot | null {
       TYPES.includes(v as TetrominoType);
     if (
       s.version !== 2 ||
-      !["marathon", "sprint40", "ultra120"].includes(s.mode) ||
+      !["marathon", "sprint40", "ultra120", "story"].includes(s.mode) ||
       !["playing", "paused", "gameover", "victory"].includes(s.status)
     )
       return null;
     if (!number(s.seed, 1, 0xffffffff) || !number(s.prngState, 1, 0xffffffff))
+      return null;
+    const storyLevel =
+      s.mode === "story" ? getStoryLevel(s.storyLevelId!) : undefined;
+    if (
+      (s.mode === "story" && !storyLevel) ||
+      (s.mode !== "story" && "storyLevelId" in s)
+    )
+      return null;
+    if (
+      storyLevel &&
+      (s.lines > storyLevel.targetLines + 3 ||
+        (s.status === "victory") !== s.lines >= storyLevel.targetLines)
+    )
       return null;
     if (
       ("continuesUsed" in s && !number(s.continuesUsed, 0, 1)) ||

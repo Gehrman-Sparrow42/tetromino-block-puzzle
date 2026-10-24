@@ -221,19 +221,16 @@ describe("held touch input", () => {
 });
 
 describe("connected gamepad buttons", () => {
-  it("repositions only on empty-zone touches, rejects collisions, and restores home on pause", () => {
-    const { controls, zone, pad, pointer, commands, settings, obstacles } =
-      setup(true);
+  it("keeps saved button placement fixed even with a legacy dynamic setting", () => {
+    const { controls, zone, pad, pointer, commands, settings } = setup(true);
     settings.padMode = "dynamic";
     pointer(zone, "pointerdown", 1, 85, 60);
-    expect(pad.style.left).toBe("10px");
-    expect(pad.style.top).toBe("35px");
+    expect(pad.style.left).toBe("0px");
+    expect(pad.style.top).toBe("0px");
     expect(commands).toEqual([]);
-    const obstacle = new ButtonStub("obstacle");
-    obstacle.bounds = { left: 0, top: 0, right: 170, bottom: 150 };
-    obstacles.push(obstacle);
     pointer(zone, "pointerdown", 2, 85, 25);
-    expect(pad.style.top).toBe("35px");
+    expect(pad.style.top).toBe("0px");
+    expect(commands).toEqual([]);
     controls.releaseAll();
     expect(pad.style.left).toBe("0px");
     expect(pad.style.top).toBe("0px");

@@ -1,0 +1,90 @@
+.story-detail h3 {
+  margin: 0 0 4px;
+}
+.story-goal {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.story-phases {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.story-phases li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 0;
+}
+.story-phases span {
+  color: var(--muted);
+}
+.story-level-list {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  max-height: 35vh;
+  overflow-y: auto;
+  scrollbar-color: var(--border) var(--surface);
+}
+.story-level {
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.story-level strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.story-level small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.story-level-state {
+  color: var(--muted);
+  font-size: 12px;
+}
+.story-level[aria-current] {
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.story-level:hover:not(:disabled) {
+  background: var(--panel);
+}
+.story-level:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.story-level:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+@media (forced-colors: active) {
+  .story-level[aria-current] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+@media (max-height: 650px) {
+  .story-level-list {
+    max-height: 30vh;
+  }
+  .story-phases li {
+    padding: 2px 0;
+  }
+}

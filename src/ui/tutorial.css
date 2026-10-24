@@ -1,0 +1,182 @@
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text);
+  padding: max(10px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+}
+.tutorial-inner {
+  max-width: 620px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tutorial-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tutorial h1 {
+  font-size: 20px;
+  margin: 0;
+  letter-spacing: -0.025em;
+}
+.tutorial h2 {
+  font-size: 22px;
+  margin: 4px 0;
+  letter-spacing: -0.025em;
+}
+.tutorial p {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+.tutorial-progress {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.tutorial-tip {
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 65ch;
+}
+.tutorial-feedback {
+  min-height: 20px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.tutorial-practice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.tutorial-board-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.tutorial #board {
+  display: block;
+  width: min(48vw, calc((100dvh - 365px) / 2));
+  min-width: 90px;
+  max-width: 220px;
+  aspect-ratio: 1 / 2;
+  border: 1px solid var(--board-border);
+}
+.tutorial aside {
+  width: 54px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.tutorial aside canvas {
+  width: 54px;
+  height: 40px;
+}
+.tutorial-controls {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.tutorial-controls button {
+  touch-action: none;
+  user-select: none;
+  min-height: 48px;
+  padding: 8px 3px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+.tutorial-controls [data-command="HARD_DROP"] {
+  grid-column: 2 / 4;
+}
+.tutorial-controls [data-command="HOLD"] {
+  grid-column: 4 / 6;
+}
+.tutorial-controls button.pressed {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.tutorial-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  padding-top: 2px;
+}
+.tutorial button {
+  min-height: 48px;
+}
+.tutorial button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.tutorial [hidden] {
+  display: none !important;
+}
+@media (max-height: 650px) {
+  .tutorial-inner {
+    gap: 6px;
+  }
+  .tutorial h2 {
+    font-size: 19px;
+  }
+  .tutorial-tip {
+    font-size: 12px;
+  }
+  .tutorial #board {
+    width: min(42vw, calc((100dvh - 330px) / 2));
+  }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .tutorial-inner {
+    max-width: 950px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: start;
+  }
+  .tutorial-header {
+    grid-column: 1 / -1;
+  }
+  .tutorial-practice {
+    grid-column: 2;
+    grid-row: 2 / 4;
+  }
+  .tutorial-footer {
+    align-self: end;
+  }
+  .tutorial #board {
+    width: calc((100dvh - 200px) / 2);
+  }
+}
+.tutorial-header button {
+  width: auto;
+  flex: none;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.tutorial-footer button {
+  width: auto;
+  flex: 1;
+  margin: 0;
+  padding: 10px 12px;
+}
+@media (max-height: 650px) and (orientation: portrait) {
+  .tutorial #board {
+    width: min(42vw, calc((100dvh - 390px) / 2));
+  }
+}

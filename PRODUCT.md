@@ -27,6 +27,7 @@ Provide a complete falling-tetromino game with familiar core rules, responsive c
 
 - Preserve the deterministic core rules: seven-piece bags, SRS quarter-turn kicks, hold, next queue, ghost, lock delay, line clears and scoring.
 - Preserve Marathon, Sprint 40 and Ultra 120.
+- Story adds twelve sequential stages with increasing line goals and deterministic speed phases, saved level progress and replay. Optional Basics and Advanced tutorials use isolated practice boards and never replace saved runs or affect records.
 - Normal offline gameplay requires no ads, accounts, analytics, online leaderboards or network connection. Optional rewarded-ad preparation supports one two-row Marathon continue; live ads remain disabled until a native provider and verification backend are configured.
 - Keep the playfield large and surrounding interface compact. Controls must remain distinguishable and usable across the supported themes and phone sizes.
 - Preserve existing saves and preferences when changing the interface.

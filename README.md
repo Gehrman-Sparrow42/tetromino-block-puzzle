@@ -8,9 +8,12 @@ Optional rewarded-continue preparation is available for a future Android build, 
 
 ## Play
 
+- **Story:** twelve levels with increasing line goals and changing speed phases. Clear a stage to unlock the next, or replay completed stages.
 - **Marathon:** endless play with a selectable starting level and progressive or fixed speed.
 - **Sprint 40:** clear forty lines as quickly as possible.
 - **Ultra 120:** score as much as possible in two minutes of active play.
+
+**Tutorial** is an optional main-menu entry with playable Basics and Advanced tracks. Practice is separate from saved runs and records. See [Story and tutorials](docs/STORY.md) for the campaign's speed bands and progression rules.
 
 Seven-piece bags, SRS quarter-turn rotation kicks, hold once per piece, five-piece next queue, ghost projection, 500 ms lock delay and a fixed fifteen-reset cap per piece. Scoring includes line clears, drops, consecutive-clear combos, back-to-back four-line clears/T-spins, and perfect clears. Runs pause when the app loses focus or enters the background, and restore paused after reopening.
 
