@@ -142,3 +142,9 @@ Verified for this change:
 - APK signature verification passes and matches the existing Desktop APK signer. Package `com.berkay.afterblock`, version 2.11.0 (21100), minimum API 24, target API 36. Permission inspection confirms no INTERNET permission.
 
 The new APK was not installed on an emulator or physical phone during this change; no Android device was connected. Browser checks and native build/lint do not establish physical touch comfort. The campaign curve is an initial tested progression and may need tuning from player feedback. Live advertising remains unconfigured and disabled.
+
+## T-spin tutorial — 2.11.1
+
+Advanced now has five lessons, ending with a prepared T-spin double. The player soft-drops into a pocket, rotates clockwise and locks. Completion requires the actual engine event to report a full T-spin and two cleared rows; an ordinary hard drop does not qualify. No rotation history or reward event is prefilled.
+
+Verified: 173 unit tests and all 12 tutorial browser cases pass across phone, compact phone and desktop, including rejection of an ordinary drop and footer visibility at 360 × 600. The compact-phone lesson screenshot was inspected. Strict TypeScript/Vite build, Capacitor sync, Android assembly/lint and APK signature verification pass. Physical-phone testing remains outstanding.

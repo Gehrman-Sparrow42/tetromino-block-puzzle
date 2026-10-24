@@ -38,7 +38,9 @@ test("basics requires real actions and clears its prepared line", async ({
   await action(page, "Replay tutorial");
   await expect(dialog).toHaveAttribute("data-lesson", "1");
 });
-test("advanced teaches real back-to-back Tetrises", async ({ page }) => {
+test("advanced teaches real back-to-back Tetrises and a T-spin double", async ({
+  page,
+}) => {
   const dialog = await open(page, "Advanced");
   await action(page, "Move right");
   await action(page, "Move right");
@@ -58,6 +60,30 @@ test("advanced teaches real back-to-back Tetrises", async ({ page }) => {
   }
   await expect(dialog).toHaveAttribute("data-lines", "8");
   await expect(dialog).toHaveAttribute("data-back-to-back", "true");
+  await action(page, "Continue");
+  await expect(
+    dialog.getByRole("heading", { name: "Spin into a pocket" }),
+  ).toBeVisible();
+  const bounds = await dialog.locator(".tutorial-footer").boundingBox();
+  await page.screenshot({ path: test.info().outputPath("t-spin-lesson.png") });
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(
+    page.viewportSize()!.height,
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Continue", exact: true }),
+  ).toBeDisabled();
+  // A plain drop is not a T-spin and must not complete the objective.
+  await action(page, "Hard drop");
+  await expect(dialog).toHaveAttribute("data-t-spin", "none");
+  await expect(
+    dialog.getByRole("button", { name: "Continue", exact: true }),
+  ).toBeDisabled();
+  await action(page, "Reset lesson");
+  await action(page, "Soft drop");
+  await action(page, "Rotate clockwise");
+  await action(page, "Hard drop");
+  await expect(dialog).toHaveAttribute("data-t-spin", "full");
+  await expect(dialog).toHaveAttribute("data-lines", "2");
   await action(page, "Continue");
   await expect(
     dialog.getByRole("heading", { name: "Practice complete" }),

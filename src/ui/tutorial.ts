@@ -72,6 +72,11 @@ const LESSONS: Record<TutorialTrack, Lesson[]> = {
         "Rotate clockwise and hard drop each of the two I pieces into the well.",
       tip: "Two Tetrises in succession earn a back-to-back bonus. This eight-row setup supplies two I pieces.",
     },
+    {
+      title: "Spin into a pocket",
+      prompt: "Soft drop, rotate clockwise, hard drop.",
+      tip: "Release ↓ before turning. Rotate into the pocket to clear both rows. Three occupied corners make this a T-spin.",
+    },
   ],
 };
 
@@ -83,7 +88,7 @@ export function createTutorialState(
   const state = createInitialState("marathon", 71400 + lesson);
   const type: TetrominoType =
     (track === "basics" && lesson === 3) ||
-    (track === "advanced" && lesson >= 2)
+    (track === "advanced" && (lesson === 2 || lesson === 3))
       ? "I"
       : "T";
   state.active = { ...state.active!, type, rotation: 0, x: 3, y: 4 };
@@ -92,12 +97,25 @@ export function createTutorialState(
     for (let x = 3; x < 7; x++) state.board[23]![x] = null;
   }
   if (track === "advanced" && lesson === 1) state.hold = "I";
-  if (track === "advanced" && lesson >= 2) {
+  if (track === "advanced" && (lesson === 2 || lesson === 3)) {
     for (let y = lesson === 3 ? 16 : 20; y < 24; y++) {
       state.board[y] = Array<TetrominoType | null>(10).fill("J");
       state.board[y]![5] = null;
     }
     state.nextQueue[0] = "I";
+  }
+  if (track === "advanced" && lesson === 4) {
+    // Start above a T-shaped pocket. A real downward move and rotation form a
+    // full T-spin double; no rotation history or clear event is pre-awarded.
+    state.active.rotation = 1;
+    state.active.y = 20;
+    state.board[21]![3] = "J";
+    state.board[22] = Array.from({ length: 10 }, (_, x) =>
+      x >= 3 && x <= 5 ? null : "J",
+    );
+    state.board[23] = Array.from({ length: 10 }, (_, x) =>
+      x === 4 ? null : "J",
+    );
   }
   const piece = state.active;
   let ghost = piece.y;
@@ -172,6 +190,7 @@ export function startTutorial(
     overlay.dataset.lines = String(state.lines);
     overlay.dataset.pieces = String(state.piecesPlaced);
     overlay.dataset.backToBack = String(state.lastEvent?.backToBack ?? false);
+    overlay.dataset.tSpin = state.lastEvent?.tSpin ?? "none";
   }
   function command(action: GameCommand) {
     if (disposed || paused || complete || finished) return;
@@ -209,6 +228,7 @@ export function startTutorial(
         swapped && blockedHold && state.piecesPlaced > 0,
         state.lastEvent?.linesCleared === 4,
         state.lines >= 8 && state.lastEvent?.backToBack === true,
+        state.lastEvent?.tSpin === "full" && state.lastEvent.linesCleared === 2,
       ][lesson]!;
     if (state.piecesPlaced > 0 && action.type === "HARD_DROP")
       controls.pieceChanged();
@@ -307,7 +327,7 @@ export function startTutorial(
       find(".tutorial-prompt").textContent =
         track === "basics"
           ? "You have moved, rotated, dropped, cleared a line and used Hold."
-          : "You have practiced landing, Hold swaps, Tetrises and back-to-back clears.";
+          : "You have practiced landing, Hold swaps, Tetrises, back-to-back clears and a T-spin double.";
       find(".tutorial-tip").textContent =
         "Replay whenever you like, or exit to choose a game.";
       find(".tutorial-feedback").textContent = "";

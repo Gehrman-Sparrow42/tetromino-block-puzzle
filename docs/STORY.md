@@ -27,6 +27,6 @@ Pause/resume retains the stage, bag, active piece and phase. Restart retries the
 
 ## Optional tutorials
 
-Tutorial is separate from Story and can be opened voluntarily from the main menu. Basics teaches movement, rotation, drops, clearing a row and Hold. Advanced practices ghost placement, Hold's once-per-piece restriction, a four-line clear, and back-to-back four-line clears.
+Tutorial is separate from Story and can be opened voluntarily from the main menu. Basics teaches movement, rotation, drops, clearing a row and Hold. Advanced practices ghost placement, Hold's once-per-piece restriction, a four-line clear, back-to-back four-line clears, and a T-spin double. The T-spin lesson requires soft-dropping into a prepared pocket and rotating before locking; a plain drop does not complete it.
 
 Lessons use scripted practice boards with the real game engine. They wait for the required action or actual clear event instead of awarding success for merely reading instructions. Reset retries a lesson; Exit returns to the menu. Practice uses transient state and never replaces a saved run, changes records, or unlocks campaign levels. A background pause releases inputs and requires an explicit resume. The practice board stays still unless dropping is being demonstrated, so players can study the setup without racing gravity.
