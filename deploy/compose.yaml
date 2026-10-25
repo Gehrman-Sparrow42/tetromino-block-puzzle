@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      NODE_ENV: production
+      ONLINE_HOST: 0.0.0.0
+      ONLINE_PORT: "8172"
+      ONLINE_ORIGINS: "https://${DOMAIN:?Set DOMAIN to your public DNS hostname},https://localhost"
+    ports:
+      - "127.0.0.1:8172:8172"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 15s
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: "${DOMAIN:?Set DOMAIN to your public DNS hostname}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:

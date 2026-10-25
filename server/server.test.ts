@@ -131,3 +131,61 @@ it("serves only the bundled playtest page and allows an explicitly configured LA
     socket.once("error", reject);
   });
 });
+
+it("serves the unified app at root and play while keeping health JSON and paths bounded", async () => {
+  const html = "<!doctype html><title>Afterblock unified app</title>";
+  const server = await startOnlineServer({
+    port: 0,
+    appHtml: html,
+    playtestHtml: "obsolete",
+  });
+  cleanup.push(server.close);
+  const base = `http://127.0.0.1:${server.port}`;
+  for (const path of ["/", "/?room=ABC234", "/play", "/play?room=ABC234"]) {
+    const page = await fetch(base + path);
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(page.headers.get("cache-control")).toBe("no-store");
+    expect(await page.text()).toBe(html);
+  }
+  const health = await fetch(base + "/health");
+  expect(health.headers.get("content-type")).toContain("application/json");
+  expect(await health.json()).toMatchObject({
+    service: "afterblock-online",
+    status: "ok",
+    rooms: 0,
+  });
+  for (const path of [
+    "/dist/index.html",
+    "/server/main.ts",
+    "/.env",
+    "/missing",
+    "/ws",
+  ]) {
+    expect((await fetch(base + path)).status).toBe(404);
+  }
+  expect((await fetch(base + "/", { method: "POST" })).status).toBe(404);
+});
+
+it("allows opaque standalone origins only through the exact configured entry", async () => {
+  const server = await startOnlineServer({ port: 0, origins: ["null"] });
+  cleanup.push(server.close);
+  const socket = new WebSocket(`ws://127.0.0.1:${server.port}/ws`, {
+    origin: "null",
+  });
+  cleanup.push(async () => {
+    socket.terminate();
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once("open", resolve);
+    socket.once("error", reject);
+  });
+  const denied = new WebSocket(`ws://127.0.0.1:${server.port}/ws`, {
+    origin: "https://localhost",
+  });
+  cleanup.push(async () => {
+    denied.terminate();
+  });
+  await new Promise<void>((resolve) => denied.once("error", () => resolve()));
+  expect(denied.readyState).not.toBe(WebSocket.OPEN);
+});

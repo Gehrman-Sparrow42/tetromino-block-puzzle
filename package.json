@@ -1,7 +1,7 @@
 {
   "name": "tetromino-block-puzzle",
   "private": true,
-  "version": "2.11.1",
+  "version": "2.12.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -18,8 +18,8 @@
     "online:typecheck": "tsc --noEmit -p tsconfig.online.json",
     "online:build": "npm run online:typecheck && vite build --config vite.online.config.ts",
     "online:server": "npm run online:build && node dist-online/main.js",
-    "online:playtest:build": "npm run typecheck && vite build --config vite.playtest.config.ts",
-    "online:lan": "npm run online:playtest:build && npm run online:server",
+    "online:lan": "npm run build && npm run online:server",
+    "online:start": "node dist-online/main.js",
     "online:test:browser": "playwright test --config playwright.online.config.ts",
     "online:test": "vitest run --config vitest.online.config.ts",
     "rewards:build": "npm run online:typecheck && vite build --config vite.rewards.config.ts",

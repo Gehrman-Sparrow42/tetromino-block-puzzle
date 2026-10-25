@@ -1,6 +1,6 @@
 # Afterblock
 
-Online Battle with configurable attack handicaps and a separate phone/PC browser playtest are available on `main`. See [Online setup](docs/ONLINE.md). The installed offline APK remains independent of the server.
+Offline modes and optional Online Battle now share one Android/browser app. Online uses the selected theme and saved controls, with configurable attack handicaps for friend matches. See [Online and Linux deployment](docs/ONLINE.md).
 
 An offline, ad-free falling-tetromino game for Android and the browser. This Android remake is the current version on `main`. The original Tetromino Block Puzzle is preserved on [`saved/original`](https://github.com/Gehrman-Sparrow42/tetromino-block-puzzle/tree/saved/original).
 
@@ -47,7 +47,7 @@ Seventeen themes change the interface, board, previews and pieces. A fresh insta
 
 Movement Score, Data Field, Amber Terminal and LCD have distinct internal patterns for all seven piece types. The additional themes include locally bundled fonts, menu/settings treatments and control shapes; gameplay and control placement stay consistent. No theme uses strobing. The compact HUD and hold/next strip leave more space for the board.
 
-Settings also include sound and volume, haptics, ghost, reduced motion, hybrid gestures, and repeat speed. Records, appearance, controls and one resumable run are stored locally. Existing settings migrate with defaults for the new appearance/control options. There are no accounts, ads, analytics, remote assets or online leaderboards. The Android package does not request internet permission; optional haptics use vibration permission. Clearing app data or uninstalling removes saved progress.
+Settings also include sound and volume, haptics, ghost, reduced motion, hybrid gestures, and repeat speed. Records, appearance, controls and one resumable run are stored locally. Online preserves that solo run and does not write solo records. The Android package requests Internet permission for optional Online, requires encrypted WSS connections, and still plays offline without a server. Optional haptics use vibration permission. Live ads remain disabled. Clearing app data or uninstalling removes saved progress.
 
 ## Development
 

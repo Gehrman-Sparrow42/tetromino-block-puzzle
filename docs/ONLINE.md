@@ -1,16 +1,22 @@
-# Online Battle and LAN playtest
+# Online Battle and Linux deployment
 
-The online foundation is merged into `main`. A separate browser playtest lets two devices try Battle on a PC-hosted server. The installed offline APK and saved offline games remain independent; there is no online APK release or public hosting yet.
+The unified Afterblock app contains the offline modes, Story, tutorials, settings, and Online Battle. One Node.js server serves the bundled app at both `/` and `/play`, JSON health at `/health`, and WebSocket connections at `/ws`. Offline play and saves stay local to each browser or Android installation; online matches run on the server.
 
 ## Phone and PC on the same Wi-Fi
 
-On Windows, run `scripts/online-lan.cmd` (or `C:\Tools\LAUNCHERS\Launch_Afterblock_Online_Server.bat`). It builds the page and server, enables LAN listening for that process, and prints the phone URLs. Open `/play` at the printed LAN address on the phone, and `http://127.0.0.1:8172/play` on the PC. Create a room on one, enter its six-character code on the other, then both press Ready. Keep the phone on the same Wi-Fi, not mobile data or an isolated guest network.
+On Windows, run `scripts/online-lan.cmd` (or the existing `C:\Tools\LAUNCHERS\Launch_Afterblock_Online_Server.bat`). It builds the unified app and server, enables LAN listening for that process, and prints the phone URLs. Open the printed LAN address on the phone and `http://127.0.0.1:8172/` on the PC. Open **Online**, create a room on one device, join its six-character code on the other, then both press Ready. Keep both devices on the same Wi-Fi rather than mobile data or an isolated guest network.
 
-If Windows blocks the connection, run `scripts/allow-online-lan.ps1` once as administrator. It allows only TCP port 8172 from the local subnet. It does not change the Wi-Fi profile or router. Remove it later with `Remove-NetFirewallRule -Name 'Afterblock-LAN-8172'` in an administrator PowerShell.
+If Windows blocks the connection, run `scripts/allow-online-lan.ps1` once as administrator. It allows only TCP port 8172 from the local subnet. Remove it later with `Remove-NetFirewallRule -Name 'Afterblock-LAN-8172'` in an administrator PowerShell. The launcher does not modify router forwarding or register a startup service. The PC must remain awake while hosting.
 
-The playtest has its own controls and opponent preview; it does not use or edit saved offline control layouts. Touch and keyboard input are supported. Leaving/disconnecting forfeits a started round; browser backgrounding does not pause the server. Leave and create another room to play again. The server stops when its process closes; nothing is registered for Windows startup. The PC must stay awake while hosting.
+Leaving or disconnecting forfeits a started round. Backgrounding an online client does not pause the server. Offline saves remain independent of a Battle round. The former standalone Online page has been retired; development, deployment and Android use the same app entry.
 
 ## Balance a match between friends
+
+### App connection settings
+
+Open **Online**, enter the server's `wss://` address ending in `/ws`, choose a name and press **Connect**. Successful endpoint choices are saved separately from solo settings. A hosted browser app proposes its own server; Android and a standalone HTML file use a saved address or the optional public build default `VITE_ONLINE_SERVER`. There is no automatic connection on app startup. A server outage does not prevent solo play.
+
+For a browser on a trusted private network, use the LAN launcher's address and explicitly enable the unencrypted-LAN checkbox when needed. Android deliberately rejects `ws://` even on a LAN; it needs a valid HTTPS/WSS server. The manifest grants Internet permission but keeps cleartext traffic and mixed content disabled. Opening Online pauses and preserves the local solo run; an online match itself cannot pause.
 
 After creating or joining a room, expand **Match balance**. The host can set each player's **outgoing attack** independently. A nerf makes that player's clears send fewer garbage rows; a buff makes them send more. Falling speed is identical for both players.
 
@@ -38,7 +44,7 @@ Uncancelled attacks queue neutral garbage rows with one hole per row. Holes use 
 
 Both players use ordinary progressive Marathon gravity from level one, with the normal clocks, movement and lock delay. The earlier gravity-handicap implementation was replaced by these outgoing-attack tiers.
 
-The playtest coalesces rendering into animation frames, skips board/preview painting when its pixels have not changed, and retains only the latest received state while a background tab is not painting. The server serializes a shared publication once for both peers. The authoritative 50 ms simulation, 20 Hz snapshots and existing backpressure limits remain in place; this does not add client prediction or establish an internet-latency benchmark.
+The online client coalesces rendering into animation frames, skips board/preview painting when its pixels have not changed, and retains only the latest received state while a background tab is not painting. The server serializes a shared publication once for both peers. The authoritative 50 ms simulation, 20 Hz snapshots and existing backpressure limits remain in place; this does not add client prediction or establish an internet-latency benchmark.
 
 ## What runs now
 
@@ -49,32 +55,67 @@ The playtest coalesces rendering into animation frames, skips board/preview pain
 - A browser-compatible `OnlineClient` with a welcome/version handshake, validation, bounded buffering, cleanup and no automatic input replay. Importing it does not start a connection.
 - Health endpoints, exact browser-origin checks, 4 KiB message limits, 120 messages/second per connection, connection/room caps, ping/pong cleanup and bounded outgoing snapshot buffering.
 
-There is no main-app UI integration, client prediction, reconnect grace, matchmaking, accounts, rematch UI or permanent storage yet. This is a local Battle playtest, not a public multiplayer release.
+The app integrates Battle into its Online entry. There is no client prediction, reconnect grace, matchmaking, account authentication, or permanent server storage. The deployment files prepare a host; no public host or domain has been provisioned.
 
 ## Run locally
 
-Use Node.js 24 and npm. In this checkout:
+Use Node.js 24 and npm. From the checkout:
 
-```powershell
+```sh
 npm ci
-npm run online:test
-npm run online:server
+npm run build
+npm run online:build
+npm run online:start
 ```
 
-`online:server` typechecks and bundles the server, then starts it. Check `http://127.0.0.1:8172/health`; the root URL also returns JSON status. WebSocket clients connect to `ws://127.0.0.1:8172/ws`. Press Ctrl+C to stop it. Build the separate page first with `npm run online:playtest:build` to serve it at `/play`. The LAN launcher does both builds automatically.
+`online:start` runs the prebuilt server without rebuilding. During development, `online:server` rebuilds the server before starting it; build the app first whenever the UI changes. The server deliberately fails startup when its unified HTML is missing. Check `http://127.0.0.1:8172/health`, open `http://127.0.0.1:8172/`, and connect WebSocket clients at `ws://127.0.0.1:8172/ws`. Ctrl+C stops the process.
 
-`scripts/online-server.cmd` is the loopback-only launcher. `scripts/online-lan.cmd` explicitly opts into LAN access. For a manual LAN start in PowerShell, set `$env:ONLINE_LAN = '1'`, then run `npm run online:lan`.
+`scripts/online-server.cmd` builds the app and runs a loopback server. `scripts/online-lan.cmd` sets `ONLINE_LAN=1` and runs both builds with LAN access.
 
-Environment options:
+| Variable          | Default                                 | Purpose                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`        | Development behavior                    | Set `production` for strict deployment configuration.                                                                                                                                                      |
+| `ONLINE_HOST`     | `127.0.0.1`                             | Bind interface; development LAN mode defaults to `0.0.0.0`.                                                                                                                                                |
+| `ONLINE_PORT`     | `8172`                                  | Shared HTTP/WebSocket port.                                                                                                                                                                                |
+| `ONLINE_LAN`      | Off                                     | Development-only `1` allows private IPv4 origins and all-interface binding; rejected in production.                                                                                                        |
+| `ONLINE_ORIGINS`  | Exact local development origins         | Comma-separated complete `http://` or `https://` origins. Required in production; wildcards, credentials, paths, and trailing slashes are rejected. When supplied, this replaces the development defaults. |
+| `ONLINE_APP_PATH` | `dist/index.html` beside `dist-online/` | Optional absolute path or checkout-relative path to the prebuilt unified HTML; never resolved from the launcher's working directory.                                                                       |
 
-| Variable         | Default                            | Purpose                                                                                                                                    |
-| ---------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ONLINE_HOST`    | `127.0.0.1`                        | Listening interface; loopback avoids accidentally exposing the prototype.                                                                  |
-| `ONLINE_PORT`    | `8172`                             | HTTP and WebSocket port.                                                                                                                   |
-| `ONLINE_LAN`     | Off                                | Set to `1` to listen on all interfaces and allow exact origins at this PC's private IPv4 addresses.                                        |
-| `ONLINE_ORIGINS` | Explicit local development origins | Comma-separated exact browser origins. Defaults cover localhost/127.0.0.1 Vite ports 5173/5178 and the Android `https://localhost` origin. |
+Development defaults include the server's `localhost`/`127.0.0.1` origins, Vite ports 5173/5178, Capacitor's `https://localhost`, and the opaque `null` origin used by the standalone Desktop `file://` HTML. Production must explicitly include the public web origin and `https://localhost` when allowing the Android app. Origins are exact browser origins, not `ws://` endpoint URLs. Production does not add the opaque origin automatically: only append the exact `null` entry to `ONLINE_ORIGINS` if standalone HTML online access is deliberately wanted. Any opaque browser context can present that origin, so it does not identify a particular local file. The server does not trust forwarded headers to approve an origin. Origin-less native/test clients remain accepted; origin validation is not authentication.
 
-Origin-less native/test connections are accepted. Origin checking is not authentication. The client requires `wss://` outside loopback by default. Only the separate playtest explicitly opts into `ws://` at private IPv4 addresses (10/8, 172.16/12, 192.168/16). This unencrypted setup is for a trusted LAN. It does not provide an internet route or modify router forwarding. Public use needs TLS, a secure endpoint and deliberate deployment configuration.
+Use HTTPS and `wss://` for public access. Private `ws://` addresses are a trusted-LAN development option, not an internet deployment configuration. Android should connect to `wss://YOUR_ACTUAL_HOST/ws`; its WebView origin remains `https://localhost`, so both origins belong in the allowlist.
+
+## Deploy on Linux with Docker Compose and Caddy
+
+The deployment files use Node.js 24, a non-root application user, the locked `ws` runtime package, a health check, and graceful SIGTERM shutdown. Build tooling and the Capacitor SDK stay out of the application runtime image. Caddy handles HTTPS and proxies both HTTP and WebSocket upgrades to the same application server. This follows [Docker's Node build guidance](https://docs.docker.com/guides/nodejs/) and [the Node image's non-root guidance](https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md).
+
+On a Linux host with Docker Engine and the Compose plugin already installed, clone or copy this repository, then:
+
+```sh
+cp deploy/.env.example deploy/.env
+# Edit deploy/.env: set DOMAIN to the actual public DNS hostname you control.
+docker compose --env-file deploy/.env -f deploy/compose.yaml config
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build
+curl --fail http://127.0.0.1:8172/health
+docker compose --env-file deploy/.env -f deploy/compose.yaml logs --tail=100 app caddy
+```
+
+`DOMAIN` is required; the example intentionally supplies no hostname. Set it to a DNS hostname only, without scheme, port, or path. Point its A/AAAA records at the Linux host and permit inbound TCP 80/443 (and optionally UDP 443 for HTTP/3). Caddy obtains and renews public certificates when DNS and reachability are correct. Certificate data is retained in named volumes. See [Caddy's HTTPS prerequisites](https://caddyserver.com/docs/automatic-https) and [WebSocket proxy support](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
+
+The app binds `0.0.0.0` inside its container so Caddy can reach it over the private Compose network. Its host publication is restricted to `127.0.0.1:8172`; only Caddy publishes public ports. The Compose allowlist is the exact `https://` public hostname plus Android's `https://localhost`. No server filesystem directory is exposed over HTTP. The application container is read-only, drops Linux capabilities, and cannot acquire new privileges.
+
+Open `https://` at the configured hostname and use Online. For another app installation, use its `wss://` hostname with `/ws`. Confirm `/health` reports `status: ok` over HTTPS and complete a two-device room/Ready/movement/disconnect smoke test before inviting players. A successful container build or health response alone does not demonstrate usable internet latency or Android connectivity.
+
+For an existing non-container reverse proxy, run the same prebuilt Node entry with `NODE_ENV=production`, an explicit `ONLINE_ORIGINS`, and `ONLINE_HOST=127.0.0.1`; proxy to port 8172 with WebSocket upgrades enabled. Do not use `ONLINE_LAN=1` in production. An explicit `ONLINE_HOST=0.0.0.0` is only needed when the chosen container/network boundary requires it.
+
+To update or stop this deployment:
+
+```sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d --build
+docker compose --env-file deploy/.env -f deploy/compose.yaml down
+```
+
+Both restart and update disconnect every room because match state is in memory. Browser/Android local saves are unaffected. Ordinary `down` preserves Caddy volumes; do not remove them during routine updates. `unless-stopped` restarts services after failures or daemon restarts unless deliberately stopped. No actual Linux host setup, DNS update, certificate issuance, or external deployment is performed by this repository change.
 
 ## Client seam
 
@@ -108,18 +149,10 @@ Snapshots include board rows (including the engine's hidden spawn rows), active-
 
 State is memory-only. Restarting the server ends all rooms. Room codes are invitations, not account authentication. The current limits are development safeguards, not production abuse protection or a measured capacity guarantee.
 
-## Next implementation steps
+## Remaining work and verification
 
-1. Integrate the separate playtest into the main web/Android UI and its configurable controls. Offline blur/background pause cannot silently pause just one online player.
-2. Add responsive local prediction/reconciliation and clock-offset handling, then test actual phone latency and background/disconnect cases.
-3. Bring the playtest opponent preview into the main UI with movable/collapsible placement without changing saved local board or control positions.
-4. Tune Battle attacks, grace timing and tier strengths from actual friend-match feedback; the initial curve is tested but not a measured skill-balance model.
-5. Add bounded reconnect tokens/grace and rematches. Choose hosting/TLS, origin policy and public connection/rate limits before exposing the server. Add the real room URL handler and verified Android App Links only after a domain is chosen.
+Room codes are invitations, not account authentication. State is memory-only, and a restart disconnects every match. The existing connection/message/room limits bound this single process; they are not a measured capacity or public-abuse guarantee. Use one instance until shared room routing and persistence are deliberately designed. Reconnect grace, client prediction, rematches, and public load/latency measurements remain separate work.
 
-The existing APK has no internet permission by design. A future online Android build must add it deliberately while keeping offline modes independent from server availability.
+`npm run online:test` covers protocol validation, readiness/countdown, host-controlled balance, garbage rules, room expiry, actual WebSocket clients, disconnect outcomes, origin/size rejection, and HTTP routing. Server route tests ensure `/` and `/play` return the same supplied app, `/health` remains JSON, unknown/source/environment paths return 404, and callers without an app fixture retain root JSON compatibility.
 
-## Verification
-
-`npm run online:test` covers the client lifecycle, malformed/versioned input, readiness/countdown, host-only validated balance, consent resets and countdown locks, tier scaling, fractional carry, actual clears, delayed garbage, cancellation and overflow, sequenced authoritative commands, topout/disconnect outcomes, room limits/expiry, live HTTP and WebSocket transport, origin/size rejection, and two real `OnlineClient` instances. `npm run online:test:browser` also checks the two-client balance UI, reset to equal, compact-screen fit and absence of board repaints for clock-only updates.
-
-`npm run build` verifies the unchanged offline browser entry. `npm run online:build` separately typechecks and bundles the server to ignored `dist-online/`. Neither command builds or replaces the user's Desktop APK.
+`npm run build` creates the unified single-file app; `npm run online:build` typechecks and bundles the Node entry. The Docker build runs both. Browser and Android app integration are tested separately. Linux container execution, Caddy certificate issuance, and Android-to-public-server connectivity require the actual target environment and are not established by local Windows builds.

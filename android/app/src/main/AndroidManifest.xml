@@ -39,5 +39,6 @@
 
     <!-- Permissions -->
 
-    <!-- Offline game. Vibration is merged from the optional haptics plugin. -->
+    <!-- Offline play remains local; optional Online uses encrypted WSS. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

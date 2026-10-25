@@ -15,7 +15,9 @@ export interface ServerOptions {
   countdownMs?: number;
   maxRooms?: number;
   maxConnections?: number;
-  /** Prebuilt standalone playtest page; no arbitrary filesystem paths are served. */
+  /** Prebuilt unified app; only the root and /play routes serve this exact HTML. */
+  appHtml?: string;
+  /** Legacy standalone playtest fixture. Prefer appHtml for deployment. */
   playtestHtml?: string;
 }
 const DEFAULT_ORIGINS = [
@@ -24,6 +26,7 @@ const DEFAULT_ORIGINS = [
   "http://localhost:5178",
   "http://127.0.0.1:5178",
   "https://localhost",
+  "null",
 ];
 
 export async function startOnlineServer(options: ServerOptions = {}) {
@@ -35,16 +38,18 @@ export async function startOnlineServer(options: ServerOptions = {}) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    const path = req.url?.split("?")[0];
+    const html = options.appHtml ?? options.playtestHtml;
     if (
       req.method === "GET" &&
-      req.url?.split("?")[0] === "/play" &&
-      options.playtestHtml
+      (path === "/" || path === "/play") &&
+      html !== undefined
     ) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.writeHead(200).end(options.playtestHtml);
+      res.writeHead(200).end(html);
       return;
     }
-    if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
+    if (req.method === "GET" && (path === "/" || path === "/health")) {
       res.writeHead(200).end(
         JSON.stringify({
           service: "afterblock-online",
@@ -64,7 +69,7 @@ export async function startOnlineServer(options: ServerOptions = {}) {
   http.on("upgrade", (req, socket, head) => {
     const origin = req.headers.origin;
     // Exact origin checks are a browser boundary, not authentication. Native/test
-    // clients can omit Origin; this development service binds to loopback by default.
+    // clients can omit Origin. Never derive approval from Host or forwarded headers.
     if (
       req.url !== "/ws" ||
       (origin && !allowedOrigins.has(origin)) ||

@@ -1,4 +1,5 @@
 import { startTutorial } from "./tutorial";
+import { startOnline } from "./online-screen";
 import "./story.css";
 import { STORY_LEVELS, getStoryLevel } from "../engine/story";
 import {
@@ -124,6 +125,7 @@ export function startApp(root: HTMLDivElement) {
           <button class="mode-card" data-mode="marathon"><span><strong>Marathon</strong><small>Endless</small></span><span aria-hidden="true">∞</span></button>
           <button class="mode-card" data-mode="sprint40"><span><strong>Sprint 40</strong><small>40 lines</small></span><span aria-hidden="true">→</span></button>
           <button class="mode-card" data-mode="ultra120"><span><strong>Ultra 120</strong><small>2 minutes</small></span><span aria-hidden="true">◷</span></button>
+          <button class="mode-card" data-action="online"><span><strong>Online</strong><small>Battle with a friend</small></span><span aria-hidden="true">→</span></button>
         </div>
         <nav class="home-links" aria-label="Menu"><button data-action="tutorial">Tutorial</button><button data-action="records">Records</button><button data-action="settings">Settings</button><button data-action="help">Help</button></nav>
       </section>
@@ -159,6 +161,7 @@ export function startApp(root: HTMLDivElement) {
   let lastFocus: HTMLElement | null = null;
   let controlEditor: ControlEditor | null = null;
   let tutorialHandle: ReturnType<typeof startTutorial> | null = null;
+  let onlineHandle: ReturnType<typeof startOnline> | null = null;
   const orientation = () =>
     window.innerWidth > window.innerHeight
       ? ("landscape" as const)
@@ -532,6 +535,24 @@ export function startApp(root: HTMLDivElement) {
       "tutorial-chooser",
       `${sheetHead("Tutorial")}<button class="primary-button" data-action="tutorial-basics">Basics</button><button class="secondary-button" data-action="tutorial-advanced">Advanced</button>`,
     );
+  }
+  function exitOnline() {
+    const handle = onlineHandle;
+    onlineHandle = null;
+    handle?.destroy();
+    modal = "";
+    root.querySelector<HTMLElement>(".shell")!.inert = false;
+    home();
+  }
+  function launchOnline() {
+    if (onlineHandle) return;
+    controls.releaseAll();
+    if (state?.status === "playing") applyCommand(state, { type: "PAUSE" });
+    persist();
+    closeModal();
+    modal = "online";
+    root.querySelector<HTMLElement>(".shell")!.inert = true;
+    onlineHandle = startOnline(root, () => settings, exitOnline);
   }
   function exitTutorial() {
     const handle = tutorialHandle;
@@ -934,6 +955,7 @@ export function startApp(root: HTMLDivElement) {
     () => settings,
     () => screen === "game" && modal === "" && state?.status === "playing",
     (key) => {
+      if (onlineHandle) return;
       if (tutorialHandle) {
         if (key === "back") back();
         return;
@@ -1000,6 +1022,10 @@ export function startApp(root: HTMLDivElement) {
       );
   }
   function back() {
+    if (onlineHandle) {
+      onlineHandle.back();
+      return;
+    }
     if (tutorialHandle) {
       exitTutorial();
       return;
@@ -1029,7 +1055,7 @@ export function startApp(root: HTMLDivElement) {
     else void exitApp();
   }
   root.addEventListener("click", (event) => {
-    if (modal === "tutorial") return;
+    if (modal === "tutorial" || modal === "online") return;
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
       "button",
     );
@@ -1039,6 +1065,9 @@ export function startApp(root: HTMLDivElement) {
       return;
     }
     switch (target.dataset.action) {
+      case "online":
+        launchOnline();
+        break;
       case "tutorial":
         showTutorialChooser();
         break;
@@ -1174,6 +1203,7 @@ export function startApp(root: HTMLDivElement) {
     }
   });
   function changeSettings(event: Event) {
+    if (modal === "online" || modal === "tutorial") return;
     const input = event.target as HTMLInputElement | HTMLSelectElement;
     if (input.name === "marathonSpeed") {
       el("speed-note").textContent =
@@ -1254,6 +1284,13 @@ export function startApp(root: HTMLDivElement) {
     }
   });
   const backgroundPause = () => {
+    if (onlineHandle) {
+      onlineHandle.background();
+      controls.releaseAll();
+      persist();
+      previous = 0;
+      return;
+    }
     tutorialHandle?.pause();
     controls.releaseAll();
     if (tutorialHandle) {
