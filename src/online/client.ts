@@ -2,6 +2,8 @@ import {
   ONLINE_VERSION,
   ROOM_CODE,
   validName,
+  validBalance,
+  type PlayerBalance,
   type ClientMessage,
   type OnlineInput,
   type ServerMessage,
@@ -80,6 +82,7 @@ const PIECES = new Set(["I", "O", "T", "S", "Z", "J", "L"]);
 function validRoom(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value.hostId === undefined || typeof value.hostId === "string") &&
     typeof value.code === "string" &&
     ROOM_CODE.test(value.code) &&
     value.mode === "survival" &&
@@ -92,7 +95,8 @@ function validRoom(value: unknown): boolean {
         isRecord(player) &&
         typeof player.id === "string" &&
         typeof player.name === "string" &&
-        typeof player.ready === "boolean",
+        typeof player.ready === "boolean" &&
+        (player.balance === undefined || validBalance(player.balance)),
     ) &&
     (value.startAt === null || typeof value.startAt === "number") &&
     (value.winnerId === null || typeof value.winnerId === "string") &&
@@ -372,6 +376,14 @@ export class OnlineClient {
     if (typeof ready !== "boolean")
       throw new OnlineClientError("Ready state must be a boolean.");
     this.send({ v: ONLINE_VERSION, type: "ready", ready });
+  }
+
+  setBalance(playerId: string, balance: PlayerBalance): void {
+    if (!playerId || playerId.length > 64 || !validBalance(balance))
+      throw new OnlineClientError(
+        "Choose a valid player and balance settings.",
+      );
+    this.send({ v: ONLINE_VERSION, type: "balance", playerId, balance });
   }
 
   sendInput(command: OnlineInput): void {

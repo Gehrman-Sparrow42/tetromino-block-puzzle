@@ -265,3 +265,7 @@ Tutorial is an optional main-menu utility, with Basics and Advanced choices. Eac
 ## Marathon setup
 
 Marathon opens a compact setup sheet with Speed (Progressive or Fixed), Starting level (1–15), one short explanatory sentence and Start. Progression remains one level per ten cleared lines up to level 30; Fixed keeps the selected level. The setup stays separate from an existing paused run until Start and any replacement confirmation are accepted. The run stores its own options; legacy runs retain their previous behavior. Fixed results have separate score and line records.
+
+## Online Survival balance
+
+The separate `/play` lobby retains its Basalt palette and compact board rails. A native details disclosure named Match balance contains one fieldset per player, with Fall rate, Starting level and Speed selects. The host can edit; the guest can inspect. Keep the settings out of the playing view, with a brief per-player summary visible throughout the round. Real changes clear readiness and countdown locks configuration. This surface does not alter offline control layouts, saves or the Android navigation.

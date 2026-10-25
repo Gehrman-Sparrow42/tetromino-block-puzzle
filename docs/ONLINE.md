@@ -10,11 +10,29 @@ If Windows blocks the connection, run `scripts/allow-online-lan.ps1` once as adm
 
 The playtest has its own controls and opponent preview; it does not use or edit saved offline control layouts. Touch and keyboard input are supported. Leaving/disconnecting forfeits a started round; browser backgrounding does not pause the server. Leave and create another room to play again. The server stops when its process closes; nothing is registered for Windows startup. The PC must stay awake while hosting.
 
+## Balance a match between friends
+
+After creating or joining a room, expand **Match balance**. The host (the room's first player) can adjust either player independently:
+
+| Setting        | Choices                          | Effect                                                                                                                                        |
+| -------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fall rate      | 50%, 75%, 100%, 125%, 150%, 200% | Lower helps by slowing automatic falling; higher adds pressure. 50% takes twice as long per gravity cell and 200% takes half as long.         |
+| Starting level | 1–15                             | Selects the initial Marathon gravity level.                                                                                                   |
+| Speed          | Progressive / Fixed              | Progressive increases a level every ten lines, up to 30; Fixed retains the selected level. The chosen fall-rate percentage applies to either. |
+
+Both players start at 100%, level 1, Progressive by default. **Reset to equal** restores those values for both. For example, a newer player could use 75%, level 1, Fixed while an experienced friend uses 125%, level 3, Progressive. These are manual handicaps, not an automatic skill rating.
+
+Both players see a compact summary before and during the match. Any actual balance change clears both Ready states, so both must ready again. Settings lock when the countdown begins, and only the server applies them. A guest cannot change settings or another room's player. The remaining player becomes host if the host leaves a waiting lobby. New-room membership starts with default balance; settings never alter offline preferences or saved games.
+
+Gravity changes do not scale the match clock or the 500 ms lock delay. Soft drop still uses the engine's manual-drop interval (or faster automatic gravity), hard drop remains immediate, and both players retain the same seeded piece sequence. This is Survival balance; there are no attacks or garbage multipliers yet.
+
+The playtest coalesces rendering into animation frames, skips board/preview painting when its pixels have not changed, and retains only the latest received state while a background tab is not painting. The server serializes a shared publication once for both peers. The authoritative 50 ms simulation, 20 Hz snapshots and existing backpressure limits remain in place; this does not add client prediction or establish an internet-latency benchmark.
+
 ## What runs now
 
 - An HTTP/WebSocket server with versioned messages, six-character room codes and two-player lobbies; loopback by default, LAN listening by explicit opt-in.
 - Create, join, leave, ready and a three-second server-controlled countdown.
-- A server-authoritative Survival round using the existing engine. Both players receive the same seeded piece sequence at their own pace. The server advances gravity, accepts sequenced gameplay commands, broadcasts board views at 20 Hz and declares a topout result.
+- A server-authoritative Survival round using the existing engine with optional per-player gravity balance. Both players receive the same seeded piece sequence at their own pace. The server advances gravity, accepts sequenced gameplay commands, broadcasts board views at 20 Hz and declares a topout result.
 - Disconnecting or leaving after the countdown begins forfeits the round. Leaving a waiting lobby frees that seat and clears readiness. A finished room expires after one minute; waiting rooms expire after 15 minutes; rooms have a one-hour maximum lifetime. Empty rooms are removed immediately.
 - A browser-compatible `OnlineClient` with a welcome/version handshake, validation, bounded buffering, cleanup and no automatic input replay. Importing it does not start a connection.
 - Health endpoints, exact browser-origin checks, 4 KiB message limits, 120 messages/second per connection, connection/room caps, ping/pong cleanup and bounded outgoing snapshot buffering.
@@ -60,6 +78,9 @@ await client.connect();
 client.createRoom("Alice");
 // The other client calls joinRoom(code, "Bob").
 // Both call setReady(true); then sendInput({ type: "HARD_DROP" }), etc.
+// Before Ready, the host may call setBalance(playerId, {
+//   gravityPercent: 75, startingLevel: 1, speedMode: "fixed"
+// });
 // leaveRoom() keeps the connection; close() disposes it.
 ```
 
@@ -87,6 +108,6 @@ The existing APK has no internet permission by design. A future online Android b
 
 ## Verification
 
-`npm run online:test` covers the client lifecycle, malformed/versioned input, readiness/countdown, same-seed starts, sequenced authoritative commands, topout/disconnect outcomes, room limits/expiry, live HTTP and WebSocket transport, origin/size rejection, and two real `OnlineClient` instances.
+`npm run online:test` covers the client lifecycle, malformed/versioned input, readiness/countdown, host-only validated balance, consent resets and countdown locks, per-player gravity with equal clocks and seeds, sequenced authoritative commands, topout/disconnect outcomes, room limits/expiry, live HTTP and WebSocket transport, origin/size rejection, and two real `OnlineClient` instances. `npm run online:test:browser` also checks the two-client balance UI, reset to equal, compact-screen fit and absence of board repaints for clock-only updates.
 
 `npm run build` verifies the unchanged offline browser entry. `npm run online:build` separately typechecks and bundles the server to ignored `dist-online/`. Neither command builds or replaces the user's Desktop APK.

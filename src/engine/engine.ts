@@ -337,7 +337,7 @@ function rotate(state: GameStateSnapshot, direction: number): void {
   }
 }
 
-function gravityInterval(state: GameStateSnapshot): number {
+function gravityInterval(state: GameStateSnapshot, gravityScale = 1): number {
   const normal = Math.max(
     16,
     1000 *
@@ -346,10 +346,11 @@ function gravityInterval(state: GameStateSnapshot): number {
         state.level - 1,
       ),
   );
-  return state.softDropActive ? Math.min(normal, 35) : normal;
+  const scaled = normal / gravityScale;
+  return state.softDropActive ? Math.min(scaled, 35) : scaled;
 }
 
-function tick(state: GameStateSnapshot, dt: number): void {
+function tick(state: GameStateSnapshot, dt: number, gravityScale = 1): void {
   if (!Number.isFinite(dt) || dt <= 0) return;
   // Event-sized steps make gravity/lock results independent of render-frame boundaries.
   let remaining = Math.min(dt, 60000);
@@ -359,7 +360,7 @@ function tick(state: GameStateSnapshot, dt: number): void {
   if (isUltra)
     remaining = Math.min(remaining, ULTRA_DURATION_MS - state.elapsedMs);
   while (remaining > 0 && state.status === "playing") {
-    const interval = gravityInterval(state);
+    const interval = gravityInterval(state, gravityScale);
     const onGround = grounded(state);
     const toGravity = Math.max(0, interval - state.gravityTimerMs);
     const toLock = onGround
@@ -405,6 +406,8 @@ function tick(state: GameStateSnapshot, dt: number): void {
 export function applyCommand(
   state: GameStateSnapshot,
   command: GameCommand,
+  /** Server-owned gravity adjustment; clocks, lock delay and input speed stay unchanged. */
+  gravityScale = 1,
 ): void {
   if (command.type === "PAUSE" && state.status === "playing") {
     state.status = "paused";
@@ -444,7 +447,15 @@ export function applyCommand(
       state.softDropActive = command.active;
       break;
     case "TICK":
-      tick(state, command.dtMs);
+      tick(
+        state,
+        command.dtMs,
+        Number.isFinite(gravityScale) &&
+          gravityScale >= 0.5 &&
+          gravityScale <= 2
+          ? gravityScale
+          : 1,
+      );
       break;
     case "HARD_DROP": {
       const distance = state.active.ghostY - state.active.y;

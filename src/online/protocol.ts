@@ -6,6 +6,27 @@ import type {
 
 export const ONLINE_VERSION = 1;
 export const ROOM_CODE = /^[A-HJ-NP-Z2-9]{6}$/;
+export const GRAVITY_PERCENTAGES = [50, 75, 100, 125, 150, 200] as const;
+export interface PlayerBalance {
+  gravityPercent: number;
+  startingLevel: number;
+  speedMode: "fixed" | "progressive";
+}
+export const DEFAULT_BALANCE: Readonly<PlayerBalance> = {
+  gravityPercent: 100,
+  startingLevel: 1,
+  speedMode: "progressive",
+};
+export function validBalance(value: unknown): value is PlayerBalance {
+  if (!object(value)) return false;
+  return (
+    GRAVITY_PERCENTAGES.some((n) => n === value.gravityPercent) &&
+    Number.isInteger(value.startingLevel) &&
+    Number(value.startingLevel) >= 1 &&
+    Number(value.startingLevel) <= 15 &&
+    (value.speedMode === "fixed" || value.speedMode === "progressive")
+  );
+}
 export type OnlineInput =
   | {
       type:
@@ -21,13 +42,21 @@ export type ClientMessage =
   | { v: 1; type: "create"; name: string }
   | { v: 1; type: "join"; code: string; name: string }
   | { v: 1; type: "ready"; ready: boolean }
+  | { v: 1; type: "balance"; playerId: string; balance: PlayerBalance }
   | { v: 1; type: "input"; seq: number; command: OnlineInput }
   | { v: 1; type: "leave" };
 export interface RoomView {
   code: string;
   mode: "survival";
   phase: "waiting" | "countdown" | "playing" | "finished";
-  players: { id: string; name: string; ready: boolean }[];
+  /** Optional only for compatibility with older development servers. */
+  hostId?: string;
+  players: {
+    id: string;
+    name: string;
+    ready: boolean;
+    balance?: PlayerBalance;
+  }[];
   startAt: number | null;
   winnerId: string | null;
   resultReason: "topout" | "disconnect" | "draw" | null;
@@ -95,6 +124,22 @@ export function parseClientMessage(value: unknown): ClientMessage | null {
     case "ready":
       return typeof value.ready === "boolean"
         ? { v: 1, type: "ready", ready: value.ready }
+        : null;
+    case "balance":
+      return typeof value.playerId === "string" &&
+        value.playerId.length > 0 &&
+        value.playerId.length <= 64 &&
+        validBalance(value.balance)
+        ? {
+            v: 1,
+            type: "balance",
+            playerId: value.playerId,
+            balance: {
+              gravityPercent: value.balance.gravityPercent,
+              startingLevel: value.balance.startingLevel,
+              speedMode: value.balance.speedMode,
+            },
+          }
         : null;
     case "leave":
       return { v: 1, type: "leave" };

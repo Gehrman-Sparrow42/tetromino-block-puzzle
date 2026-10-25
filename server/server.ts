@@ -1,7 +1,11 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket, WebSocketServer } from "ws";
-import { ONLINE_VERSION, parseClientMessage } from "../src/online/protocol";
+import {
+  ONLINE_VERSION,
+  parseClientMessage,
+  type ServerMessage,
+} from "../src/online/protocol";
 import { RoomService } from "./rooms";
 
 export interface ServerOptions {
@@ -74,6 +78,9 @@ export async function startOnlineServer(options: ServerOptions = {}) {
     );
   });
   const alive = new Set<WebSocket>();
+  // Both peers receive the same publication. Serialize it once; WeakMap entries
+  // disappear when that publication is no longer referenced.
+  const encoded = new WeakMap<ServerMessage, string>();
   sockets.on("connection", (socket) => {
     alive.add(socket);
     const id = rooms.connect((message) => {
@@ -85,7 +92,12 @@ export async function startOnlineServer(options: ServerOptions = {}) {
       // Preview updates are replaceable. Do not queue stale boards behind a slow peer.
       if (message.type === "snapshot" && socket.bufferedAmount > 64 * 1024)
         return;
-      socket.send(JSON.stringify(message));
+      let payload = encoded.get(message);
+      if (payload === undefined) {
+        payload = JSON.stringify(message);
+        encoded.set(message, payload);
+      }
+      socket.send(payload);
     });
     let windowStart = Date.now();
     let messages = 0;

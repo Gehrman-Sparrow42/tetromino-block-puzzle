@@ -18,7 +18,8 @@ body {
   margin: 0;
 }
 button,
-input {
+input,
+select {
   font: inherit;
 }
 button {
@@ -41,7 +42,9 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
   outline: 2px solid #b4edb8;
   outline-offset: 2px;
 }
@@ -49,7 +52,8 @@ button[hidden],
 [hidden] {
   display: none !important;
 }
-input {
+input,
+select {
   width: 100%;
   min-width: 0;
   background: #233840;
@@ -150,6 +154,51 @@ label {
   min-height: 18px;
   margin: 4px 0;
   color: #b4edb8;
+}
+#balance-summary {
+  color: #b4c9c7;
+  font-size: 11px;
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+#match-options {
+  margin: 8px 0 12px;
+  border-block: 1px solid #607b80;
+}
+#match-options summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 14px;
+}
+#balance-help {
+  font-size: 12px;
+  color: #b4c9c7;
+  margin: 0 0 10px;
+}
+#balance-players {
+  display: grid;
+  gap: 12px;
+}
+#balance-players fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  gap: 8px;
+}
+#balance-players legend {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+#balance-players select {
+  min-height: 48px;
+  padding: 8px 4px;
+}
+#reset-balance {
+  margin-block: 12px;
+  min-height: 48px;
 }
 .arena {
   display: grid;

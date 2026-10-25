@@ -3,6 +3,11 @@ import { COLS, ROWS, HIDDEN_ROWS, SHAPES } from "../engine/constants";
 import type { TetrominoType } from "../contracts/game-contract";
 import { OnlineClient } from "./client";
 import type { BoardView, OnlineInput, RoomView } from "./protocol";
+import {
+  DEFAULT_BALANCE,
+  GRAVITY_PERCENTAGES,
+  type PlayerBalance,
+} from "./protocol";
 
 function element<T extends HTMLElement>(id: string): T {
   const value = document.getElementById(id);
@@ -16,6 +21,12 @@ const code = element<HTMLInputElement>("code");
 const ready = element<HTMLButtonElement>("ready");
 const retry = element<HTMLButtonElement>("retry");
 const error = element("error");
+const balancePlayers = element("balance-players");
+const balanceOptions = element<HTMLDetailsElement>("match-options");
+const resetBalance = element<HTMLButtonElement>("reset-balance");
+let balanceKey = "";
+let updateFrame = 0;
+const painted = new Map<string, string>();
 const controls = [
   ...document.querySelectorAll<HTMLButtonElement>("[data-action]"),
 ];
@@ -64,6 +75,86 @@ function playable(): boolean {
 function input(command: OnlineInput): void {
   if (playable()) attempt(() => client.sendInput(command));
 }
+function scheduleUpdate(): void {
+  if (updateFrame) return;
+  updateFrame = requestAnimationFrame(() => {
+    updateFrame = 0;
+    update();
+  });
+}
+function updateBalance(): void {
+  if (!room) return;
+  const host = room.hostId === client.playerId;
+  const editable =
+    client.status === "connected" && room.phase === "waiting" && host;
+  balanceOptions.hidden = room.phase !== "waiting";
+  resetBalance.disabled = !editable;
+  element("balance-help").textContent = host
+    ? "Slower helps; faster adds a challenge. Changes reset Ready."
+    : "The host can adjust each player. Changes reset Ready.";
+  element("balance-summary").textContent = room.players
+    .map((p) => {
+      const b = p.balance ?? DEFAULT_BALANCE;
+      return `${p.id === client.playerId ? "You" : p.name}: ${b.gravityPercent}% · Lv ${b.startingLevel} ${b.speedMode}`;
+    })
+    .join(" / ");
+  const key = JSON.stringify([
+    editable,
+    room.players.map((p) => [p.id, p.name, p.balance]),
+  ]);
+  if (key === balanceKey) return;
+  balanceKey = key;
+  balancePlayers.replaceChildren();
+  for (const player of room.players) {
+    const b = player.balance ?? DEFAULT_BALANCE;
+    const fieldset = document.createElement("fieldset");
+    fieldset.dataset.playerId = player.id;
+    fieldset.disabled = !editable;
+    const legend = document.createElement("legend");
+    legend.textContent = `${player.name}${player.id === client.playerId ? " (you)" : ""}`;
+    fieldset.append(legend);
+    const select = (
+      labelText: string,
+      name: keyof PlayerBalance,
+      options: [string, string][],
+      value: string,
+    ) => {
+      const label = document.createElement("label");
+      label.append(document.createTextNode(labelText));
+      const input = document.createElement("select");
+      input.name = name;
+      for (const [value, text] of options) input.add(new Option(text, value));
+      input.value = value;
+      label.append(input);
+      fieldset.append(label);
+    };
+    select(
+      "Fall rate",
+      "gravityPercent",
+      GRAVITY_PERCENTAGES.map((n) => [
+        String(n),
+        `${n}%${n === 100 ? " · Normal" : n < 100 ? " · Slower" : " · Faster"}`,
+      ]),
+      String(b.gravityPercent),
+    );
+    select(
+      "Starting level",
+      "startingLevel",
+      Array.from({ length: 15 }, (_, i) => [String(i + 1), String(i + 1)]),
+      String(b.startingLevel),
+    );
+    select(
+      "Speed",
+      "speedMode",
+      [
+        ["progressive", "Progressive"],
+        ["fixed", "Fixed"],
+      ],
+      b.speedMode,
+    );
+    balancePlayers.append(fieldset);
+  }
+}
 function update(): void {
   const connected = client.status === "connected";
   lobby.hidden = room !== null;
@@ -87,6 +178,7 @@ function update(): void {
     return;
   }
   element("room-code").textContent = room.code;
+  updateBalance();
   element("players").textContent = room.players
     .map(
       (p) =>
@@ -137,6 +229,11 @@ function tile(
   ctx.fillRect(x + 1, y + 1, size - 2, Math.max(1, size * 0.12));
 }
 function drawBoard(id: string, view?: BoardView): void {
+  // Clock/score/ack updates do not change pixels. Keep a canvas until its visible
+  // board or active piece changes instead of repainting both boards at 20 Hz.
+  const key = JSON.stringify([view?.board, view?.active]);
+  if (painted.get(id) === key) return;
+  painted.set(id, key);
   const canvas = element<HTMLCanvasElement>(id);
   const ctx = canvas.getContext("2d")!;
   const size = canvas.width / COLS;
@@ -174,6 +271,9 @@ function drawBoard(id: string, view?: BoardView): void {
     );
 }
 function drawPreview(id: string, type: TetrominoType | null): void {
+  const key = type ?? "empty";
+  if (painted.get(id) === key) return;
+  painted.set(id, key);
   const canvas = element<HTMLCanvasElement>(id);
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -204,6 +304,25 @@ lobby.addEventListener("submit", (event) => {
   event.preventDefault();
   attempt(() => client.joinRoom(code.value.trim(), name.value));
 });
+balancePlayers.addEventListener("change", (event) => {
+  const target = event.target as HTMLSelectElement;
+  const fieldset = target.closest("fieldset");
+  if (!fieldset || fieldset.disabled) return;
+  const value = (name: string) =>
+    fieldset.querySelector<HTMLSelectElement>(`[name="${name}"]`)!.value;
+  attempt(() =>
+    client.setBalance(fieldset.dataset.playerId!, {
+      gravityPercent: Number(value("gravityPercent")),
+      startingLevel: Number(value("startingLevel")),
+      speedMode: value("speedMode") as PlayerBalance["speedMode"],
+    }),
+  );
+});
+resetBalance.addEventListener("click", () => {
+  if (!room || resetBalance.disabled) return;
+  for (const p of room.players)
+    attempt(() => client.setBalance(p.id, { ...DEFAULT_BALANCE }));
+});
 element("create").addEventListener("click", () =>
   attempt(() => client.createRoom(name.value)),
 );
@@ -221,7 +340,7 @@ element("leave").addEventListener("click", () => {
 retry.addEventListener("click", () => {
   room = null;
   boards = {};
-  update();
+  scheduleUpdate();
   void connect();
 });
 async function connect(): Promise<void> {
@@ -241,7 +360,7 @@ client.subscribeStatus((status) => {
         : "Disconnected";
   retry.hidden = status !== "disconnected";
   if (status !== "connected") releaseAll();
-  update();
+  scheduleUpdate();
 });
 client.subscribe((message) => {
   if (message.type === "error") showError(message.message);
@@ -255,7 +374,7 @@ client.subscribe((message) => {
   }
   if (message.type === "snapshot") boards = message.boards;
   if (!playable()) releaseAll();
-  update();
+  scheduleUpdate();
 });
 
 // Each pointer/key owns its action, so releasing one thumb does not release another.
@@ -327,6 +446,8 @@ const keys: Record<string, string> = {
 window.addEventListener("keydown", (event) => {
   if (
     event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLSelectElement ||
+    event.target instanceof HTMLTextAreaElement ||
     !keys[event.code] ||
     !playable()
   )
@@ -341,13 +462,15 @@ window.addEventListener("keyup", (event) => release(`key-${event.code}`));
 window.addEventListener("blur", releaseAll);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) releaseAll();
+  else scheduleUpdate();
 });
 window.addEventListener("pagehide", () => {
   releaseAll();
+  cancelAnimationFrame(updateFrame);
   client.close();
 });
 setInterval(() => {
-  if (room?.phase === "countdown") update();
+  if (room?.phase === "countdown") scheduleUpdate();
 }, 100);
 update();
 void connect();

@@ -68,6 +68,30 @@ function makeClient(url = "ws://localhost:8080", timeout = 100) {
 }
 
 describe("OnlineClient", () => {
+  it("sends balance choices only after validation", async () => {
+    const { client, socket } = makeClient();
+    const connected = client.connect();
+    socket.open();
+    socket.welcome();
+    await connected;
+    const balance = {
+      gravityPercent: 75,
+      startingLevel: 4,
+      speedMode: "fixed" as const,
+    };
+    client.setBalance("player-2", balance);
+    expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+      v: 1,
+      type: "balance",
+      playerId: "player-2",
+      balance,
+    });
+    expect(() =>
+      client.setBalance("player-2", { ...balance, gravityPercent: 110 }),
+    ).toThrow(/valid/);
+    expect(() => client.setBalance("", balance)).toThrow(/valid/);
+    client.close();
+  });
   it("validates secure URL policy and rejects credentials and fragments", () => {
     expect(() => new OnlineClient("ws://example.com")).toThrow(
       OnlineClientError,

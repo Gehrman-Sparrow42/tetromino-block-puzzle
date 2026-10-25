@@ -9,6 +9,31 @@ import type {
 import { createInitialState, applyCommand, validateSnapshot } from "./engine";
 import { SHAPES } from "./constants";
 
+it("online gravity balance changes falling only, preserving clocks, soft drop and lock delay", () => {
+  for (const scale of [0.5, 1, 2]) {
+    const s = createInitialState("marathon", 42);
+    const y = s.active!.y;
+    applyCommand(s, { type: "TICK", dtMs: 1000 }, scale);
+    expect(s.active!.y).toBe(y + Math.floor(scale));
+    expect(s.elapsedMs).toBe(1000);
+
+    const soft = createInitialState("marathon", 42);
+    const sy = soft.active!.y;
+    applyCommand(soft, { type: "SOFT_DROP", active: true }, scale);
+    applyCommand(soft, { type: "TICK", dtMs: 70 }, scale);
+    expect(soft.active!.y).toBe(sy + 2);
+    expect(soft.elapsedMs).toBe(70);
+
+    const ground = createInitialState("marathon", 42);
+    setPiece(ground, "T", 3, 22);
+    applyCommand(ground, { type: "TICK", dtMs: 499 }, scale);
+    expect(ground.piecesPlaced).toBe(0);
+    applyCommand(ground, { type: "TICK", dtMs: 1 }, scale);
+    expect(ground.piecesPlaced).toBe(1);
+    expect(ground.elapsedMs).toBe(500);
+  }
+});
+
 function setPiece(
   s: GameStateSnapshot,
   type: TetrominoType,

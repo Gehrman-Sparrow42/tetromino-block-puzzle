@@ -129,6 +129,129 @@ describe("private authoritative Survival rooms", () => {
       room: { phase: "waiting" },
     });
   });
+
+  it("lets only the waiting host set visible balance and clears both ready states", () => {
+    const { a, b, start } = setup();
+    const balance = {
+      gravityPercent: 50,
+      startingLevel: 3,
+      speedMode: "fixed" as const,
+    };
+    a.send({ v: 1, type: "ready", ready: true });
+    b.send({ v: 1, type: "balance", playerId: a.id, balance });
+    expect(b.messages.at(-1)).toMatchObject({ code: "not_host" });
+    a.send({ v: 1, type: "balance", playerId: b.id, balance });
+    for (const peer of [a, b])
+      expect(peer.messages.at(-1)).toMatchObject({
+        type: "room",
+        room: {
+          hostId: a.id,
+          players: [
+            {
+              ready: false,
+              balance: {
+                gravityPercent: 100,
+                startingLevel: 1,
+                speedMode: "progressive",
+              },
+            },
+            { ready: false, balance },
+          ],
+        },
+      });
+    a.send({ v: 1, type: "balance", playerId: "outsider", balance });
+    expect(a.messages.at(-1)).toMatchObject({ code: "invalid_balance" });
+    a.send({ v: 1, type: "ready", ready: true });
+    b.send({ v: 1, type: "ready", ready: true });
+    a.send({
+      v: 1,
+      type: "balance",
+      playerId: b.id,
+      balance: { ...balance, gravityPercent: 200 },
+    });
+    expect(a.messages.at(-1)).toMatchObject({ code: "not_waiting" });
+    start();
+    a.send({ v: 1, type: "balance", playerId: b.id, balance });
+    expect(a.messages.at(-1)).toMatchObject({ code: "not_waiting" });
+  });
+
+  it("applies per-player gravity without changing clocks or seeded pieces", () => {
+    const { service, a, b, start } = setup();
+    a.send({
+      v: 1,
+      type: "balance",
+      playerId: a.id,
+      balance: {
+        gravityPercent: 50,
+        startingLevel: 1,
+        speedMode: "progressive",
+      },
+    });
+    a.send({
+      v: 1,
+      type: "balance",
+      playerId: b.id,
+      balance: { gravityPercent: 200, startingLevel: 1, speedMode: "fixed" },
+    });
+    start();
+    const first = a.messages.at(-1)!;
+    if (first.type !== "snapshot") throw Error("Missing snapshot");
+    const initialY = first.boards[a.id].active!.y;
+    for (let i = 1; i < 20; i++) service.tick(100 + i * 50);
+    const frame = a.messages.at(-1)!;
+    if (frame.type !== "snapshot") throw Error("Missing snapshot");
+    expect(frame.boards[a.id].active!.y).toBe(initialY);
+    expect(frame.boards[b.id].active!.y).toBe(initialY + 2);
+    expect(frame.boards[a.id].elapsedMs).toBe(1000);
+    expect(frame.boards[b.id].elapsedMs).toBe(1000);
+    expect(frame.boards[a.id].next).toBe(frame.boards[b.id].next);
+    service.disconnect(a.id, 1100);
+    b.send({ v: 1, type: "leave" }, 1100);
+    b.send({ v: 1, type: "create", name: "Bob" }, 1101);
+    expect(b.messages.at(-1)).toMatchObject({
+      room: {
+        hostId: b.id,
+        players: [
+          {
+            balance: {
+              gravityPercent: 100,
+              startingLevel: 1,
+              speedMode: "progressive",
+            },
+          },
+        ],
+      },
+    });
+  });
+});
+
+it("rejects invalid balance payloads and strips untrusted extra configuration", () => {
+  const balance = { gravityPercent: 75, startingLevel: 4, speedMode: "fixed" };
+  for (const bad of [
+    { ...balance, gravityPercent: 0 },
+    { ...balance, gravityPercent: 110 },
+    { ...balance, gravityPercent: "50" },
+    { ...balance, startingLevel: 16 },
+    { ...balance, startingLevel: 1.5 },
+    { ...balance, speedMode: "cheat" },
+    null,
+  ])
+    expect(
+      parseClientMessage({
+        v: 1,
+        type: "balance",
+        playerId: "p",
+        balance: bad,
+      }),
+    ).toBeNull();
+  expect(
+    parseClientMessage({
+      v: 1,
+      type: "balance",
+      playerId: "p",
+      balance: { ...balance, score: 999 },
+    }),
+  ).toEqual({ v: 1, type: "balance", playerId: "p", balance });
 });
 
 it("rejects forged clocks, pause, malformed commands and incompatible protocol versions", () => {

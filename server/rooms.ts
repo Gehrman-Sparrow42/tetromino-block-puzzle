@@ -1,6 +1,11 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import { applyCommand, createInitialState } from "../src/engine/engine";
 import type { GameStateSnapshot } from "../src/contracts/game-contract";
+import {
+  DEFAULT_BALANCE,
+  validBalance,
+  type PlayerBalance,
+} from "../src/online/protocol";
 import type {
   BoardView,
   ClientMessage,
@@ -12,6 +17,7 @@ interface Player {
   id: string;
   name: string;
   ready: boolean;
+  balance: PlayerBalance;
   seq: number;
   state: GameStateSnapshot | null;
   send: (message: ServerMessage) => void;
@@ -52,6 +58,7 @@ export class RoomService {
       id,
       name: "",
       ready: false,
+      balance: { ...DEFAULT_BALANCE },
       seq: 0,
       state: null,
       send,
@@ -65,7 +72,13 @@ export class RoomService {
       code: room.code,
       mode: "survival",
       phase: room.phase,
-      players: room.players.map(({ id, name, ready }) => ({ id, name, ready })),
+      hostId: room.players[0]?.id,
+      players: room.players.map(({ id, name, ready, balance }) => ({
+        id,
+        name,
+        ready,
+        balance: { ...balance },
+      })),
       startAt: room.startAt,
       winnerId: room.winnerId,
       resultReason: room.resultReason,
@@ -168,6 +181,7 @@ export class RoomService {
       p.ready = false;
       p.seq = 0;
       p.state = null;
+      p.balance = { ...DEFAULT_BALANCE };
       room.players.push(p);
       // A changed lobby always requires fresh consent from both players.
       for (const member of room.players) member.ready = false;
@@ -176,6 +190,39 @@ export class RoomService {
     }
     const room = p.room;
     if (!room) return this.error(p, "no_room", "Create or join a room first.");
+    if (message.type === "balance") {
+      if (room.phase !== "waiting")
+        return this.error(
+          p,
+          "not_waiting",
+          "Balance is locked once the countdown starts.",
+        );
+      if (room.players[0] !== p)
+        return this.error(
+          p,
+          "not_host",
+          "Only the host can change player balance.",
+        );
+      const target = room.players.find(
+        (member) => member.id === message.playerId,
+      );
+      if (!target || !validBalance(message.balance))
+        return this.error(
+          p,
+          "invalid_balance",
+          "Choose a player in this room and valid settings.",
+        );
+      if (
+        target.balance.gravityPercent === message.balance.gravityPercent &&
+        target.balance.startingLevel === message.balance.startingLevel &&
+        target.balance.speedMode === message.balance.speedMode
+      )
+        return;
+      target.balance = { ...message.balance };
+      for (const member of room.players) member.ready = false;
+      this.publish(room);
+      return;
+    }
     if (message.type === "ready") {
       if (room.phase !== "waiting")
         return this.error(p, "not_waiting", "This round has already started.");
@@ -195,7 +242,8 @@ export class RoomService {
     if (message.seq <= p.seq)
       return this.error(p, "stale_input", "Input sequence must increase.");
     p.seq = message.seq;
-    if (p.state) applyCommand(p.state, message.command);
+    if (p.state)
+      applyCommand(p.state, message.command, p.balance.gravityPercent / 100);
     this.resolveResult(room, now);
   }
   private finish(
@@ -240,12 +288,20 @@ export class RoomService {
       }
       if (room.phase === "countdown" && now >= room.startAt!) {
         for (const p of room.players)
-          p.state = createInitialState("marathon", room.seed);
+          p.state = createInitialState("marathon", room.seed, {
+            startingLevel: p.balance.startingLevel,
+            speedMode: p.balance.speedMode,
+          });
         room.phase = "playing";
       }
       if (room.phase !== "playing") continue;
       for (const p of room.players)
-        if (p.state) applyCommand(p.state, { type: "TICK", dtMs: STEP_MS });
+        if (p.state)
+          applyCommand(
+            p.state,
+            { type: "TICK", dtMs: STEP_MS },
+            p.balance.gravityPercent / 100,
+          );
       room.frame++;
       this.resolveResult(room, now);
       if (room.phase === "playing") this.publish(room, true);
