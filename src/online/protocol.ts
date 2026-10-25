@@ -2,30 +2,30 @@ import type {
   ActivePiece,
   RunStatus,
   TetrominoType,
+  BoardCell,
 } from "../contracts/game-contract";
 
 export const ONLINE_VERSION = 1;
 export const ROOM_CODE = /^[A-HJ-NP-Z2-9]{6}$/;
-export const GRAVITY_PERCENTAGES = [50, 75, 100, 125, 150, 200] as const;
+export const ATTACK_LEVELS = [-3, -2, -1, 0, 1, 2, 3] as const;
+export const ATTACK_PERCENTAGES = [50, 70, 85, 100, 120, 140, 170] as const;
+export function attackPercent(level: number): number {
+  return ATTACK_PERCENTAGES[level + 3] ?? 100;
+}
+export function attackLabel(level: number): string {
+  return level === 0
+    ? "Normal"
+    : `${level < 0 ? "Nerf" : "Buff"} ${Math.abs(level)}`;
+}
 export interface PlayerBalance {
-  gravityPercent: number;
-  startingLevel: number;
-  speedMode: "fixed" | "progressive";
+  attackLevel: number;
 }
 export const DEFAULT_BALANCE: Readonly<PlayerBalance> = {
-  gravityPercent: 100,
-  startingLevel: 1,
-  speedMode: "progressive",
+  attackLevel: 0,
 };
 export function validBalance(value: unknown): value is PlayerBalance {
   if (!object(value)) return false;
-  return (
-    GRAVITY_PERCENTAGES.some((n) => n === value.gravityPercent) &&
-    Number.isInteger(value.startingLevel) &&
-    Number(value.startingLevel) >= 1 &&
-    Number(value.startingLevel) <= 15 &&
-    (value.speedMode === "fixed" || value.speedMode === "progressive")
-  );
+  return ATTACK_LEVELS.some((n) => n === value.attackLevel);
 }
 export type OnlineInput =
   | {
@@ -47,7 +47,7 @@ export type ClientMessage =
   | { v: 1; type: "leave" };
 export interface RoomView {
   code: string;
-  mode: "survival";
+  mode: "survival" | "battle";
   phase: "waiting" | "countdown" | "playing" | "finished";
   /** Optional only for compatibility with older development servers. */
   hostId?: string;
@@ -63,7 +63,9 @@ export interface RoomView {
 }
 /** Only renderable data: no PRNG, hidden bag or complete opponent queue. */
 export interface BoardView {
-  board: (TetrominoType | null)[][];
+  board: BoardCell[][];
+  incoming?: number;
+  sent?: number;
   active: Pick<ActivePiece, "type" | "rotation" | "x" | "y"> | null;
   hold: TetrominoType | null;
   next: TetrominoType;
@@ -135,9 +137,7 @@ export function parseClientMessage(value: unknown): ClientMessage | null {
             type: "balance",
             playerId: value.playerId,
             balance: {
-              gravityPercent: value.balance.gravityPercent,
-              startingLevel: value.balance.startingLevel,
-              speedMode: value.balance.speedMode,
+              attackLevel: value.balance.attackLevel,
             },
           }
         : null;

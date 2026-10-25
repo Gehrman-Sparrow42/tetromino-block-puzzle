@@ -1,6 +1,6 @@
-# Online Survival and LAN playtest
+# Online Battle and LAN playtest
 
-The online foundation is merged into `main`. A separate browser playtest lets two devices try Survival on a PC-hosted server. The installed offline APK and saved offline games remain independent; there is no online APK release or public hosting yet.
+The online foundation is merged into `main`. A separate browser playtest lets two devices try Battle on a PC-hosted server. The installed offline APK and saved offline games remain independent; there is no online APK release or public hosting yet.
 
 ## Phone and PC on the same Wi-Fi
 
@@ -12,19 +12,31 @@ The playtest has its own controls and opponent preview; it does not use or edit 
 
 ## Balance a match between friends
 
-After creating or joining a room, expand **Match balance**. The host (the room's first player) can adjust either player independently:
+After creating or joining a room, expand **Match balance**. The host can set each player's **outgoing attack** independently. A nerf makes that player's clears send fewer garbage rows; a buff makes them send more. Falling speed is identical for both players.
 
-| Setting        | Choices                          | Effect                                                                                                                                        |
-| -------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fall rate      | 50%, 75%, 100%, 125%, 150%, 200% | Lower helps by slowing automatic falling; higher adds pressure. 50% takes twice as long per gravity cell and 200% takes half as long.         |
-| Starting level | 1–15                             | Selects the initial Marathon gravity level.                                                                                                   |
-| Speed          | Progressive / Fixed              | Progressive increases a level every ten lines, up to 30; Fixed retains the selected level. The chosen fall-rate percentage applies to either. |
+| Choice | Outgoing attack |
+| ------ | --------------: |
+| Nerf 3 |             50% |
+| Nerf 2 |             70% |
+| Nerf 1 |             85% |
+| Normal |            100% |
+| Buff 1 |            120% |
+| Buff 2 |            140% |
+| Buff 3 |            170% |
 
-Both players start at 100%, level 1, Progressive by default. **Reset to equal** restores those values for both. For example, a newer player could use 75%, level 1, Fixed while an experienced friend uses 125%, level 3, Progressive. These are manual handicaps, not an automatic skill rating.
+Both players default to Normal. **Reset to equal** restores Normal for both. The host can nerf the stronger friend or buff the less experienced friend. These settings are manual, not a skill rating. Each player has one selection; nerf and buff do not stack on the same player.
 
-Both players see a compact summary before and during the match. Any actual balance change clears both Ready states, so both must ready again. Settings lock when the countdown begins, and only the server applies them. A guest cannot change settings or another room's player. The remaining player becomes host if the host leaves a waiting lobby. New-room membership starts with default balance; settings never alter offline preferences or saved games.
+Both players see the choices before and during the match. Any actual change clears both Ready states; settings lock when countdown begins. Only the server applies attacks and host changes. If the host leaves a waiting lobby, the remaining player becomes host. New-room membership starts with Normal; offline preferences and saves stay independent.
 
-Gravity changes do not scale the match clock or the 500 ms lock delay. Soft drop still uses the engine's manual-drop interval (or faster automatic gravity), hard drop remains immediate, and both players retain the same seeded piece sequence. This is Survival balance; there are no attacks or garbage multipliers yet.
+## Attack and garbage rules
+
+Ordinary singles send 0 rows, doubles 1, triples 2 and Tetrises 4. Full T-spin singles/doubles/triples send 2/4/6; minis send 1/2 for one/two cleared rows. A difficult back-to-back clear adds 1, combos add `min(4, floor(combo / 2))`, and a perfect clear adds 4. No clear means no attack.
+
+The sender's tier scales the combined attack. Integer hundredths carry between clears so nerfed small attacks accumulate rather than disappearing. Incoming garbage cancels first, oldest rows first; only the remainder is sent. For example, ten ordinary Tetrises with no bonuses generate 40 rows at Normal, 28 at Nerf 2 and 68 at Buff 3 before cancellation. Actual play may add bonuses.
+
+Uncancelled attacks queue neutral garbage rows with one hole per row. Holes use a separate server-owned generator and do not change the seeded piece sequence. Each packet uses one shared hole column. Rows mature after 750 ms and rise only after the receiving player locks a piece, after resolving that lock's outgoing attack/cancellation. At most eight rows rise per lock and forty rows may be pending; excess queued attacks are discarded to bound memory. Overflow or collision at the spawn area ends the round. Incoming and Sent counters appear beside the board.
+
+Both players use ordinary progressive Marathon gravity from level one, with the normal clocks, movement and lock delay. The earlier gravity-handicap implementation was replaced by these outgoing-attack tiers.
 
 The playtest coalesces rendering into animation frames, skips board/preview painting when its pixels have not changed, and retains only the latest received state while a background tab is not painting. The server serializes a shared publication once for both peers. The authoritative 50 ms simulation, 20 Hz snapshots and existing backpressure limits remain in place; this does not add client prediction or establish an internet-latency benchmark.
 
@@ -32,12 +44,12 @@ The playtest coalesces rendering into animation frames, skips board/preview pain
 
 - An HTTP/WebSocket server with versioned messages, six-character room codes and two-player lobbies; loopback by default, LAN listening by explicit opt-in.
 - Create, join, leave, ready and a three-second server-controlled countdown.
-- A server-authoritative Survival round using the existing engine with optional per-player gravity balance. Both players receive the same seeded piece sequence at their own pace. The server advances gravity, accepts sequenced gameplay commands, broadcasts board views at 20 Hz and declares a topout result.
+- A server-authoritative Battle round using the existing engine with per-player outgoing-attack balance. Both players receive the same seeded piece sequence at their own pace. The server advances gravity, accepts sequenced gameplay commands, broadcasts board views at 20 Hz and declares a topout result.
 - Disconnecting or leaving after the countdown begins forfeits the round. Leaving a waiting lobby frees that seat and clears readiness. A finished room expires after one minute; waiting rooms expire after 15 minutes; rooms have a one-hour maximum lifetime. Empty rooms are removed immediately.
 - A browser-compatible `OnlineClient` with a welcome/version handshake, validation, bounded buffering, cleanup and no automatic input replay. Importing it does not start a connection.
 - Health endpoints, exact browser-origin checks, 4 KiB message limits, 120 messages/second per connection, connection/room caps, ping/pong cleanup and bounded outgoing snapshot buffering.
 
-There is no garbage/attack system, main-app UI integration, client prediction, reconnect grace, matchmaking, accounts, rematch UI or permanent storage yet. This is a local Survival playtest, not a public multiplayer release.
+There is no main-app UI integration, client prediction, reconnect grace, matchmaking, accounts, rematch UI or permanent storage yet. This is a local Battle playtest, not a public multiplayer release.
 
 ## Run locally
 
@@ -79,7 +91,7 @@ client.createRoom("Alice");
 // The other client calls joinRoom(code, "Bob").
 // Both call setReady(true); then sendInput({ type: "HARD_DROP" }), etc.
 // Before Ready, the host may call setBalance(playerId, {
-//   gravityPercent: 75, startingLevel: 1, speedMode: "fixed"
+//   attackLevel: 2 // -3..-1 nerfs, 0 normal, 1..3 buffs
 // });
 // leaveRoom() keeps the connection; close() disposes it.
 ```
@@ -101,13 +113,13 @@ State is memory-only. Restarting the server ends all rooms. Room codes are invit
 1. Integrate the separate playtest into the main web/Android UI and its configurable controls. Offline blur/background pause cannot silently pause just one online player.
 2. Add responsive local prediction/reconciliation and clock-offset handling, then test actual phone latency and background/disconnect cases.
 3. Bring the playtest opponent preview into the main UI with movable/collapsible placement without changing saved local board or control positions.
-4. Implement Battle separately: a garbage-cell representation, deterministic holes, attack/cancellation rules, arrival timing and tests. The protocol currently advertises Survival only.
+4. Tune Battle attacks, grace timing and tier strengths from actual friend-match feedback; the initial curve is tested but not a measured skill-balance model.
 5. Add bounded reconnect tokens/grace and rematches. Choose hosting/TLS, origin policy and public connection/rate limits before exposing the server. Add the real room URL handler and verified Android App Links only after a domain is chosen.
 
 The existing APK has no internet permission by design. A future online Android build must add it deliberately while keeping offline modes independent from server availability.
 
 ## Verification
 
-`npm run online:test` covers the client lifecycle, malformed/versioned input, readiness/countdown, host-only validated balance, consent resets and countdown locks, per-player gravity with equal clocks and seeds, sequenced authoritative commands, topout/disconnect outcomes, room limits/expiry, live HTTP and WebSocket transport, origin/size rejection, and two real `OnlineClient` instances. `npm run online:test:browser` also checks the two-client balance UI, reset to equal, compact-screen fit and absence of board repaints for clock-only updates.
+`npm run online:test` covers the client lifecycle, malformed/versioned input, readiness/countdown, host-only validated balance, consent resets and countdown locks, tier scaling, fractional carry, actual clears, delayed garbage, cancellation and overflow, sequenced authoritative commands, topout/disconnect outcomes, room limits/expiry, live HTTP and WebSocket transport, origin/size rejection, and two real `OnlineClient` instances. `npm run online:test:browser` also checks the two-client balance UI, reset to equal, compact-screen fit and absence of board repaints for clock-only updates.
 
 `npm run build` verifies the unchanged offline browser entry. `npm run online:build` separately typechecks and bundles the server to ignored `dist-online/`. Neither command builds or replaces the user's Desktop APK.

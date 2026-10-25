@@ -1,5 +1,6 @@
 import type {
   ActivePiece,
+  BoardCell,
   GameCommand,
   GameMode,
   GameStateSnapshot,
@@ -87,6 +88,41 @@ function ghost(state: GameStateSnapshot): void {
   const probe = { ...state.active };
   while (fits(state, { ...probe, y: probe.y + 1 })) probe.y++;
   state.active.ghostY = probe.y;
+}
+
+/** Raise the settled stack; holes are ordered from the uppermost new row down. */
+export function applyGarbage(
+  state: GameStateSnapshot,
+  holes: readonly number[],
+): boolean {
+  if (
+    state.status !== "playing" ||
+    !state.active ||
+    !Array.isArray(holes) ||
+    holes.length < 1 ||
+    holes.length > 20 ||
+    !Array.from(holes).every(
+      (hole) => Number.isInteger(hole) && hole >= 0 && hole < COLS,
+    )
+  )
+    return false;
+
+  const overflow = state.board
+    .slice(0, holes.length)
+    .some((row) => row.some((cell) => cell !== null));
+  const garbage = holes.map((hole) =>
+    Array.from({ length: COLS }, (_, x): BoardCell =>
+      x === hole ? null : "G",
+    ),
+  );
+  state.board = state.board.slice(holes.length).concat(garbage);
+  if (overflow || !fits(state, state.active)) {
+    state.blockedPiece = state.active.type;
+    state.active = null;
+    state.status = "gameover";
+    state.softDropActive = false;
+  } else ghost(state);
+  return true;
 }
 
 function spawn(state: GameStateSnapshot, type?: TetrominoType): void {
@@ -337,7 +373,7 @@ function rotate(state: GameStateSnapshot, direction: number): void {
   }
 }
 
-function gravityInterval(state: GameStateSnapshot, gravityScale = 1): number {
+function gravityInterval(state: GameStateSnapshot): number {
   const normal = Math.max(
     16,
     1000 *
@@ -346,11 +382,10 @@ function gravityInterval(state: GameStateSnapshot, gravityScale = 1): number {
         state.level - 1,
       ),
   );
-  const scaled = normal / gravityScale;
-  return state.softDropActive ? Math.min(scaled, 35) : scaled;
+  return state.softDropActive ? Math.min(normal, 35) : normal;
 }
 
-function tick(state: GameStateSnapshot, dt: number, gravityScale = 1): void {
+function tick(state: GameStateSnapshot, dt: number): void {
   if (!Number.isFinite(dt) || dt <= 0) return;
   // Event-sized steps make gravity/lock results independent of render-frame boundaries.
   let remaining = Math.min(dt, 60000);
@@ -360,7 +395,7 @@ function tick(state: GameStateSnapshot, dt: number, gravityScale = 1): void {
   if (isUltra)
     remaining = Math.min(remaining, ULTRA_DURATION_MS - state.elapsedMs);
   while (remaining > 0 && state.status === "playing") {
-    const interval = gravityInterval(state, gravityScale);
+    const interval = gravityInterval(state);
     const onGround = grounded(state);
     const toGravity = Math.max(0, interval - state.gravityTimerMs);
     const toLock = onGround
@@ -406,8 +441,6 @@ function tick(state: GameStateSnapshot, dt: number, gravityScale = 1): void {
 export function applyCommand(
   state: GameStateSnapshot,
   command: GameCommand,
-  /** Server-owned gravity adjustment; clocks, lock delay and input speed stay unchanged. */
-  gravityScale = 1,
 ): void {
   if (command.type === "PAUSE" && state.status === "playing") {
     state.status = "paused";
@@ -447,15 +480,7 @@ export function applyCommand(
       state.softDropActive = command.active;
       break;
     case "TICK":
-      tick(
-        state,
-        command.dtMs,
-        Number.isFinite(gravityScale) &&
-          gravityScale >= 0.5 &&
-          gravityScale <= 2
-          ? gravityScale
-          : 1,
-      );
+      tick(state, command.dtMs);
       break;
     case "HARD_DROP": {
       const distance = state.active.ghostY - state.active.y;
@@ -533,7 +558,7 @@ export function validateSnapshot(value: unknown): GameStateSnapshot | null {
         (row) =>
           Array.isArray(row) &&
           row.length === COLS &&
-          Array.from(row).every((v) => v === null || type(v)),
+          Array.from(row).every((v) => v === null || v === "G" || type(v)),
       )
     )
       return null;

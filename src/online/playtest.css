@@ -185,7 +185,7 @@ label {
   border: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 #balance-players legend {

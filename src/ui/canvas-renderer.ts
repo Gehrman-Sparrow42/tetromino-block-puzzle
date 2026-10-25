@@ -383,7 +383,29 @@ export function drawBoard(
   }
   for (let y = HIDDEN_ROWS; y < state.board.length; y++)
     state.board[y].forEach((type, x) => {
-      if (type)
+      if (type === "G") {
+        // Garbage is a neutral stack tile, never a playable tetromino type.
+        const gap = Math.min(cell / 5, Math.max(0.7, cell * 0.055));
+        const side = cell - gap * 2;
+        ctx.save();
+        ctx.fillStyle = "#777d86";
+        ctx.fillRect(
+          x * cell + gap,
+          (y - HIDDEN_ROWS) * cell + gap,
+          side,
+          side,
+        );
+        ctx.strokeStyle = theme.board.background;
+        ctx.lineWidth = Math.max(0.7, cell * 0.05);
+        const inset = cell * 0.2;
+        ctx.strokeRect(
+          x * cell + inset,
+          (y - HIDDEN_ROWS) * cell + inset,
+          cell - inset * 2,
+          cell - inset * 2,
+        );
+        ctx.restore();
+      } else if (type)
         block(ctx, x * cell, (y - HIDDEN_ROWS) * cell, cell, type, theme);
     });
   const active = state.active;

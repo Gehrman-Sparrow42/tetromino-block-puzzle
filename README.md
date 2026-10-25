@@ -1,6 +1,6 @@
 # Afterblock
 
-Online Survival groundwork and a separate phone/PC browser playtest are available on `main`. See [Online setup](docs/ONLINE.md). The installed offline APK remains independent of the server.
+Online Battle with configurable attack handicaps and a separate phone/PC browser playtest are available on `main`. See [Online setup](docs/ONLINE.md). The installed offline APK remains independent of the server.
 
 An offline, ad-free falling-tetromino game for Android and the browser. This Android remake is the current version on `main`. The original Tetromino Block Puzzle is preserved on [`saved/original`](https://github.com/Gehrman-Sparrow42/tetromino-block-puzzle/tree/saved/original).
 

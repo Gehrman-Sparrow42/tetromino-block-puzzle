@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RoomService } from "./rooms";
+import type { GameStateSnapshot } from "../src/contracts/game-contract";
+import { attackPercent } from "../src/online/protocol";
 import {
   parseClientMessage,
   type ClientMessage,
@@ -33,6 +35,141 @@ function setup(maxRooms = 100) {
   };
   return { service, a, b, peer, code: room.room.code, start };
 }
+
+// Test-only access to the authoritative state; clients have no fixture/input API.
+function playerState(service: RoomService, id: string): GameStateSnapshot {
+  return (
+    service as unknown as { players: Map<string, { state: GameStateSnapshot }> }
+  ).players.get(id)!.state;
+}
+function prepareTetris(state: GameStateSnapshot): void {
+  state.board = Array.from({ length: 24 }, () => Array(10).fill(null));
+  for (let y = 20; y < 24; y++)
+    state.board[y] = Array.from({ length: 10 }, (_, x) =>
+      x === 5 ? null : "J",
+    );
+  state.board[19][0] = "J"; // Do not award a perfect-clear bonus.
+  state.active = {
+    type: "I",
+    rotation: 1,
+    x: 3,
+    y: 4,
+    ghostY: 20,
+    lockTimerMs: 0,
+    lockResetsUsed: 0,
+    lastActionWasRotation: false,
+    lastKickIndex: 0,
+  };
+  state.combo = -1;
+  state.backToBack = false;
+}
+
+describe("authoritative Battle attacks", () => {
+  for (const level of [-3, -2, -1, 0, 1, 2, 3])
+    it(`applies attack tier ${level} to a real Tetris`, () => {
+      const { service, a, b, start } = setup();
+      a.send({
+        v: 1,
+        type: "balance",
+        playerId: a.id,
+        balance: { attackLevel: level },
+      });
+      start();
+      prepareTetris(playerState(service, a.id));
+      a.send(
+        { v: 1, type: "input", seq: 1, command: { type: "HARD_DROP" } },
+        101,
+      );
+      service.tick(150);
+      const view = b.messages.at(-1)!;
+      if (view.type !== "snapshot") throw Error("Missing snapshot");
+      const attack = Math.floor((4 * attackPercent(level)) / 100);
+      expect(view.boards[b.id].incoming).toBe(attack);
+      expect(view.boards[a.id].sent).toBe(attack);
+      expect(view.boards[a.id].lines).toBe(4);
+      expect(view.boards[a.id].level).toBe(view.boards[b.id].level);
+      expect(view.boards[a.id].elapsedMs).toBe(view.boards[b.id].elapsedMs);
+    });
+
+  it("delays incoming rows until a mature piece boundary and inserts actual garbage", () => {
+    const { service, a, b, start } = setup();
+    start();
+    prepareTetris(playerState(service, a.id));
+    a.send(
+      { v: 1, type: "input", seq: 1, command: { type: "HARD_DROP" } },
+      101,
+    );
+    b.send(
+      { v: 1, type: "input", seq: 1, command: { type: "HARD_DROP" } },
+      200,
+    );
+    expect(
+      playerState(service, b.id)
+        .board.flat()
+        .filter((x) => x === "G"),
+    ).toHaveLength(0);
+    service.tick(850);
+    b.send(
+      { v: 1, type: "input", seq: 2, command: { type: "HARD_DROP" } },
+      851,
+    );
+    const state = playerState(service, b.id);
+    expect(state.board.flat().filter((x) => x === "G")).toHaveLength(36);
+    expect(
+      state.board
+        .slice(-4)
+        .every((row) => row.filter((x) => x === null).length === 1),
+    ).toBe(true);
+    service.tick(900);
+    expect(b.messages.at(-1)).toMatchObject({
+      boards: { [b.id]: { incoming: 0 } },
+    });
+  });
+
+  it("cancels pending garbage with an actual clear before sending leftovers", () => {
+    const { service, a, b, start } = setup();
+    start();
+    prepareTetris(playerState(service, a.id));
+    a.send(
+      { v: 1, type: "input", seq: 1, command: { type: "HARD_DROP" } },
+      101,
+    );
+    prepareTetris(playerState(service, b.id));
+    b.send(
+      { v: 1, type: "input", seq: 1, command: { type: "HARD_DROP" } },
+      200,
+    );
+    service.tick(250);
+    expect(a.messages.at(-1)).toMatchObject({
+      boards: {
+        [a.id]: { incoming: 0, sent: 4 },
+        [b.id]: { incoming: 0, sent: 0 },
+      },
+    });
+  });
+
+  it("caps pending rows and lets garbage overflow finish a match", () => {
+    const { service, a, b, start } = setup();
+    start();
+    for (let seq = 1; seq <= 12; seq++) {
+      prepareTetris(playerState(service, a.id));
+      a.send({ v: 1, type: "input", seq, command: { type: "HARD_DROP" } }, 101);
+    }
+    service.tick(150);
+    expect(a.messages.at(-1)).toMatchObject({
+      boards: { [b.id]: { incoming: 40 } },
+    });
+    // A settled block in the outgoing top rows overflows on the next rise.
+    playerState(service, b.id).board[0][0] = "J";
+    b.send(
+      { v: 1, type: "input", seq: 1, command: { type: "HARD_DROP" } },
+      851,
+    );
+    expect(a.messages.at(-1)).toMatchObject({
+      room: { phase: "finished", winnerId: a.id, resultReason: "topout" },
+    });
+  });
+});
 
 describe("private authoritative Survival rooms", () => {
   it("requires both ready, starts after countdown, and gives both the same piece sequence", () => {
@@ -133,9 +270,7 @@ describe("private authoritative Survival rooms", () => {
   it("lets only the waiting host set visible balance and clears both ready states", () => {
     const { a, b, start } = setup();
     const balance = {
-      gravityPercent: 50,
-      startingLevel: 3,
-      speedMode: "fixed" as const,
+      attackLevel: -2,
     };
     a.send({ v: 1, type: "ready", ready: true });
     b.send({ v: 1, type: "balance", playerId: a.id, balance });
@@ -150,9 +285,7 @@ describe("private authoritative Survival rooms", () => {
             {
               ready: false,
               balance: {
-                gravityPercent: 100,
-                startingLevel: 1,
-                speedMode: "progressive",
+                attackLevel: 0,
               },
             },
             { ready: false, balance },
@@ -167,81 +300,22 @@ describe("private authoritative Survival rooms", () => {
       v: 1,
       type: "balance",
       playerId: b.id,
-      balance: { ...balance, gravityPercent: 200 },
+      balance: { ...balance, attackLevel: 3 },
     });
     expect(a.messages.at(-1)).toMatchObject({ code: "not_waiting" });
     start();
     a.send({ v: 1, type: "balance", playerId: b.id, balance });
     expect(a.messages.at(-1)).toMatchObject({ code: "not_waiting" });
   });
-
-  it("applies per-player gravity without changing clocks or seeded pieces", () => {
-    const { service, a, b, start } = setup();
-    a.send({
-      v: 1,
-      type: "balance",
-      playerId: a.id,
-      balance: {
-        gravityPercent: 50,
-        startingLevel: 1,
-        speedMode: "progressive",
-      },
-    });
-    a.send({
-      v: 1,
-      type: "balance",
-      playerId: b.id,
-      balance: { gravityPercent: 200, startingLevel: 1, speedMode: "fixed" },
-    });
-    start();
-    const first = a.messages.at(-1)!;
-    if (first.type !== "snapshot") throw Error("Missing snapshot");
-    const initialY = first.boards[a.id].active!.y;
-    for (let i = 1; i < 20; i++) service.tick(100 + i * 50);
-    const frame = a.messages.at(-1)!;
-    if (frame.type !== "snapshot") throw Error("Missing snapshot");
-    expect(frame.boards[a.id].active!.y).toBe(initialY);
-    expect(frame.boards[b.id].active!.y).toBe(initialY + 2);
-    expect(frame.boards[a.id].elapsedMs).toBe(1000);
-    expect(frame.boards[b.id].elapsedMs).toBe(1000);
-    expect(frame.boards[a.id].next).toBe(frame.boards[b.id].next);
-    service.disconnect(a.id, 1100);
-    b.send({ v: 1, type: "leave" }, 1100);
-    b.send({ v: 1, type: "create", name: "Bob" }, 1101);
-    expect(b.messages.at(-1)).toMatchObject({
-      room: {
-        hostId: b.id,
-        players: [
-          {
-            balance: {
-              gravityPercent: 100,
-              startingLevel: 1,
-              speedMode: "progressive",
-            },
-          },
-        ],
-      },
-    });
-  });
 });
-
-it("rejects invalid balance payloads and strips untrusted extra configuration", () => {
-  const balance = { gravityPercent: 75, startingLevel: 4, speedMode: "fixed" };
-  for (const bad of [
-    { ...balance, gravityPercent: 0 },
-    { ...balance, gravityPercent: 110 },
-    { ...balance, gravityPercent: "50" },
-    { ...balance, startingLevel: 16 },
-    { ...balance, startingLevel: 1.5 },
-    { ...balance, speedMode: "cheat" },
-    null,
-  ])
+it("rejects invalid attack levels and ignores forged extra configuration", () => {
+  for (const attackLevel of [-4, 4, 1.5, "2", null])
     expect(
       parseClientMessage({
         v: 1,
         type: "balance",
         playerId: "p",
-        balance: bad,
+        balance: { attackLevel },
       }),
     ).toBeNull();
   expect(
@@ -249,9 +323,14 @@ it("rejects invalid balance payloads and strips untrusted extra configuration", 
       v: 1,
       type: "balance",
       playerId: "p",
-      balance: { ...balance, score: 999 },
+      balance: { attackLevel: 2, score: 999 },
     }),
-  ).toEqual({ v: 1, type: "balance", playerId: "p", balance });
+  ).toEqual({
+    v: 1,
+    type: "balance",
+    playerId: "p",
+    balance: { attackLevel: 2 },
+  });
 });
 
 it("rejects forged clocks, pause, malformed commands and incompatible protocol versions", () => {
@@ -262,6 +341,7 @@ it("rejects forged clocks, pause, malformed commands and incompatible protocol v
     { v: 1, type: "input", seq: -1, command: { type: "HARD_DROP" } },
     { v: 1, type: "input", seq: 1, command: { type: "TICK", dtMs: 99999 } },
     { v: 1, type: "input", seq: 1, command: { type: "PAUSE" } },
+    { v: 1, type: "attack", lines: 999 },
     {
       v: 1,
       type: "input",

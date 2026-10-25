@@ -85,7 +85,7 @@ function validRoom(value: unknown): boolean {
     (value.hostId === undefined || typeof value.hostId === "string") &&
     typeof value.code === "string" &&
     ROOM_CODE.test(value.code) &&
-    value.mode === "survival" &&
+    (value.mode === "survival" || value.mode === "battle") &&
     ["waiting", "countdown", "playing", "finished"].includes(
       String(value.phase),
     ) &&
@@ -106,13 +106,24 @@ function validRoom(value: unknown): boolean {
 }
 
 function validBoard(value: unknown): boolean {
+  if (isRecord(value))
+    for (const key of ["incoming", "sent"]) {
+      if (
+        value[key] !== undefined &&
+        (!Number.isSafeInteger(value[key]) || Number(value[key]) < 0)
+      )
+        return false;
+    }
   if (
     !isRecord(value) ||
     !Array.isArray(value.board) ||
     !value.board.every(
       (row) =>
         Array.isArray(row) &&
-        row.every((piece) => piece === null || PIECES.has(String(piece))),
+        row.every(
+          (piece) =>
+            piece === null || piece === "G" || PIECES.has(String(piece)),
+        ),
     ) ||
     !(value.hold === null || PIECES.has(String(value.hold))) ||
     !PIECES.has(String(value.next)) ||

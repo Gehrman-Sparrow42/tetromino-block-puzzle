@@ -75,9 +75,7 @@ describe("OnlineClient", () => {
     socket.welcome();
     await connected;
     const balance = {
-      gravityPercent: 75,
-      startingLevel: 4,
-      speedMode: "fixed" as const,
+      attackLevel: 2,
     };
     client.setBalance("player-2", balance);
     expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
@@ -87,7 +85,7 @@ describe("OnlineClient", () => {
       balance,
     });
     expect(() =>
-      client.setBalance("player-2", { ...balance, gravityPercent: 110 }),
+      client.setBalance("player-2", { ...balance, attackLevel: 4 }),
     ).toThrow(/valid/);
     expect(() => client.setBalance("", balance)).toThrow(/valid/);
     client.close();

@@ -1,4 +1,5 @@
 export type TetrominoType = "I" | "O" | "T" | "S" | "Z" | "J" | "L";
+export type BoardCell = TetrominoType | "G" | null;
 export type RotationState = 0 | 1 | 2 | 3;
 export type GameMode = "marathon" | "sprint40" | "ultra120" | "story";
 export interface StoryOptions {
@@ -53,7 +54,7 @@ export interface GameStateSnapshot {
   status: RunStatus;
   seed: number;
   prngState: number;
-  board: (TetrominoType | null)[][];
+  board: BoardCell[][];
   active: ActivePiece | null;
   /** The already-consumed piece whose spawn caused a block-out. */
   blockedPiece?: TetrominoType;

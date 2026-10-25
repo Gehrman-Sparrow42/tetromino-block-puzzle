@@ -5,7 +5,9 @@ import { OnlineClient } from "./client";
 import type { BoardView, OnlineInput, RoomView } from "./protocol";
 import {
   DEFAULT_BALANCE,
-  GRAVITY_PERCENTAGES,
+  ATTACK_LEVELS,
+  attackLabel,
+  attackPercent,
   type PlayerBalance,
 } from "./protocol";
 
@@ -90,12 +92,12 @@ function updateBalance(): void {
   balanceOptions.hidden = room.phase !== "waiting";
   resetBalance.disabled = !editable;
   element("balance-help").textContent = host
-    ? "Slower helps; faster adds a challenge. Changes reset Ready."
-    : "The host can adjust each player. Changes reset Ready.";
+    ? "Nerf sends less; buff sends more. Changes reset Ready."
+    : "The host can adjust outgoing attacks. Changes reset Ready.";
   element("balance-summary").textContent = room.players
     .map((p) => {
       const b = p.balance ?? DEFAULT_BALANCE;
-      return `${p.id === client.playerId ? "You" : p.name}: ${b.gravityPercent}% · Lv ${b.startingLevel} ${b.speedMode}`;
+      return `${p.id === client.playerId ? "You" : p.name}: ${attackLabel(b.attackLevel)} (${attackPercent(b.attackLevel)}%)`;
     })
     .join(" / ");
   const key = JSON.stringify([
@@ -129,28 +131,13 @@ function updateBalance(): void {
       fieldset.append(label);
     };
     select(
-      "Fall rate",
-      "gravityPercent",
-      GRAVITY_PERCENTAGES.map((n) => [
-        String(n),
-        `${n}%${n === 100 ? " · Normal" : n < 100 ? " · Slower" : " · Faster"}`,
+      "Outgoing attack",
+      "attackLevel",
+      ATTACK_LEVELS.map((level) => [
+        String(level),
+        `${attackLabel(level)} · ${attackPercent(level)}%`,
       ]),
-      String(b.gravityPercent),
-    );
-    select(
-      "Starting level",
-      "startingLevel",
-      Array.from({ length: 15 }, (_, i) => [String(i + 1), String(i + 1)]),
-      String(b.startingLevel),
-    );
-    select(
-      "Speed",
-      "speedMode",
-      [
-        ["progressive", "Progressive"],
-        ["fixed", "Fixed"],
-      ],
-      b.speedMode,
+      String(b.attackLevel),
     );
     balancePlayers.append(fieldset);
   }
@@ -173,6 +160,8 @@ function update(): void {
     drawPreview("next", null);
     element("score").textContent = "0";
     element("lines").textContent = "0";
+    element("incoming").textContent = "0";
+    element("sent").textContent = "0";
     element("opponent-name").textContent = "Opponent";
     element("opponent-score").textContent = "";
     return;
@@ -209,6 +198,8 @@ function update(): void {
   const other = boards[opponent?.id ?? ""];
   element("score").textContent = String(own?.score ?? 0);
   element("lines").textContent = String(own?.lines ?? 0);
+  element("incoming").textContent = String(own?.incoming ?? 0);
+  element("sent").textContent = String(own?.sent ?? 0);
   element("opponent-score").textContent = other ? `${other.lines} lines` : "";
   drawBoard("board", own);
   drawBoard("opponent", other);
@@ -218,12 +209,12 @@ function update(): void {
 
 function tile(
   ctx: CanvasRenderingContext2D,
-  type: TetrominoType,
+  type: TetrominoType | "G",
   x: number,
   y: number,
   size: number,
 ): void {
-  ctx.fillStyle = colors[type];
+  ctx.fillStyle = type === "G" ? "#829b9e" : colors[type];
   ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
   ctx.fillStyle = "#ffffff33";
   ctx.fillRect(x + 1, y + 1, size - 2, Math.max(1, size * 0.12));
@@ -312,9 +303,7 @@ balancePlayers.addEventListener("change", (event) => {
     fieldset.querySelector<HTMLSelectElement>(`[name="${name}"]`)!.value;
   attempt(() =>
     client.setBalance(fieldset.dataset.playerId!, {
-      gravityPercent: Number(value("gravityPercent")),
-      startingLevel: Number(value("startingLevel")),
-      speedMode: value("speedMode") as PlayerBalance["speedMode"],
+      attackLevel: Number(value("attackLevel")),
     }),
   );
 });

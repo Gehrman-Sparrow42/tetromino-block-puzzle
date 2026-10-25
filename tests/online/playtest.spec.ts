@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("phone and PC create, join, play and leave a Survival room", async ({
+test("phone and PC create, join, play and leave a Battle room", async ({
   browser,
 }) => {
   const phone = await browser.newContext({
@@ -41,11 +41,24 @@ test("phone and PC create, join, play and leave a Survival room", async ({
   const other = a
     .locator("#balance-players fieldset")
     .filter({ has: a.locator("legend", { hasText: "PC" }) });
-  await self.locator('[name="gravityPercent"]').selectOption("50");
+  await expect(self.locator("option")).toHaveCount(7);
+  for (const label of [
+    "Nerf 1",
+    "Nerf 2",
+    "Nerf 3",
+    "Normal",
+    "Buff 1",
+    "Buff 2",
+    "Buff 3",
+  ])
+    await expect(self.locator("option").filter({ hasText: label })).toHaveCount(
+      1,
+    );
+  await self.locator('[name="attackLevel"]').selectOption("-2");
   await expect(a.locator("#ready")).toHaveText("Ready");
-  await expect(b.locator("#balance-summary")).toContainText("Phone: 50%");
-  await other.locator('[name="startingLevel"]').selectOption("5");
-  await expect(b.locator("#balance-summary")).toContainText("Lv 5");
+  await expect(b.locator("#balance-summary")).toContainText("Phone: Nerf 2");
+  await other.locator('[name="attackLevel"]').selectOption("3");
+  await expect(b.locator("#balance-summary")).toContainText("Buff 3");
   await a.screenshot({ path: "test-results/online-balance-phone.png" });
   await a.setViewportSize({ width: 360, height: 600 });
   expect(
@@ -53,17 +66,17 @@ test("phone and PC create, join, play and leave a Survival room", async ({
   ).toBe(true);
   await a.screenshot({ path: "test-results/online-balance-small-phone.png" });
   await a.locator("#reset-balance").tap();
-  await expect(b.locator("#balance-summary")).not.toContainText("50%");
-  await expect(b.locator("#balance-summary")).not.toContainText("Lv 5");
-  await self.locator('[name="gravityPercent"]').selectOption("50");
-  await expect(b.locator("#balance-summary")).toContainText("Phone: 50%");
+  await expect(b.locator("#balance-summary")).not.toContainText("Nerf 2");
+  await expect(b.locator("#balance-summary")).not.toContainText("Buff 3");
+  await self.locator('[name="attackLevel"]').selectOption("-2");
+  await expect(b.locator("#balance-summary")).toContainText("Phone: Nerf 2");
   await a.setViewportSize({ width: 393, height: 851 });
   await a.locator("#ready").tap();
   await b.locator("#ready").click();
   await expect(a.locator("#phase")).toHaveText("Playing", { timeout: 6_000 });
   await expect(a.locator("#match-options")).toBeHidden();
   // Elapsed-time-only snapshots must not repaint a stationary own board. The
-  // assisted player takes two seconds per gravity cell at this starting level.
+  // players retain the normal one-second starting gravity.
   await a.evaluate(() => {
     const ctx = document
       .querySelector<HTMLCanvasElement>("#board")!

@@ -1,5 +1,18 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
-import { applyCommand, createInitialState } from "../src/engine/engine";
+import {
+  applyCommand,
+  applyGarbage,
+  createInitialState,
+} from "../src/engine/engine";
+import {
+  createBattleState,
+  scaledAttack,
+  cancelIncoming,
+  takeGarbage,
+  GARBAGE_DELAY_MS,
+  MAX_PENDING,
+  type BattleState,
+} from "./battle";
 import type { GameStateSnapshot } from "../src/contracts/game-contract";
 import {
   DEFAULT_BALANCE,
@@ -18,6 +31,7 @@ interface Player {
   name: string;
   ready: boolean;
   balance: PlayerBalance;
+  battle: BattleState;
   seq: number;
   state: GameStateSnapshot | null;
   send: (message: ServerMessage) => void;
@@ -31,6 +45,7 @@ interface Room {
   winnerId: string | null;
   resultReason: RoomView["resultReason"];
   seed: number;
+  garbageSeed: number;
   frame: number;
   createdAt: number;
   matchEndedAt: number | null;
@@ -59,6 +74,7 @@ export class RoomService {
       name: "",
       ready: false,
       balance: { ...DEFAULT_BALANCE },
+      battle: createBattleState(),
       seq: 0,
       state: null,
       send,
@@ -70,7 +86,7 @@ export class RoomService {
   private view(room: Room): RoomView {
     return {
       code: room.code,
-      mode: "survival",
+      mode: "battle",
       phase: room.phase,
       hostId: room.players[0]?.id,
       players: room.players.map(({ id, name, ready, balance }) => ({
@@ -93,6 +109,8 @@ export class RoomService {
         if (!s) continue;
         boards[p.id] = {
           board: s.board,
+          incoming: p.battle.pending.length,
+          sent: p.battle.sent,
           active: s.active
             ? {
                 type: s.active.type,
@@ -159,6 +177,7 @@ export class RoomService {
           winnerId: null,
           resultReason: null,
           seed: randomInt(1, 0x100000000),
+          garbageSeed: randomInt(1, 0x100000000),
           frame: 0,
           createdAt: now,
           matchEndedAt: null,
@@ -182,6 +201,7 @@ export class RoomService {
       p.seq = 0;
       p.state = null;
       p.balance = { ...DEFAULT_BALANCE };
+      p.battle = createBattleState();
       room.players.push(p);
       // A changed lobby always requires fresh consent from both players.
       for (const member of room.players) member.ready = false;
@@ -212,12 +232,7 @@ export class RoomService {
           "invalid_balance",
           "Choose a player in this room and valid settings.",
         );
-      if (
-        target.balance.gravityPercent === message.balance.gravityPercent &&
-        target.balance.startingLevel === message.balance.startingLevel &&
-        target.balance.speedMode === message.balance.speedMode
-      )
-        return;
+      if (target.balance.attackLevel === message.balance.attackLevel) return;
       target.balance = { ...message.balance };
       for (const member of room.players) member.ready = false;
       this.publish(room);
@@ -242,9 +257,39 @@ export class RoomService {
     if (message.seq <= p.seq)
       return this.error(p, "stale_input", "Input sequence must increase.");
     p.seq = message.seq;
-    if (p.state)
-      applyCommand(p.state, message.command, p.balance.gravityPercent / 100);
+    if (p.state) {
+      const before = p.state.piecesPlaced;
+      applyCommand(p.state, message.command);
+      if (p.state.piecesPlaced > before) this.processLocks(room, [p], now);
+    }
     this.resolveResult(room, now);
+  }
+  private processLocks(room: Room, locked: Player[], now: number): void {
+    // Clears resolve before garbage rises; same-tick attacks can cancel.
+    for (const p of locked) {
+      if (p.state?.status !== "playing") continue;
+      const attack = cancelIncoming(
+        p.battle,
+        scaledAttack(p.battle, p.state.lastEvent, p.balance.attackLevel),
+      );
+      const other = room.players.find((member) => member !== p);
+      if (!other || attack === 0) continue;
+      let seed = room.garbageSeed;
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      room.garbageSeed = seed >>> 0;
+      const hole = room.garbageSeed % 10;
+      const count = Math.min(attack, MAX_PENDING - other.battle.pending.length);
+      for (let i = 0; i < count; i++)
+        other.battle.pending.push({ hole, readyAt: now + GARBAGE_DELAY_MS });
+      p.battle.sent += count;
+    }
+    for (const p of locked) {
+      const holes = takeGarbage(p.battle, now);
+      if (holes.length && p.state?.status === "playing")
+        applyGarbage(p.state, holes);
+    }
   }
   private finish(
     room: Room,
@@ -288,20 +333,18 @@ export class RoomService {
       }
       if (room.phase === "countdown" && now >= room.startAt!) {
         for (const p of room.players)
-          p.state = createInitialState("marathon", room.seed, {
-            startingLevel: p.balance.startingLevel,
-            speedMode: p.balance.speedMode,
-          });
+          p.state = createInitialState("marathon", room.seed);
         room.phase = "playing";
       }
       if (room.phase !== "playing") continue;
+      const locked: Player[] = [];
       for (const p of room.players)
-        if (p.state)
-          applyCommand(
-            p.state,
-            { type: "TICK", dtMs: STEP_MS },
-            p.balance.gravityPercent / 100,
-          );
+        if (p.state) {
+          const before = p.state.piecesPlaced;
+          applyCommand(p.state, { type: "TICK", dtMs: STEP_MS });
+          if (p.state.piecesPlaced > before) locked.push(p);
+        }
+      this.processLocks(room, locked, now);
       room.frame++;
       this.resolveResult(room, now);
       if (room.phase === "playing") this.publish(room, true);

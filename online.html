@@ -7,12 +7,12 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="theme-color" content="#17252c" />
-    <title>Afterblock · Survival</title>
+    <title>Afterblock · Battle</title>
   </head>
   <body>
     <main id="app">
       <header>
-        <h1>Survival</h1>
+        <h1>Battle</h1>
         <span id="connection" role="status">Connecting…</span
         ><button id="retry" hidden>Retry</button>
       </header>
@@ -49,7 +49,7 @@
         <details id="match-options">
           <summary>Match balance</summary>
           <p id="balance-help">
-            The host can adjust each player. Changes reset Ready.
+            The host can adjust outgoing attacks. Changes reset Ready.
           </p>
           <div id="balance-players"></div>
           <button id="reset-balance" type="button">Reset to equal</button>
@@ -73,6 +73,8 @@
           ></canvas
           ><span class="label">Score</span><strong id="score">0</strong
           ><span class="label">Lines</span><strong id="lines">0</strong>
+          <span class="label">Incoming</span><strong id="incoming">0</strong>
+          <span class="label">Sent</span><strong id="sent">0</strong>
         </aside>
         <canvas
           id="board"

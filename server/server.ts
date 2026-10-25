@@ -50,7 +50,7 @@ export async function startOnlineServer(options: ServerOptions = {}) {
           service: "afterblock-online",
           protocol: ONLINE_VERSION,
           status: "ok",
-          mode: "survival",
+          mode: "battle",
           rooms: rooms.roomCount,
         }),
       );
