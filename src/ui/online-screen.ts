@@ -1,3 +1,4 @@
+import { t, getLanguage, getLocale } from "../platform/i18n";
 import "./online-screen.css";
 import { Capacitor } from "@capacitor/core";
 import type {
@@ -130,50 +131,50 @@ export function startOnline(
   overlay.classList.toggle("reduce-motion", settings().reducedMotion);
   overlay.innerHTML = `
     <div class="online-inner">
-      <header class="online-header"><h2 id="online-title">Online Battle</h2><button type="button" class="online-button online-exit" data-online="exit">Exit</button></header>
-      <p class="online-status" role="status" aria-live="polite">Disconnected. Connect to a server to play.</p>
+      <header class="online-header"><h2 id="online-title">${t("Online Battle")}</h2><button type="button" class="online-button online-exit" data-online="exit">${t("Exit")}</button></header>
+      <p class="online-status" role="status" aria-live="polite">${t("Disconnected. Connect to a server to play.")}</p>
       <p class="online-error" role="alert" hidden></p>
-      <section class="online-connection" aria-label="Server connection">
-        <label>Server address<input name="onlineEndpoint" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="wss://your-server.example/ws" /></label>
-        <label>Your name<input name="onlineName" maxlength="24" autocomplete="nickname" placeholder="Player" /></label>
-        <label class="online-lan"><input name="onlineLan" type="checkbox" /> Allow an unencrypted private LAN server</label>
-        <p class="online-server-help">Use a secure wss:// server. Connect is always your choice.</p>
-        <div class="online-actions"><button type="button" class="online-button online-primary" data-online="connect">Connect</button><button type="button" class="online-button" data-online="disconnect" hidden>Disconnect</button></div>
+      <section class="online-connection" aria-label="${t("Server connection")}">
+        <label>${t("Server address")}<input name="onlineEndpoint" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="${t("wss://your-server.example/ws")}" /></label>
+        <label>${t("Your name")}<input name="onlineName" maxlength="24" autocomplete="nickname" placeholder="${t("Player")}" /></label>
+        <label class="online-lan"><input name="onlineLan" type="checkbox" /> ${t("Allow an unencrypted private LAN server")}</label>
+        <p class="online-server-help">${t("Use a secure wss:// server. Connect is always your choice.")}</p>
+        <div class="online-actions"><button type="button" class="online-button online-primary" data-online="connect">${t("Connect")}</button><button type="button" class="online-button" data-online="disconnect" hidden>${t("Disconnect")}</button></div>
       </section>
-      <section class="online-lobby" aria-label="Create or join a room">
-        <p>Two players. Same pieces. Clear lines to send garbage.</p>
-        <button type="button" class="online-button online-primary" data-online="create" disabled>Create room</button>
-        <div class="online-join"><label>Room code<input name="onlineCode" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" /></label><button type="button" class="online-button" data-online="join" disabled>Join</button></div>
+      <section class="online-lobby" aria-label="${t("Create or join a room")}">
+        <p>${t("Two players. Same pieces. Clear lines to send garbage.")}</p>
+        <button type="button" class="online-button online-primary" data-online="create" disabled>${t("Create room")}</button>
+        <div class="online-join"><label>${t("Room code")}<input name="onlineCode" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" /></label><button type="button" class="online-button" data-online="join" disabled>${t("Join")}</button></div>
       </section>
-      <section class="online-room" hidden aria-label="Room lobby"><div class="online-room-heading"><h3>Room <strong class="online-code"></strong></h3><button type="button" class="online-button" data-online="leave">Leave room</button></div>
+      <section class="online-room" hidden aria-label="${t("Room lobby")}"><div class="online-room-heading"><h3>${t("Room")} <strong class="online-code"></strong></h3><button type="button" class="online-button" data-online="leave">${t("Leave room")}</button></div>
         <div class="online-players"></div><p class="online-balance-summary"></p>
-        <details class="online-balance"><summary>Match balance</summary><p class="online-balance-help"></p><div class="online-balance-fields"></div><button type="button" class="online-button" data-online="reset-balance" hidden>Reset to equal</button></details>
-        <button type="button" class="online-button online-primary" data-online="ready">Ready</button>
+        <details class="online-balance"><summary>${t("Match balance")}</summary><p class="online-balance-help"></p><div class="online-balance-fields"></div><button type="button" class="online-button" data-online="reset-balance" hidden>${t("Reset to equal")}</button></details>
+        <button type="button" class="online-button online-primary" data-online="ready">${t("Ready")}</button>
       </section>
-      <section class="online-game" hidden aria-label="Online match">
+      <section class="online-game" hidden aria-label="${t("Online match")}">
         <div class="online-match-status" role="status" aria-live="polite"></div>
         <div class="online-stage">
-          <div class="online-board"><canvas id="board" aria-label="Your online playfield" role="img"></canvas></div>
-          <aside class="online-left"><span>HOLD</span><canvas class="online-hold" aria-label="Held piece"></canvas><dl><dt>LINES</dt><dd class="online-lines">0</dd><dt>SENT</dt><dd class="online-sent">0</dd><dt>INCOMING</dt><dd class="online-incoming">0</dd></dl></aside>
-          <aside class="online-right"><span>NEXT</span><canvas class="online-next" aria-label="Next piece"></canvas><span class="online-opponent-name">OPPONENT</span><canvas class="online-opponent" aria-label="Opponent playfield" role="img"></canvas></aside>
+          <div class="online-board"><canvas id="board" aria-label="${t("Your online playfield")}" role="img"></canvas></div>
+          <aside class="online-left"><span>${t("HOLD")}</span><canvas class="online-hold" aria-label="${t("Held piece")}"></canvas><dl><dt>${t("LINES")}</dt><dd class="online-lines">0</dd><dt>${t("SENT")}</dt><dd class="online-sent">0</dd><dt>${t("INCOMING")}</dt><dd class="online-incoming">0</dd></dl></aside>
+          <aside class="online-right"><span>${t("NEXT")}</span><canvas class="online-next" aria-label="${t("Next piece")}"></canvas><span class="online-opponent-name">${t("OPPONENT")}</span><canvas class="online-opponent" aria-label="${t("Opponent playfield")}" role="img"></canvas></aside>
           <div class="online-controls"><div class="online-movement-pad"><svg class="online-pad-outline" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2H298V98H198V198H102V98H2Z"/></svg>${ACTIONS.slice(
             0,
             3,
           )
             .map(
               ([action, icon, label]) =>
-                `<button type="button" class="control online-control" data-command="${action}" aria-label="${label}"><span aria-hidden="true">${icon}</span></button>`,
+                `<button type="button" class="control online-control" data-command="${action}" aria-label="${t(label)}"><span aria-hidden="true">${icon}</span></button>`,
             )
             .join("")}</div>${ACTIONS.slice(3)
             .map(
               ([action, icon, label]) =>
-                `<button type="button" class="control online-control" data-command="${action}" aria-label="${label}"><span aria-hidden="true">${icon}</span></button>`,
+                `<button type="button" class="control online-control" data-command="${action}" aria-label="${t(label)}"><span aria-hidden="true">${icon}</span></button>`,
             )
             .join("")}</div>
         </div>
         <p class="online-battle-balance"></p>
       </section>
-      <section class="online-confirm" role="alertdialog" aria-modal="true" aria-labelledby="online-confirm-title" hidden tabindex="-1"><h3 id="online-confirm-title">Forfeit this round?</h3><p>Online matches cannot pause. Leaving ends your round.</p><button type="button" class="online-button online-primary" data-online="forfeit">Forfeit and leave</button><button type="button" class="online-button" data-online="cancel-exit">Keep playing</button></section>
+      <section class="online-confirm" role="alertdialog" aria-modal="true" aria-labelledby="online-confirm-title" hidden tabindex="-1"><h3 id="online-confirm-title">${t("Forfeit this round?")}</h3><p>${t("Online matches cannot pause. Leaving ends your round.")}</p><button type="button" class="online-button online-primary" data-online="forfeit">${t("Forfeit and leave")}</button><button type="button" class="online-button" data-online="cancel-exit">${t("Keep playing")}</button></section>
     </div>`;
   root.append(overlay);
   const get = <T extends HTMLElement = HTMLElement>(selector: string) =>
@@ -183,12 +184,13 @@ export function startOnline(
     code = get<HTMLInputElement>('[name="onlineCode"]'),
     lan = get<HTMLInputElement>('[name="onlineLan"]');
   endpoint.value = read(ENDPOINT_KEY) || defaultEndpoint();
-  name.value = read(NAME_KEY) || "Player";
+  name.value = read(NAME_KEY) || t("Player");
   const native = Capacitor.isNativePlatform();
   get<HTMLElement>(".online-lan").hidden = native;
   if (native)
-    get(".online-server-help").textContent =
-      "Android requires a secure wss:// server. Enter its address, then Connect.";
+    get(".online-server-help").textContent = t(
+      "Android requires a secure wss:// server. Enter its address, then Connect.",
+    );
   let client: OnlineClient | null = null,
     room: RoomView | null = null,
     boards: Record<string, BoardView> = {};
@@ -203,9 +205,69 @@ export function startOnline(
   const unsubscribers: (() => void)[] = [];
   const painted = new Map<HTMLCanvasElement, string>();
   const boardPixels = new WeakMap<BoardView, string>();
-  const error = (value: unknown) => {
-    get(".online-error").textContent =
-      value instanceof Error ? value.message : String(value);
+  const serverErrors: Record<string, string> = {
+    already_joined: "Leave your current room first.",
+    capacity: "The server is full. Try again later.",
+    not_found: "That room is unavailable.",
+    room_full: "That room is full or already started.",
+    no_room: "Create or join a room first.",
+    not_waiting: "This round has already started.",
+    not_host: "Only the host can change player balance.",
+    invalid_balance: "Choose a player in this room and valid settings.",
+    not_playing: "Wait for the round to start.",
+    stale_input: "Input sequence must increase.",
+    invalid_message: "Unsupported protocol version or invalid message.",
+  };
+  const clientErrors = new Set([
+    "Android requires wss://. Use a secure server address and try Connect again.",
+    "WebSocket URL must be an absolute ws:// or wss:// URL.",
+    "WebSocket URL must use ws:// or wss://.",
+    "WebSocket URLs cannot contain credentials.",
+    "WebSocket URLs cannot contain a fragment.",
+    "Use wss:// outside loopback, or explicitly enable a private LAN playtest.",
+    "connectTimeoutMs must be a positive finite number.",
+    "This client has been closed.",
+    "Server sent a malformed or unsupported protocol message.",
+    "Server sent a message before the welcome handshake completed.",
+    "Server sent a duplicate welcome message.",
+    "WebSocket connection failed before the welcome handshake completed.",
+    "Room code must be six valid uppercase letters or digits.",
+    "Ready state must be a boolean.",
+    "Choose a valid player and balance settings.",
+    "Join or create a room before sending game input.",
+    "Client closed before the welcome handshake completed.",
+    "Connect and complete the welcome handshake before sending messages.",
+    "WebSocket send buffer would exceed 64 KiB.",
+  ]);
+  const error = (value: unknown, code?: string) => {
+    const message = value instanceof Error ? value.message : String(value);
+    let source = code
+      ? serverErrors[code]
+      : clientErrors.has(message)
+        ? message
+        : undefined;
+    if (
+      !source &&
+      message.startsWith("Timed out waiting for the server welcome message")
+    )
+      source = "Connection timed out. Check the server address and try again.";
+    if (!source && message.startsWith("Could not send WebSocket message:"))
+      source =
+        "Could not send the message. Check the connection and try again.";
+    if (
+      !source &&
+      (message.startsWith("Could not create WebSocket:") ||
+        message.startsWith("WebSocket closed before welcome"))
+    )
+      source =
+        "Could not connect to the server. Check the address and network, then try again.";
+    get(".online-error").textContent = source
+      ? t(source)
+      : getLanguage() === "tr"
+        ? t(
+            "Could not connect to the server. Check the address and network, then try again.",
+          )
+        : message;
     get(".online-error").hidden = false;
   };
   const attempt = (action: () => void) => {
@@ -236,7 +298,7 @@ export function startOnline(
     )
       return;
     attempt(() => client!.sendInput(command as OnlineInput));
-    if (command.type === "HOLD") controls.pieceChanged();
+    if (command.type === t("HOLD")) controls.pieceChanged();
   }
   const controls = new TouchControls(
     overlay,
@@ -246,8 +308,9 @@ export function startOnline(
     (key) => {
       if (key === "back") back();
       else if (started()) {
-        get(".online-match-status").textContent =
-          "Online matches cannot pause. Exit to forfeit.";
+        get(".online-match-status").textContent = t(
+          "Online matches cannot pause. Exit to forfeit.",
+        );
         controls.releaseAll();
       }
     },
@@ -292,8 +355,9 @@ export function startOnline(
             boards = {};
             confirming = false;
             get(".online-confirm").hidden = true;
-            get(".online-status").textContent =
-              "Connection lost. The round cannot resume. Check the address or network, then Retry.";
+            get(".online-status").textContent = t(
+              "Connection lost. The round cannot resume. Check the address or network, then Retry.",
+            );
           }
           update();
         }),
@@ -302,7 +366,7 @@ export function startOnline(
         next.subscribe((message) => {
           if (disposed || client !== next) return;
           if (message.type === "error") {
-            error(message.message);
+            error(message.message, message.code);
             return;
           }
           if (message.type === "left") {
@@ -356,10 +420,10 @@ export function startOnline(
     get<HTMLButtonElement>('[data-online="connect"]').disabled =
       isConnected || connecting;
     get('[data-online="connect"]').textContent = connecting
-      ? "Connecting…"
+      ? t("Connecting…")
       : client?.status === "disconnected"
-        ? "Retry"
-        : "Connect";
+        ? t("Retry")
+        : t("Connect");
     get('[data-online="disconnect"]').hidden = !isConnected && !connecting;
     get(".online-connection").hidden = !!room;
     get(".online-lobby").hidden = !!room;
@@ -372,32 +436,41 @@ export function startOnline(
     if (client?.status !== "disconnected")
       get(".online-status").textContent = isConnected
         ? room
-          ? `Room ${room.code} · ${room.mode === "battle" ? "Battle" : "Survival"}`
-          : "Connected. Create a room or enter a room code."
+          ? t("Room {code} · {mode}", {
+              code: room.code,
+              mode: t(room.mode === "battle" ? "Battle" : "Survival"),
+            })
+          : t("Connected. Create a room or enter a room code.")
         : connecting
-          ? "Connecting to server…"
-          : "Disconnected. Connect to a server to play.";
+          ? t("Connecting to server…")
+          : t("Disconnected. Connect to a server to play.");
     if (!room) return;
     get(".online-code").textContent = room.code;
     const player = room.players.find((p) => p.id === client?.playerId);
     const ready = get<HTMLButtonElement>('[data-online="ready"]');
     ready.disabled = !isConnected || room.phase !== "waiting";
-    ready.textContent = player?.ready ? "Not ready" : "Ready";
+    ready.textContent = player?.ready ? t("Not ready") : t("Ready");
     get(".online-players").replaceChildren(
       ...room.players.map((p) => {
         const row = document.createElement("p");
         const label = document.createElement("strong");
-        label.textContent = `${p.name}${p.id === client?.playerId ? " (you)" : ""}`;
+        label.textContent =
+          p.id === client?.playerId
+            ? t("{name} (you)", { name: p.name })
+            : p.name;
         const status = document.createElement("span");
-        status.textContent = p.ready ? "Ready" : "Not ready";
+        status.textContent = p.ready ? t("Ready") : t("Not ready");
         row.append(label, status);
         return row;
       }),
     );
     const summary = room.players
-      .map(
-        (p) =>
-          `${p.id === client?.playerId ? "You" : p.name}: ${attackLabel(p.balance?.attackLevel ?? 0)} (${attackPercent(p.balance?.attackLevel ?? 0)}%)`,
+      .map((p) =>
+        t("{name}: {balance} ({percent}%)", {
+          name: p.id === client?.playerId ? t("You") : p.name,
+          balance: t(attackLabel(p.balance?.attackLevel ?? 0)),
+          percent: attackPercent(p.balance?.attackLevel ?? 0),
+        }),
       )
       .join(" / ");
     get(".online-balance-summary").textContent = summary;
@@ -406,8 +479,8 @@ export function startOnline(
       editable = host && room.phase === "waiting" && isConnected;
     get<HTMLButtonElement>('[data-online="reset-balance"]').hidden = !editable;
     get(".online-balance-help").textContent = host
-      ? "Outgoing attacks only. Changes reset both players’ readiness."
-      : "The host can change outgoing attacks. Changes reset readiness.";
+      ? t("Outgoing attacks only. Changes reset both players’ readiness.")
+      : t("The host can change outgoing attacks. Changes reset readiness.");
     const key = JSON.stringify([editable, room.players]);
     if (key !== balanceKey) {
       balanceKey = key;
@@ -418,14 +491,20 @@ export function startOnline(
           const legend = document.createElement("legend");
           legend.textContent = p.name;
           const label = document.createElement("label");
-          label.append("Outgoing attack");
+          label.append(t("Outgoing attack"));
           const select = document.createElement("select");
           select.dataset.player = p.id;
-          select.setAttribute("aria-label", `${p.name} outgoing attack`);
+          select.setAttribute(
+            "aria-label",
+            t("{name} outgoing attack", { name: p.name }),
+          );
           for (const level of ATTACK_LEVELS)
             select.add(
               new Option(
-                `${attackLabel(level)} · ${attackPercent(level)}%`,
+                t("{balance} · {percent}%", {
+                  balance: t(attackLabel(level)),
+                  percent: attackPercent(level),
+                }),
                 String(level),
               ),
             );
@@ -437,23 +516,27 @@ export function startOnline(
       );
     }
     if (room.phase === "countdown")
-      get(".online-match-status").textContent = "Both ready. Starting…";
+      get(".online-match-status").textContent = t("Both ready. Starting…");
     else if (room.phase === "playing")
       get(".online-match-status").textContent = backgrounded
-        ? "You left the app. The live round kept running; it cannot pause."
-        : "Live round · no pause";
+        ? t("You left the app. The live round kept running; it cannot pause.")
+        : t("Live round · no pause");
     else if (room.phase === "finished") {
       const result =
         room.winnerId === client?.playerId
-          ? "You won"
+          ? t("You won")
           : room.winnerId === null
-            ? "Draw"
-            : "Round lost";
-      get(".online-match-status").textContent =
-        `${result}${room.resultReason === "disconnect" ? " · player left" : ""}. Leave the room to play again.`;
+            ? t("Draw")
+            : t("Round lost");
+      get(".online-match-status").textContent = t(
+        room.resultReason === "disconnect"
+          ? "{result} · player left. Leave the room to play again."
+          : "{result}. Leave the room to play again.",
+        { result },
+      );
     }
     const opponent = room.players.find((p) => p.id !== client?.playerId);
-    get(".online-opponent-name").textContent = opponent?.name || "OPPONENT";
+    get(".online-opponent-name").textContent = opponent?.name || t("OPPONENT");
   }
   function layout() {
     const stage = get(".online-stage"),
@@ -558,7 +641,7 @@ export function startOnline(
   }
   function setMetric(selector: string, value: number) {
     const node = get(selector),
-      text = String(value);
+      text = value.toLocaleString(getLocale());
     if (node.textContent !== text) node.textContent = text;
   }
   function render() {
@@ -613,8 +696,9 @@ export function startOnline(
     controls.releaseAll();
     if (started()) {
       backgrounded = true;
-      get(".online-match-status").textContent =
-        "The live round keeps running in the background. Online matches cannot pause.";
+      get(".online-match-status").textContent = t(
+        "The live round keeps running in the background. Online matches cannot pause.",
+      );
     }
   }
   function visibility() {
@@ -629,8 +713,9 @@ export function startOnline(
       backgrounded = false;
       update();
       if (started())
-        get(".online-match-status").textContent =
-          "The live round continued while you were away. Online matches cannot pause.";
+        get(".online-match-status").textContent = t(
+          "The live round continued while you were away. Online matches cannot pause.",
+        );
     }
   }
   function click(event: Event) {

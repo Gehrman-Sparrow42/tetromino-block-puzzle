@@ -36,7 +36,7 @@ Provide a complete falling-tetromino game with familiar core rules, responsive c
 
 ## Brand Commitments
 
-The current app name is Afterblock. Use short, functional English labels. Avoid slogans, promotional prose and unnecessary explanation in the playing interface. The user explicitly requested multiple themes and translucent, configurable controls.
+The current app name is Afterblock. Use short, functional English and Turkish labels, selected instantly in Settings. Avoid slogans, promotional prose and unnecessary explanation in the playing interface. The user explicitly requested multiple themes and translucent, configurable controls.
 
 ## Evidence on Hand
 
@@ -56,4 +56,4 @@ The current app name is Afterblock. Use short, functional English labels. Avoid 
 
 ## Open Decisions
 
-No public release, store listing, additional languages or formal accessibility certification has been requested. Do not invent those commitments. The visual game is not currently playable using a screen reader alone.
+Personal Android builds are published through GitHub Releases. English and Turkish are supported; a store listing, further languages and formal accessibility certification have not been requested. The visual game is not currently playable using a screen reader alone.

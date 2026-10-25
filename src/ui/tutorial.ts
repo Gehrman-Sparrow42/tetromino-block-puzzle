@@ -9,6 +9,7 @@ import { SHAPES } from "../engine/constants";
 import { drawBoard, drawPreview } from "./canvas-renderer";
 import { getTheme } from "./themes";
 import { TouchControls } from "./touch-controls";
+import { t, subscribeLanguage } from "../platform/i18n";
 import "./tutorial.css";
 
 export type TutorialTrack = "basics" | "advanced";
@@ -143,10 +144,10 @@ export function startTutorial(
   overlay.setAttribute("aria-modal", "true");
   overlay.setAttribute(
     "aria-label",
-    track === "basics" ? "Basics tutorial" : "Advanced tutorial",
+    track === "basics" ? t("Basics tutorial") : t("Advanced tutorial"),
   );
   overlay.tabIndex = -1;
-  overlay.innerHTML = `<div class="tutorial-inner"><header class="tutorial-header"><h1>${track === "basics" ? "Basics" : "Advanced"} tutorial</h1><button class="secondary-button" data-tutorial-exit>Exit tutorial</button></header><div class="tutorial-objective"><div class="tutorial-progress"></div><h2></h2><p class="tutorial-prompt"></p><p class="tutorial-tip"></p><p class="tutorial-feedback" role="status" aria-live="polite"></p></div><div class="tutorial-practice"><div class="tutorial-board-wrap"><canvas id="board" aria-label="Practice board"></canvas><aside><span>Hold</span><canvas class="tutorial-hold" aria-label="Held piece"></canvas><span>Next</span><canvas class="tutorial-next" aria-label="Next piece"></canvas></aside></div><div class="tutorial-controls" aria-label="Practice controls">${[
+  overlay.innerHTML = `<div class="tutorial-inner"><header class="tutorial-header"><h1>${t(track === "basics" ? "Basics tutorial" : "Advanced tutorial")}</h1><button class="secondary-button" data-tutorial-exit>${t("Exit tutorial")}</button></header><div class="tutorial-objective"><div class="tutorial-progress"></div><h2></h2><p class="tutorial-prompt"></p><p class="tutorial-tip"></p><p class="tutorial-feedback" role="status" aria-live="polite"></p></div><div class="tutorial-practice"><div class="tutorial-board-wrap"><canvas id="board" aria-label="${t("Practice board")}"></canvas><aside><span>${t("Hold")}</span><canvas class="tutorial-hold" aria-label="${t("Held piece")}"></canvas><span>${t("Next")}</span><canvas class="tutorial-next" aria-label="${t("Next piece")}"></canvas></aside></div><div class="tutorial-controls" aria-label="${t("Practice controls")}">${[
     ["MOVE_LEFT", "Move left", "←"],
     ["SOFT_DROP", "Soft drop", "↓"],
     ["MOVE_RIGHT", "Move right", "→"],
@@ -157,11 +158,11 @@ export function startTutorial(
   ]
     .map(
       ([command, label, text]) =>
-        `<button type="button" data-command="${command}" aria-label="${label}">${text}</button>`,
+        `<button type="button" data-command="${command}" aria-label="${t(label!)}">${t(text!)}</button>`,
     )
     .join(
       "",
-    )}</div></div><footer class="tutorial-footer"><button class="secondary-button" data-reset>Reset lesson</button><button class="primary-button" data-continue disabled>Continue</button><button class="primary-button" data-resume hidden>Resume practice</button></footer></div>`;
+    )}</div></div><footer class="tutorial-footer"><button class="secondary-button" data-reset>${t("Reset lesson")}</button><button class="primary-button" data-continue disabled>${t("Continue")}</button><button class="primary-button" data-resume hidden>${t("Resume practice")}</button></footer></div>`;
   root.append(overlay);
   const find = <T extends HTMLElement>(selector: string) =>
     overlay.querySelector<T>(selector)!;
@@ -182,6 +183,71 @@ export function startTutorial(
     blockedHold = false;
   let frame = 0,
     previous = performance.now();
+  let unsubscribeLanguage = () => {};
+  function refreshLanguage() {
+    const title = t(
+      track === "basics" ? "Basics tutorial" : "Advanced tutorial",
+    );
+    overlay.setAttribute("aria-label", title);
+    find("h1").textContent = title;
+    find("[data-tutorial-exit]").textContent = t("Exit tutorial");
+    find("[data-reset]").textContent = t("Reset lesson");
+    find("[data-resume]").textContent = t("Resume practice");
+    continueButton.textContent = t(finished ? "Replay tutorial" : "Continue");
+    for (const [selector, label] of [
+      ["#board", "Practice board"],
+      [".tutorial-hold", "Held piece"],
+      [".tutorial-next", "Next piece"],
+      [".tutorial-controls", "Practice controls"],
+    ]) {
+      find(selector!).setAttribute("aria-label", t(label!));
+    }
+    const sideLabels = overlay.querySelectorAll("aside span");
+    sideLabels[0]!.textContent = t("Hold");
+    sideLabels[1]!.textContent = t("Next");
+    for (const [action, label, text] of [
+      ["MOVE_LEFT", "Move left", "←"],
+      ["SOFT_DROP", "Soft drop", "↓"],
+      ["MOVE_RIGHT", "Move right", "→"],
+      ["ROTATE_CCW", "Rotate counterclockwise", "↶"],
+      ["ROTATE_CW", "Rotate clockwise", "↷"],
+      ["HARD_DROP", "Hard drop", "Drop"],
+      ["HOLD", "Hold", "Hold"],
+    ]) {
+      const button = find(`[data-command="${action}"]`);
+      button.setAttribute("aria-label", t(label!));
+      button.textContent = t(text!);
+    }
+    find(".tutorial-progress").textContent = t("Lesson {count} of {total}", {
+      count: Math.min(lesson + 1, LESSONS[track].length),
+      total: LESSONS[track].length,
+    });
+    if (finished) {
+      find("h2").textContent = t("Practice complete");
+      find(".tutorial-prompt").textContent = t(
+        track === "basics"
+          ? "You have moved, rotated, dropped, cleared a line and used Hold."
+          : "You have practiced landing, Hold swaps, Tetrises, back-to-back clears and a T-spin double.",
+      );
+      find(".tutorial-tip").textContent = t(
+        "Replay whenever you like, or exit to choose a game.",
+      );
+    } else {
+      const data = LESSONS[track][lesson]!;
+      find("h2").textContent = t(data.title);
+      find(".tutorial-prompt").textContent = t(data.prompt);
+      find(".tutorial-tip").textContent = t(data.tip);
+    }
+    find(".tutorial-feedback").textContent = finished
+      ? ""
+      : paused
+        ? t("Practice paused. Resume when you are ready.")
+        : complete
+          ? t("Goal reached. Continue when you are ready.")
+          : state.status === "gameover"
+            ? t("Try again with Reset lesson.")
+            : "";
+  }
   function render() {
     const theme = getTheme(settings().theme);
     drawBoard(board, state, true, [], theme);
@@ -234,9 +300,9 @@ export function startTutorial(
       controls.pieceChanged();
     continueButton.disabled = !complete;
     find(".tutorial-feedback").textContent = complete
-      ? "Goal reached. Continue when you are ready."
+      ? t("Goal reached. Continue when you are ready.")
       : state.status === "gameover"
-        ? "Try again with Reset lesson."
+        ? t("Try again with Reset lesson.")
         : "";
     render();
   }
@@ -264,13 +330,15 @@ export function startTutorial(
         false;
     overlay.dataset.lesson = String(lesson + 1);
     const data = LESSONS[track][lesson]!;
-    find(".tutorial-progress").textContent =
-      `Lesson ${lesson + 1} of ${LESSONS[track].length}`;
-    find("h2").textContent = data.title;
-    find(".tutorial-prompt").textContent = data.prompt;
-    find(".tutorial-tip").textContent = data.tip;
+    find(".tutorial-progress").textContent = t("Lesson {count} of {total}", {
+      count: lesson + 1,
+      total: LESSONS[track].length,
+    });
+    find("h2").textContent = t(data.title);
+    find(".tutorial-prompt").textContent = t(data.prompt);
+    find(".tutorial-tip").textContent = t(data.tip);
     find(".tutorial-feedback").textContent = "";
-    continueButton.textContent = "Continue";
+    continueButton.textContent = t("Continue");
     continueButton.disabled = true;
     find<HTMLButtonElement>("[data-reset]").hidden = false;
     find<HTMLButtonElement>("[data-resume]").hidden = true;
@@ -282,12 +350,14 @@ export function startTutorial(
     controls.releaseAll();
     paused = true;
     find<HTMLButtonElement>("[data-resume]").hidden = false;
-    find(".tutorial-feedback").textContent =
-      "Practice paused. Resume when you are ready.";
+    find(".tutorial-feedback").textContent = t(
+      "Practice paused. Resume when you are ready.",
+    );
   }
   function destroy() {
     if (disposed) return;
     disposed = true;
+    unsubscribeLanguage();
     cancelAnimationFrame(frame);
     controls.destroy();
     window.removeEventListener("blur", pause);
@@ -308,7 +378,7 @@ export function startTutorial(
     paused = false;
     find<HTMLButtonElement>("[data-resume]").hidden = true;
     find(".tutorial-feedback").textContent = complete
-      ? "Goal reached. Continue when you are ready."
+      ? t("Goal reached. Continue when you are ready.")
       : "";
     overlay.focus();
   };
@@ -323,16 +393,19 @@ export function startTutorial(
     else {
       finished = true;
       controls.releaseAll();
-      find("h2").textContent = "Practice complete";
+      find("h2").textContent = t("Practice complete");
       find(".tutorial-prompt").textContent =
         track === "basics"
-          ? "You have moved, rotated, dropped, cleared a line and used Hold."
-          : "You have practiced landing, Hold swaps, Tetrises, back-to-back clears and a T-spin double.";
-      find(".tutorial-tip").textContent =
-        "Replay whenever you like, or exit to choose a game.";
+          ? t("You have moved, rotated, dropped, cleared a line and used Hold.")
+          : t(
+              "You have practiced landing, Hold swaps, Tetrises, back-to-back clears and a T-spin double.",
+            );
+      find(".tutorial-tip").textContent = t(
+        "Replay whenever you like, or exit to choose a game.",
+      );
       find(".tutorial-feedback").textContent = "";
       find<HTMLButtonElement>("[data-reset]").hidden = true;
-      continueButton.textContent = "Replay tutorial";
+      continueButton.textContent = t("Replay tutorial");
     }
   };
   window.addEventListener("blur", pause);
@@ -346,6 +419,7 @@ export function startTutorial(
     frame = requestAnimationFrame(animate);
   }
   loadLesson();
+  unsubscribeLanguage = subscribeLanguage(refreshLanguage);
   frame = requestAnimationFrame(animate);
   return { destroy, pause };
 }

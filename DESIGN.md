@@ -127,7 +127,7 @@ components:
 
 Afterblock keeps the board and thumb controls dominant while each selectable theme carries a complete material treatment through menus, sheets, the board and piece previews. The user approved the original nine new worlds alongside the four existing themes; four additional material studies extend that family. This is a family of visual systems rather than a single palette with interchangeable accent colors.
 
-The theme registry and stylesheet are the authority for exact appearance; the Canvas renderer is the authority for tiles and ghosts. Short functional English labels, locally bundled typefaces for the new worlds and a shared phone-first geometry keep the experience coherent. Theme changes alter appearance without moving gameplay controls.
+The theme registry and stylesheet are the authority for exact appearance; the Canvas renderer is the authority for tiles and ghosts. Short functional English and Turkish labels, locally bundled typefaces for the new worlds and a shared phone-first geometry keep the experience coherent. Theme changes alter appearance without moving gameplay controls.
 
 **Key Characteristics:**
 
@@ -269,3 +269,7 @@ Marathon opens a compact setup sheet with Speed (Progressive or Fixed), Starting
 ## Online Battle balance
 
 Online is a main-menu mode in the same app served at `/` and `/play` and bundled in Android. Its scoped overlay inherits the selected theme and uses the shared board, rail and saved control geometry. Connection is explicit, with a server address, name and optional browser-only private-LAN allowance. A details disclosure named Match balance contains one fieldset per player, with one Outgoing attack select (three nerfs, Normal and three buffs). The host can edit and reset to equal; the guest can inspect. Keep settings out of the playing view, with a brief per-player summary visible throughout the round. Real changes clear readiness and countdown locks configuration. The opponent board stays within a compact rail. Back/Exit during a live round asks before forfeiting; leaving restores the home screen and preserved solo run. The overlay never edits offline layouts or records.
+
+## Language selection
+
+Settings starts with an English/Türkçe selector that applies immediately and persists. Preserve the active run, settings-sheet disclosure and scroll position; refresh authored static labels in place. All menus, Story, lessons, editor tools, themes, feedback and Online status/errors use the shared catalogs. Do not translate player names, server addresses or room codes. Turkish copy must fit the same phone layouts and touch targets; keep labels short and allow longer descriptions to wrap. Update document language and numeric formatting with the selection.

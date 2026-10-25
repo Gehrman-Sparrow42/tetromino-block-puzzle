@@ -1,3 +1,4 @@
+import { t, setLanguage, getLocale } from "../platform/i18n";
 import { startTutorial } from "./tutorial";
 import { startOnline } from "./online-screen";
 import "./story.css";
@@ -59,7 +60,7 @@ const MODE_NAMES: Record<GameMode, string> = {
   sprint40: "Sprint 40",
   ultra120: "Ultra 120",
 };
-const num = (value: number) => value.toLocaleString("en-US");
+const num = (value: number) => value.toLocaleString(getLocale());
 export function formatTime(ms: number, hundredths = false, countdown = false) {
   const value = Math.max(0, ms);
   const seconds = countdown
@@ -69,7 +70,9 @@ export function formatTime(ms: number, hundredths = false, countdown = false) {
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
   return hundredths
-    ? `${clock}.${Math.floor((value % 1000) / 10)
+    ? `${clock}${getLocale() === "tr-TR" ? "," : "."}${Math.floor(
+        (value % 1000) / 10,
+      )
         .toString()
         .padStart(2, "0")}`
     : clock;
@@ -84,7 +87,7 @@ const CONTROL_ICONS: Record<string, string> = {
   HOLD: "⇄",
 };
 const control = (command: string, label: string) =>
-  `<button class="control" data-command="${command}" aria-label="${label}"><span aria-hidden="true">${CONTROL_ICONS[command]}</span></button>`;
+  `<button class="control" data-command="${command}" data-i18n-aria="${label}" aria-label="${t(label)}"><span aria-hidden="true">${CONTROL_ICONS[command]}</span></button>`;
 const padOutline = `<svg class="pad-outline" viewBox="0 0 300 200" preserveAspectRatio="none" aria-hidden="true"><path d="M2 2H298V98H198V198H102V98H2Z"/></svg>`;
 
 export function startApp(root: HTMLDivElement) {
@@ -93,6 +96,7 @@ export function startApp(root: HTMLDivElement) {
   let settings = loadSettings(),
     stats = loadStats(),
     state = loadRun();
+  setLanguage(settings.language);
   const themeAccess = loadThemeAccess(settings.theme);
   if (!isThemeUnlocked(themeAccess, settings.theme)) {
     settings = { ...settings, theme: "ink" };
@@ -117,47 +121,64 @@ export function startApp(root: HTMLDivElement) {
   };
   root.innerHTML = `
     <main class="shell">
-      <section id="home" class="home-screen" aria-label="Main menu">
+      <section id="home" class="home-screen" data-i18n-aria="Main menu" aria-label="${t("Main menu")}">
         <h1>Afterblock</h1>
-        <button id="resume-card" class="resume-card" data-action="resume"><span><strong>Resume</strong><small id="resume-detail"></small></span><span aria-hidden="true">→</span></button>
-        <div class="mode-list" aria-label="Choose a game mode">
-          <button class="mode-card" data-action="story-levels"><span><strong>Story</strong><small>12 levels</small></span><span aria-hidden="true">→</span></button>
-          <button class="mode-card" data-mode="marathon"><span><strong>Marathon</strong><small>Endless</small></span><span aria-hidden="true">∞</span></button>
-          <button class="mode-card" data-mode="sprint40"><span><strong>Sprint 40</strong><small>40 lines</small></span><span aria-hidden="true">→</span></button>
-          <button class="mode-card" data-mode="ultra120"><span><strong>Ultra 120</strong><small>2 minutes</small></span><span aria-hidden="true">◷</span></button>
-          <button class="mode-card" data-action="online"><span><strong>Online</strong><small>Battle with a friend</small></span><span aria-hidden="true">→</span></button>
+        <button id="resume-card" class="resume-card" data-action="resume"><span><strong data-i18n="Resume">${t("Resume")}</strong><small id="resume-detail"></small></span><span aria-hidden="true">→</span></button>
+        <div class="mode-list" data-i18n-aria="Choose a game mode" aria-label="${t("Choose a game mode")}">
+          <button class="mode-card" data-action="story-levels"><span><strong data-i18n="Story">${t("Story")}</strong><small data-i18n="12 levels">${t("12 levels")}</small></span><span aria-hidden="true">→</span></button>
+          <button class="mode-card" data-mode="marathon"><span><strong data-i18n="Marathon">${t("Marathon")}</strong><small data-i18n="Endless">${t("Endless")}</small></span><span aria-hidden="true">∞</span></button>
+          <button class="mode-card" data-mode="sprint40"><span><strong data-i18n="Sprint 40">${t("Sprint 40")}</strong><small data-i18n="40 lines">${t("40 lines")}</small></span><span aria-hidden="true">→</span></button>
+          <button class="mode-card" data-mode="ultra120"><span><strong data-i18n="Ultra 120">${t("Ultra 120")}</strong><small data-i18n="2 minutes">${t("2 minutes")}</small></span><span aria-hidden="true">◷</span></button>
+          <button class="mode-card" data-action="online"><span><strong data-i18n="Online">${t("Online")}</strong><small data-i18n="Battle with a friend">${t("Battle with a friend")}</small></span><span aria-hidden="true">→</span></button>
         </div>
-        <nav class="home-links" aria-label="Menu"><button data-action="tutorial">Tutorial</button><button data-action="records">Records</button><button data-action="settings">Settings</button><button data-action="help">Help</button></nav>
+        <nav class="home-links" data-i18n-aria="Menu" aria-label="${t("Menu")}"><button data-action="tutorial" data-i18n="Tutorial">${t("Tutorial")}</button><button data-action="records" data-i18n="Records">${t("Records")}</button><button data-action="settings" data-i18n="Settings">${t("Settings")}</button><button data-action="help" data-i18n="Help">${t("Help")}</button></nav>
       </section>
-      <section id="game" class="game-screen" hidden aria-label="Game">
+      <section id="game" class="game-screen" hidden data-i18n-aria="Game" aria-label="${t("Game")}">
         <div class="play-area">
-          <aside class="left-rail" aria-label="Run status">
-            <button class="hold-panel" data-command="HOLD" aria-label="Hold piece"><span>Hold</span><canvas id="hold" aria-hidden="true"></canvas></button>
+          <aside class="left-rail" data-i18n-aria="Run status" aria-label="${t("Run status")}">
+            <button class="hold-panel" data-command="HOLD" data-i18n-aria="Hold piece" aria-label="${t("Hold piece")}"><span data-i18n="Hold">${t("Hold")}</span><canvas id="hold" aria-hidden="true"></canvas></button>
             <div class="rail-stats">
-              <div class="hud-score"><span id="mode-label">Marathon</span><strong id="score">0</strong></div>
-              <div><span>Lines</span><strong id="lines">0</strong></div>
-              <div><span id="speed-label">Level</span><strong id="level">1</strong></div>
-              <div><span id="time-label">Time</span><strong id="time">00:00</strong></div>
+              <div class="hud-score"><span id="mode-label" data-i18n="Marathon">${t("Marathon")}</span><strong id="score">0</strong></div>
+              <div><span data-i18n="Lines">${t("Lines")}</span><strong id="lines">0</strong></div>
+              <div><span id="speed-label" data-i18n="Level">${t("Level")}</span><strong id="level">1</strong></div>
+              <div><span id="time-label" data-i18n="Time">${t("Time")}</span><strong id="time">00:00</strong></div>
             </div>
           </aside>
-          <aside class="next-rail" aria-label="Upcoming pieces">
-            <button class="icon-button pause-button" data-action="pause" aria-label="Pause game">Ⅱ</button>
-            <div class="next-strip"><span>Next</span>${Array.from({ length: 1 }, (_, i) => `<canvas id="next-${i}" aria-label="Upcoming piece ${i + 1}"></canvas>`).join("")}</div>
+          <aside class="next-rail" data-i18n-aria="Upcoming pieces" aria-label="${t("Upcoming pieces")}">
+            <button class="icon-button pause-button" data-action="pause" data-i18n-aria="Pause game" aria-label="${t("Pause game")}">Ⅱ</button>
+            <div class="next-strip"><span data-i18n="Next">${t("Next")}</span>${Array.from({ length: 1 }, (_, i) => `<canvas id="next-${i}" data-i18n-aria="Upcoming piece {number}" data-i18n-number="${i + 1}" aria-label="${t("Upcoming piece {number}", { number: num(i + 1) })}"></canvas>`).join("")}</div>
           </aside>
-          <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" aria-label="Tetromino playfield, ten columns and twenty rows"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
-          <div class="control-deck" aria-label="Game controls">
+          <div class="playfield"><div class="board-wrap"><canvas id="board" role="img" data-i18n-aria="Tetromino playfield, ten columns and twenty rows" aria-label="${t("Tetromino playfield, ten columns and twenty rows")}"></canvas><div id="feedback" class="feedback" aria-live="polite"></div></div></div>
+          <div class="control-deck" data-i18n-aria="Game controls" aria-label="${t("Game controls")}">
             <div class="movement-pad" data-movement-pad>${padOutline}${control("MOVE_LEFT", "Left")}${control("SOFT_DROP", "Soft drop")}${control("MOVE_RIGHT", "Right")}</div>${control("HARD_DROP", "Hard drop")}${control("HOLD", "Hold")}${control("ROTATE_CCW", "Rotate left")}${control("ROTATE_CW", "Rotate right")}
           </div>
         </div>
       </section>
     </main>
     <div id="modal-layer" class="modal-layer" hidden><section id="dialog" class="sheet" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"></section></div>
-    <div id="storage-notice" class="storage-notice" role="status" hidden>Storage unavailable. Progress cannot be saved.</div>`;
+    <div id="storage-notice" class="storage-notice" role="status" hidden data-i18n="Storage unavailable. Progress cannot be saved.">${t("Storage unavailable. Progress cannot be saved.")}</div>`;
   const el = <T extends HTMLElement = HTMLElement>(id: string) =>
     root.querySelector<T>(`#${id}`)!;
   const dialog = el("dialog"),
     layer = el("modal-layer"),
     canvas = el<HTMLCanvasElement>("board");
+  function refreshStaticLabels() {
+    for (const node of root.querySelectorAll<HTMLElement>(
+      ".shell [data-i18n], #storage-notice[data-i18n]",
+    ))
+      node.textContent = t(node.dataset.i18n!);
+    for (const node of root.querySelectorAll<HTMLElement>(
+      ".shell [data-i18n-aria]",
+    ))
+      node.setAttribute(
+        "aria-label",
+        t(node.dataset.i18nAria!, {
+          number: num(Number(node.dataset.i18nNumber ?? 0)),
+        }),
+      );
+    updateResume();
+    draw();
+  }
   let lastFocus: HTMLElement | null = null;
   let controlEditor: ControlEditor | null = null;
   let tutorialHandle: ReturnType<typeof startTutorial> | null = null;
@@ -315,7 +336,7 @@ export function startApp(root: HTMLDivElement) {
     const railPreview = Object.entries(rails)
       .map(
         ([side, rect]) =>
-          `<div class="control-reference-rail" style="left:${offset + rect.x * scale}px;top:${rect.y * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px;font-size:${9 * scale}px">${side === "left" ? "Hold<br>Score<br>Lines<br>Level<br>Time" : "Pause<br>Next"}</div>`,
+          `<div class="control-reference-rail" style="left:${offset + rect.x * scale}px;top:${rect.y * scale}px;width:${rect.width * scale}px;height:${rect.height * scale}px;font-size:${9 * scale}px">${side === "left" ? [t("Hold"), t("Score"), t("Lines"), t("Level"), t("Time")].join("<br>") : [t("Pause"), t("Next")].join("<br>")}</div>`,
       )
       .join("");
     preview.innerHTML =
@@ -351,7 +372,7 @@ export function startApp(root: HTMLDivElement) {
     const currentTheme = dialog.querySelector<HTMLElement>(
       "[data-current-theme]",
     );
-    if (currentTheme) currentTheme.textContent = THEMES[settings.theme].name;
+    if (currentTheme) currentTheme.textContent = t(THEMES[settings.theme].name);
     syncControlFields();
     layoutControls();
     drawControlPreview();
@@ -390,7 +411,7 @@ export function startApp(root: HTMLDivElement) {
     el("resume-card").hidden = !available;
     if (state)
       el("resume-detail").textContent =
-        `${state.mode === "story" ? `Story ${state.storyLevelId}` : MODE_NAMES[state.mode]} · ${num(state.score)}`;
+        `${state.mode === "story" ? t("Story {level}", { level: num(state.storyLevelId!) }) : t(MODE_NAMES[state.mode])} · ${num(state.score)}`;
   }
   function showModal(type: string, content: string) {
     if (type !== "theme-unlock") cancelThemePreview();
@@ -434,7 +455,7 @@ export function startApp(root: HTMLDivElement) {
     });
   }
   const sheetHead = (title: string, close = true) =>
-    `<div class="sheet-top"><h2 id="dialog-title">${title}</h2>${close ? '<button class="icon-button" data-action="close" aria-label="Close dialog">×</button>' : ""}</div>`;
+    `<div class="sheet-top"><h2 id="dialog-title">${t(title)}</h2>${close ? `<button class="icon-button" data-action="close" data-i18n-aria="Close dialog" aria-label="${t("Close dialog")}">×</button>` : ""}</div>`;
   function pause() {
     if (
       screen !== "game" ||
@@ -447,7 +468,7 @@ export function startApp(root: HTMLDivElement) {
     persist();
     showModal(
       "pause",
-      `${sheetHead(state.mode === "story" ? `Story ${state.storyLevelId} · Paused` : "Paused", false)}<div class="sheet-stats"><span>Score<strong>${num(state.score)}</strong></span><span>Lines<strong>${state.lines}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">Resume</button><button class="secondary-button" data-action="settings">Settings</button><div class="split-actions"><button data-action="restart">Restart</button><button data-action="home">Menu</button></div>`,
+      `${sheetHead(state.mode === "story" ? t("Story {level} · Paused", { level: num(state.storyLevelId!) }) : "Paused", false)}<div class="sheet-stats"><span>${t("Score")}<strong>${num(state.score)}</strong></span><span>${t("Lines")}<strong>${num(state.lines)}</strong></span><span>${t("Time")}<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="resume">${t("Resume")}</button><button class="secondary-button" data-action="settings">${t("Settings")}</button><div class="split-actions"><button data-action="restart">${t("Restart")}</button><button data-action="home">${t("Menu")}</button></div>`,
     );
   }
   function resume() {
@@ -509,7 +530,7 @@ export function startApp(root: HTMLDivElement) {
       };
       showModal(
         "marathon-setup",
-        `${sheetHead("Marathon")}<label class="setting-row"><span>Speed</span><select name="marathonSpeed" aria-label="Speed"><option value="progressive" ${pendingMarathon.speedMode === "progressive" ? "selected" : ""}>Progressive</option><option value="fixed" ${pendingMarathon.speedMode === "fixed" ? "selected" : ""}>Fixed</option></select></label><label class="setting-row"><span>Starting level</span><select name="marathonLevel" aria-label="Starting level">${Array.from({ length: 15 }, (_, i) => `<option value="${i + 1}" ${pendingMarathon.startingLevel === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label><p id="speed-note">${pendingMarathon.speedMode === "fixed" ? "Speed stays constant." : "Faster every 10 lines."}</p><button class="primary-button" data-action="start-marathon">Start</button>`,
+        `${sheetHead("Marathon")}<label class="setting-row"><span>${t("Speed")}</span><select name="marathonSpeed" data-i18n-aria="Speed" aria-label="${t("Speed")}"><option value="progressive" ${pendingMarathon.speedMode === "progressive" ? "selected" : ""}>${t("Progressive")}</option><option value="fixed" ${pendingMarathon.speedMode === "fixed" ? "selected" : ""}>${t("Fixed")}</option></select></label><label class="setting-row"><span>${t("Starting level")}</span><select name="marathonLevel" data-i18n-aria="Starting level" aria-label="${t("Starting level")}">${Array.from({ length: 15 }, (_, i) => `<option value="${i + 1}" ${pendingMarathon.startingLevel === i + 1 ? "selected" : ""}>${num(i + 1)}</option>`).join("")}</select></label><p id="speed-note">${pendingMarathon.speedMode === "fixed" ? t("Speed stays constant.") : t("Faster every 10 lines.")}</p><button class="primary-button" data-action="start-marathon">${t("Start")}</button>`,
       );
       return;
     }
@@ -521,7 +542,7 @@ export function startApp(root: HTMLDivElement) {
       }
       showModal(
         "confirm",
-        `${sheetHead("Replace saved run?")}<p>Your ${MODE_NAMES[state.mode]} run will be replaced.</p><button class="primary-button" data-action="confirm-new">Start ${MODE_NAMES[mode]}</button><button class="secondary-button" data-action="close">Cancel</button>`,
+        `${sheetHead("Replace saved run?")}<p>${t("Your {mode} run will be replaced.", { mode: t(MODE_NAMES[state.mode]) })}</p><button class="primary-button" data-action="confirm-new">${t("Start {mode}", { mode: t(MODE_NAMES[mode]) })}</button><button class="secondary-button" data-action="close">${t("Cancel")}</button>`,
       );
     } else newRun(mode);
   }
@@ -533,7 +554,7 @@ export function startApp(root: HTMLDivElement) {
     }
     showModal(
       "tutorial-chooser",
-      `${sheetHead("Tutorial")}<button class="primary-button" data-action="tutorial-basics">Basics</button><button class="secondary-button" data-action="tutorial-advanced">Advanced</button>`,
+      `${sheetHead("Tutorial")}<button class="primary-button" data-action="tutorial-basics">${t("Basics")}</button><button class="secondary-button" data-action="tutorial-advanced">${t("Advanced")}</button>`,
     );
   }
   function exitOnline() {
@@ -594,16 +615,16 @@ export function startApp(root: HTMLDivElement) {
     showModal(
       "story-levels",
       `${sheetHead("Story")}
-      <section class="story-detail" aria-label="Selected level">
-        <h3>Level ${level.id} · ${level.title}</h3><p class="story-goal">Clear ${level.targetLines} lines</p>
-        <ol class="story-phases" aria-label="Speed bands">${level.phases.map((phase, i) => `<li><span>Lines ${phase.fromLine}–${(level.phases[i + 1]?.fromLine ?? level.targetLines) - 1}</span><strong>Speed ${phase.speed}</strong></li>`).join("")}</ol>
-        <button class="primary-button" data-action="start-story">${progress.completed[String(id)] ? "Replay" : "Start"} level ${id}</button>
+      <section class="story-detail" data-i18n-aria="Selected level" aria-label="${t("Selected level")}">
+        <h3>${t("Level {level} · {title}", { level: num(level.id), title: t(level.title) })}</h3><p class="story-goal">${t("Clear {lines} lines", { lines: num(level.targetLines) })}</p>
+        <ol class="story-phases" data-i18n-aria="Speed bands" aria-label="${t("Speed bands")}">${level.phases.map((phase, i) => `<li><span>${t("Lines {from}–{to}", { from: num(phase.fromLine), to: num((level.phases[i + 1]?.fromLine ?? level.targetLines) - 1) })}</span><strong>${t("Speed {level}", { level: num(phase.speed) })}</strong></li>`).join("")}</ol>
+        <button class="primary-button" data-action="start-story">${t(progress.completed[String(id)] ? "Replay level {level}" : "Start level {level}", { level: num(id) })}</button>
       </section>
-      <div class="story-level-list" role="group" aria-label="Story levels">${STORY_LEVELS.map(
+      <div class="story-level-list" role="group" data-i18n-aria="Story levels" aria-label="${t("Story levels")}">${STORY_LEVELS.map(
         (item) => {
           const unlocked = isStoryLevelUnlocked(progress, item.id);
           const completed = !!progress.completed[String(item.id)];
-          return `<button class="story-level" data-action="select-story-level" data-story-level="${item.id}" ${!unlocked ? "disabled" : ""} ${item.id === id ? 'aria-current="true"' : ""}><span><strong>${item.id}. ${item.title}</strong><small>${item.targetLines} lines</small></span><span class="story-level-state">${completed ? "Completed" : !unlocked ? "Locked" : "Ready"}</span></button>`;
+          return `<button class="story-level" data-action="select-story-level" data-story-level="${item.id}" ${!unlocked ? "disabled" : ""} ${item.id === id ? 'aria-current="true"' : ""}><span><strong>${num(item.id)}. ${t(item.title)}</strong><small>${t("{lines} lines", { lines: num(item.targetLines) })}</small></span><span class="story-level-state">${completed ? t("Completed") : !unlocked ? t("Locked") : t("Ready")}</span></button>`;
         },
       ).join("")}</div>`,
     );
@@ -616,14 +637,14 @@ export function startApp(root: HTMLDivElement) {
     const next = getStoryLevel(level.id + 1);
     const title = won
       ? !next
-        ? "Story complete"
-        : `Level ${level.id} complete`
-      : `Level ${level.id} · Game over`;
+        ? t("Story complete")
+        : t("Level {level} complete", { level: num(level.id) })
+      : t("Level {level} · Game over", { level: num(level.id) });
     showModal(
       "result",
-      `${sheetHead(title, false)}<div class="result-score">${num(state.score)}<span>Score</span></div><div class="sheet-stats"><span>Lines<strong>${state.lines}/${level.targetLines}</strong></span><span>Time<strong>${formatTime(state.elapsedMs)}</strong></span></div>
-      ${won && !storyCompletionSaved ? '<p role="status">Progress could not be saved. Try again to unlock the next level.</p><button class="primary-button" data-action="save-story-result">Save progress</button>' : won && next ? '<button class="primary-button" data-action="next-story-level">Next level</button>' : ""}
-      <button class="secondary-button" data-action="restart">${won ? "Replay" : "Retry"} level ${level.id}</button><div class="split-actions"><button data-action="story-levels">Levels</button><button data-action="home">Menu</button></div>`,
+      `${sheetHead(title, false)}<div class="result-score">${num(state.score)}<span>${t("Score")}</span></div><div class="sheet-stats"><span>${t("Lines")}<strong>${state.lines}/${num(level.targetLines)}</strong></span><span>${t("Time")}<strong>${formatTime(state.elapsedMs)}</strong></span></div>
+      ${won && !storyCompletionSaved ? `<p role="status">${t("Progress could not be saved. Try again to unlock the next level.")}</p><button class="primary-button" data-action="save-story-result">${t("Save progress")}</button>` : won && next ? `<button class="primary-button" data-action="next-story-level">${t("Next level")}</button>` : ""}
+      <button class="secondary-button" data-action="restart">${t(won ? "Replay level {level}" : "Retry level {level}", { level: num(level.id) })}</button><div class="split-actions"><button data-action="story-levels">${t("Levels")}</button><button data-action="home">${t("Menu")}</button></div>`,
     );
   }
   function showSettings(themePickerOpen = false) {
@@ -632,7 +653,7 @@ export function startApp(root: HTMLDivElement) {
       persist();
     }
     const toggle = (key: keyof UserSettings, title: string, value: boolean) =>
-      `<label class="setting-row"><span>${title}</span><input type="checkbox" name="${key}" ${value ? "checked" : ""}/></label>`;
+      `<label class="setting-row"><span>${t(title)}</span><input type="checkbox" name="${key}" ${value ? "checked" : ""}/></label>`;
     const range = (
       key: keyof UserSettings,
       title: string,
@@ -641,31 +662,35 @@ export function startApp(root: HTMLDivElement) {
       step: number,
       label = title,
     ) =>
-      `<label class="setting-row range-row"><span>${title}</span><input name="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" aria-label="${label}"/></label>`;
+      `<label class="setting-row range-row"><span>${t(title)}</span><input name="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}" aria-label="${t(label)}"/></label>`;
     const select = (
       key: keyof UserSettings,
       title: string,
       options: [string, string][],
       label = title,
     ) =>
-      `<label class="setting-row"><span>${title}</span><select name="${key}" aria-label="${label}">${options.map(([value, text]) => `<option value="${value}" ${settings[key] === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>`;
+      `<label class="setting-row"><span>${t(title)}</span><select name="${key}" aria-label="${t(label)}">${options.map(([value, text]) => `<option value="${value}" ${settings[key] === value ? "selected" : ""}>${t(text)}</option>`).join("")}</select></label>`;
     showModal(
       "settings",
       `${sheetHead("Settings")}<form id="settings-form">
+      ${select("language", "Language", [
+        ["en", "English"],
+        ["tr", "Türkçe"],
+      ])}
       <details class="theme-picker" ${themePickerOpen ? "open" : ""}>
-        <summary><span>Theme</span><strong data-current-theme>${THEMES[settings.theme].name}</strong></summary>
-        <fieldset class="theme-options"><legend>Choose theme</legend>
+        <summary><span>${t("Theme")}</span><strong data-current-theme>${t(THEMES[settings.theme].name)}</strong></summary>
+        <fieldset class="theme-options"><legend>${t("Choose theme")}</legend>
         ${Object.values(THEMES)
           .map((theme) => {
             const swatches = `<span class="theme-swatches" aria-hidden="true"><i style="background:${theme.css["--bg"]}"></i><i style="background:${theme.css["--accent"]}"></i><i style="background:${theme.pieces.T}"></i></span>`;
             return isThemeUnlocked(themeAccess, theme.id)
-              ? `<label class="theme-choice"><input type="radio" name="theme" value="${theme.id}" ${settings.theme === theme.id ? "checked" : ""}>${swatches}<span>${theme.name}</span></label>`
-              : `<button type="button" class="theme-choice theme-locked" data-action="preview-theme" data-theme-id="${theme.id}" aria-label="Preview ${theme.name}">${swatches}<span class="theme-choice-name">${theme.name}</span><span class="theme-preview-label">Preview</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></button>`;
+              ? `<label class="theme-choice"><input type="radio" name="theme" value="${theme.id}" ${settings.theme === theme.id ? "checked" : ""}>${swatches}<span>${t(theme.name)}</span></label>`
+              : `<button type="button" class="theme-choice theme-locked" data-action="preview-theme" data-theme-id="${theme.id}" aria-label="${t("Preview {theme}", { theme: t(theme.name) })}">${swatches}<span class="theme-choice-name">${t(theme.name)}</span><span class="theme-preview-label">${t("Preview")}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></button>`;
           })
           .join("")}
         </fieldset>
       </details>
-      <h3>Controls</h3>
+      <h3>${t("Controls")}</h3>
       ${select(
         "controlLayout",
         "Layout",
@@ -688,11 +713,11 @@ export function startApp(root: HTMLDivElement) {
         "Gamepad preset",
       )}
       <div class="control-preview" aria-hidden="true"></div>
-      <button type="button" class="secondary-button" data-action="edit-controls">Edit controls</button>
+      <button type="button" class="secondary-button" data-action="edit-controls">${t("Edit controls")}</button>
       ${range("controlScale", "Size", 0.85, 2, 0.01, "Control size")}
       ${range("controlOpacity", "Opacity", 0.08, 0.6, 0.01, "Control opacity")}
       ${range("boardScale", "Board size", 0.5, 1, 0.01, "Board size")}
-      <button type="button" class="secondary-button" data-action="reset-controls">Reset controls</button>
+      <button type="button" class="secondary-button" data-action="reset-controls">${t("Reset controls")}</button>
       ${select(
         "controlScheme",
         "Input",
@@ -704,13 +729,13 @@ export function startApp(root: HTMLDivElement) {
       )}
       ${range("dasMs", "Move delay", 80, 300, 5, "Move repeat delay")}
       ${range("arrMs", "Repeat interval", 16, 100, 1, "Move repeat interval")}
-      <h3>Sound & display</h3>
+      <h3>${t("Sound & display")}</h3>
       ${toggle("soundEnabled", "Sound", settings.soundEnabled)}
       ${range("soundVolume", "Volume", 0, 1, 0.05, "Sound volume")}
       ${toggle("hapticsEnabled", "Haptics", settings.hapticsEnabled)}
       ${toggle("ghostEnabled", "Ghost piece", settings.ghostEnabled)}
       ${toggle("reducedMotion", "Reduced motion", settings.reducedMotion)}
-      </form><button class="primary-button" data-action="close">Done</button>`,
+      </form><button class="primary-button" data-action="close">${t("Done")}</button>`,
     );
     syncControlFields();
     drawControlPreview();
@@ -731,11 +756,11 @@ export function startApp(root: HTMLDivElement) {
     applyTheme(id);
     showModal(
       "theme-unlock",
-      `${sheetHead(`Unlock ${THEMES[id].name}`, false)}
-      <p>Watch 1 ad to unlock. Stays available offline.</p>
-      <p class="theme-unlock-status" role="status">${message || (!rewardedAds.enabled ? "Ads unavailable. You can still use the four free themes." : "")}</p>
-      <button class="primary-button" data-action="unlock-theme" ${!rewardedAds.enabled || themeRequest ? "disabled" : ""}>${themeRequest ? "Waiting for ad…" : !rewardedAds.enabled ? "Ads unavailable" : rewardedAds.isTest ? "Test ad · unlock" : "Watch ad · unlock"}</button>
-      <button class="secondary-button" data-action="cancel-theme">Back</button>`,
+      `${sheetHead(t("Unlock {theme}", { theme: t(THEMES[id].name) }), false)}
+      <p>${t("Watch 1 ad to unlock. Stays available offline.")}</p>
+      <p class="theme-unlock-status" role="status">${message || (!rewardedAds.enabled ? t("Ads unavailable. You can still use the four free themes.") : "")}</p>
+      <button class="primary-button" data-action="unlock-theme" ${!rewardedAds.enabled || themeRequest ? "disabled" : ""}>${themeRequest ? t("Waiting for ad…") : !rewardedAds.enabled ? t("Ads unavailable") : rewardedAds.isTest ? t("Test ad · unlock") : t("Watch ad · unlock")}</button>
+      <button class="secondary-button" data-action="cancel-theme">${t("Back")}</button>`,
     );
     draw();
   }
@@ -767,13 +792,13 @@ export function startApp(root: HTMLDivElement) {
       if (!current()) return;
       themeRequest = null;
       if (!result.earned) {
-        previewTheme(target, "Ad not completed. Try again or go back.");
+        previewTheme(target, t("Ad not completed. Try again or go back."));
         return;
       }
       if (!grantThemeUnlock(themeAccess, target)) {
         previewTheme(
           target,
-          "Unlock could not be saved. Check storage and try again.",
+          t("Unlock could not be saved. Check storage and try again."),
         );
         return;
       }
@@ -785,27 +810,27 @@ export function startApp(root: HTMLDivElement) {
     } catch {
       if (!current()) return;
       themeRequest = null;
-      previewTheme(target, "Ad unavailable. Try again or go back.");
+      previewTheme(target, t("Ad unavailable. Try again or go back."));
     }
   }
   function showRecords(current: PersonalBestStats) {
     showModal(
       "records",
-      `${sheetHead("Records")}<div class="record"><span>Marathon / score</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>Marathon / lines</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>Fixed / score</span><strong>${num(current.marathonFixedHighScore ?? 0)}</strong></div><div class="record"><span>Fixed / lines</span><strong>${num(current.marathonFixedMaxLines ?? 0)}</strong></div><div class="record"><span>Sprint 40 / fastest</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>Ultra 120 / score</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${num(current.gamesPlayed)} games</p><button class="primary-button" data-action="close">Close</button>`,
+      `${sheetHead("Records")}<div class="record"><span>${t("Marathon / score")}</span><strong>${num(current.marathonHighScore)}</strong></div><div class="record"><span>${t("Marathon / lines")}</span><strong>${num(current.marathonMaxLines)}</strong></div><div class="record"><span>${t("Fixed / score")}</span><strong>${num(current.marathonFixedHighScore ?? 0)}</strong></div><div class="record"><span>${t("Fixed / lines")}</span><strong>${num(current.marathonFixedMaxLines ?? 0)}</strong></div><div class="record"><span>${t("Sprint 40 / fastest")}</span><strong>${current.sprint40BestTimeMs === null ? "—" : formatTime(current.sprint40BestTimeMs, true)}</strong></div><div class="record"><span>${t("Ultra 120 / score")}</span><strong>${num(current.ultra120HighScore)}</strong></div><p class="record-note">${t("{games} games", { games: num(current.gamesPlayed) })}</p><button class="primary-button" data-action="close">${t("Close")}</button>`,
     );
   }
   function help() {
     showModal(
       "help",
       `${sheetHead("Help")}<div class="help-copy">
-      <p>Fill a horizontal row to clear it. The game ends when the stack reaches the top.</p>
-      <p>Story: 12 levels with changing speed bands.<br>Marathon: endless, faster every 10 lines.<br>Sprint 40: clear 40 lines.<br>Ultra 120: score in 2 minutes.</p>
-      <h3>Touch</h3><p>← / → move · ↓ soft drop · ⇓ hard drop<br>↶ / ↷ rotate · ⇄ hold</p>
-      <p>Hold swaps once per piece. Next shows the upcoming piece.</p>
-      <h3>Keyboard</h3><p>Arrows move · Z / X rotate · C / Shift hold<br>Space drops · P / Escape pauses</p>
-      <h3>Swipes</h3><p>Enable in Settings. Tap rotates; swipe sideways moves, down drops, up holds.</p>
-      <h3>Scoring</h3><p>Clear several rows together, combos and T-spins for extra points. Consecutive four-line clears and T-spins earn a bonus.</p>
-      </div><button class="primary-button" data-action="close">Close</button>`,
+      <p>${t("Fill a horizontal row to clear it. The game ends when the stack reaches the top.")}</p>
+      <p>${t("Story: 12 levels with changing speed bands.")}<br>${t("Marathon: endless, faster every 10 lines.")}<br>${t("Sprint 40: clear 40 lines.")}<br>${t("Ultra 120: score in 2 minutes.")}</p>
+      <h3>${t("Touch")}</h3><p>${t("← / → move · ↓ soft drop · ⇓ hard drop")}<br>${t("↶ / ↷ rotate · ⇄ hold")}</p>
+      <p>${t("Hold swaps once per piece. Next shows the upcoming piece.")}</p>
+      <h3>${t("Keyboard")}</h3><p>${t("Arrows move · Z / X rotate · C / Shift hold")}<br>${t("Space drops · P / Escape pauses")}</p>
+      <h3>${t("Swipes")}</h3><p>${t("Enable in Settings. Tap rotates; swipe sideways moves, down drops, up holds.")}</p>
+      <h3>${t("Scoring")}</h3><p>${t("Clear several rows together, combos and T-spins for extra points. Consecutive four-line clears and T-spins earn a bonus.")}</p>
+      </div><button class="primary-button" data-action="close">${t("Close")}</button>`,
     );
   }
   function cancelRewardRequest() {
@@ -815,7 +840,7 @@ export function startApp(root: HTMLDivElement) {
   function offerContinue(message = "") {
     showModal(
       "continue",
-      `${sheetHead("Continue?", false)}<p>Clear the bottom 2 rows and continue once this Marathon. This run will not update personal bests.</p><p role="status" data-reward-status>${message}</p><button class="primary-button" data-action="watch-ad" ${rewardRequest ? "disabled" : ""}>${rewardRequest ? "Waiting for ad…" : message ? "Try again" : rewardedAds.isTest ? "Test ad · clear 2 rows" : "Watch ad · clear 2 rows"}</button><button class="secondary-button" data-action="end-run">End run</button>`,
+      `${sheetHead("Continue?", false)}<p>${t("Clear the bottom 2 rows and continue once this Marathon. This run will not update personal bests.")}</p><p role="status" data-reward-status>${message}</p><button class="primary-button" data-action="watch-ad" ${rewardRequest ? "disabled" : ""}>${rewardRequest ? t("Waiting for ad…") : message ? t("Try again") : rewardedAds.isTest ? t("Test ad · clear 2 rows") : t("Watch ad · clear 2 rows")}</button><button class="secondary-button" data-action="end-run">${t("End run")}</button>`,
     );
   }
   async function requestContinue() {
@@ -851,7 +876,7 @@ export function startApp(root: HTMLDivElement) {
         persist();
         pause();
         draw();
-      } else offerContinue("Ad not completed. Try again or end the run.");
+      } else offerContinue(t("Ad not completed. Try again or end the run."));
     } catch {
       if (
         request.signal.aborted ||
@@ -861,7 +886,7 @@ export function startApp(root: HTMLDivElement) {
       )
         return;
       rewardRequest = null;
-      offerContinue("Ad unavailable. Try again or end the run.");
+      offerContinue(t("Ad unavailable. Try again or end the run."));
     }
   }
   function terminal() {
@@ -891,7 +916,7 @@ export function startApp(root: HTMLDivElement) {
     }
     showModal(
       "result",
-      `${sheetHead(won ? "Complete" : "Game over", false)}<div class="result-score">${num(state.score)}<span>Score</span></div><div class="sheet-stats"><span>Lines<strong>${state.lines}</strong></span><span>Level<strong>${state.level}</strong></span><span>Time<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="restart">Play again</button><button class="secondary-button" data-action="home">Menu</button>`,
+      `${sheetHead(won ? "Complete" : "Game over", false)}<div class="result-score">${num(state.score)}<span>${t("Score")}</span></div><div class="sheet-stats"><span>${t("Lines")}<strong>${state.lines}</strong></span><span>${t("Level")}<strong>${num(state.level)}</strong></span><span>${t("Time")}<strong>${formatTime(state.elapsedMs, state.mode === "sprint40")}</strong></span></div><button class="primary-button" data-action="restart">${t("Play again")}</button><button class="secondary-button" data-action="home">${t("Menu")}</button>`,
     );
   }
   function send(command: GameCommand) {
@@ -933,9 +958,15 @@ export function startApp(root: HTMLDivElement) {
       persist();
       const event = state.lastEvent;
       if (event && (event.linesCleared || event.tSpin !== "none")) {
-        const names = ["", "SINGLE", "DOUBLE", "TRIPLE", "FOUR LINES"];
+        const names = [
+          "",
+          t("SINGLE"),
+          t("DOUBLE"),
+          t("TRIPLE"),
+          t("FOUR LINES"),
+        ];
         el("feedback").textContent =
-          `${event.perfectClear ? "PERFECT CLEAR" : event.tSpin !== "none" ? "T-SPIN" : names[event.linesCleared]}${event.combo > 0 ? ` · ${event.combo + 1} COMBO` : ""} +${num(event.pointsAwarded)}`;
+          `${event.perfectClear ? t("PERFECT CLEAR") : event.tSpin !== "none" ? t("T-SPIN") : names[event.linesCleared]}${event.combo > 0 ? ` · ${t("{combo} COMBO", { combo: num(event.combo + 1) })}` : ""} +${num(event.pointsAwarded)}`;
         feedbackUntil = performance.now() + 450;
         flashRows = settings.reducedMotion ? [] : event.rows;
         playSound("clear", settings);
@@ -943,7 +974,9 @@ export function startApp(root: HTMLDivElement) {
       }
     }
     if (state.mode === "story" && state.level !== level) {
-      el("feedback").textContent = `Speed ${state.level}`;
+      el("feedback").textContent = t("Speed {level}", {
+        level: num(state.level),
+      });
       feedbackUntil = performance.now() + 900;
     }
     if (state.level > level) playSound("level", settings);
@@ -970,27 +1003,32 @@ export function startApp(root: HTMLDivElement) {
     const now = performance.now();
     el("mode-label").textContent =
       state.mode === "story"
-        ? `Story ${state.storyLevelId}`
-        : MODE_NAMES[state.mode];
-    el("speed-label").textContent = state.mode === "story" ? "Speed" : "Level";
+        ? t("Story {level}", { level: num(state.storyLevelId!) })
+        : t(MODE_NAMES[state.mode]);
+    el("speed-label").textContent =
+      state.mode === "story" ? t("Speed") : t("Level");
     const score = el("score");
     score.textContent =
       state.score < 100000
         ? num(state.score)
-        : new Intl.NumberFormat("en", {
+        : new Intl.NumberFormat(getLocale(), {
             notation: "compact",
             maximumFractionDigits: 1,
           }).format(state.score);
     score.title = num(state.score);
-    score.setAttribute("aria-label", `${num(state.score)} points`);
+    score.setAttribute(
+      "aria-label",
+      t("{points} points", { points: num(state.score) }),
+    );
     el("lines").textContent =
       state.mode === "story"
         ? `${state.lines}/${getStoryLevel(state.storyLevelId!)?.targetLines ?? "—"}`
         : state.mode === "sprint40"
           ? `${state.lines}/40`
-          : String(state.lines);
-    el("level").textContent = String(state.level);
-    el("time-label").textContent = state.mode === "ultra120" ? "Left" : "Time";
+          : num(state.lines);
+    el("level").textContent = num(state.level);
+    el("time-label").textContent =
+      state.mode === "ultra120" ? t("Remaining") : t("Time");
     el("time").textContent = formatTime(
       state.mode === "ultra120" ? 120000 - state.elapsedMs : state.elapsedMs,
       state.mode === "sprint40",
@@ -1208,11 +1246,29 @@ export function startApp(root: HTMLDivElement) {
     if (input.name === "marathonSpeed") {
       el("speed-note").textContent =
         input.value === "fixed"
-          ? "Speed stays constant."
-          : "Faster every 10 lines.";
+          ? t("Speed stays constant.")
+          : t("Faster every 10 lines.");
       return;
     }
     if (!input.closest("#settings-form")) return;
+    if (input.name === "language") {
+      if (input.value !== "en" && input.value !== "tr") return;
+      if (input.value === settings.language) return;
+      const scroll = dialog.scrollTop;
+      const expanded =
+        dialog.querySelector<HTMLDetailsElement>(".theme-picker")?.open ??
+        false;
+      settings = { ...settings, language: input.value };
+      if (!saveSettings(settings)) el("storage-notice").hidden = false;
+      setLanguage(input.value);
+      refreshStaticLabels();
+      showSettings(expanded);
+      dialog.scrollTop = scroll;
+      dialog
+        .querySelector<HTMLSelectElement>('[name="language"]')
+        ?.focus({ preventScroll: true });
+      return;
+    }
     if (
       input.name === "theme" &&
       (!isThemeId(input.value) || !isThemeUnlocked(themeAccess, input.value))
@@ -1333,5 +1389,6 @@ export function startApp(root: HTMLDivElement) {
     persist();
   }
   updateResume();
+  refreshStaticLabels();
   requestAnimationFrame(frame);
 }

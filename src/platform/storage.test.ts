@@ -25,6 +25,21 @@ beforeEach(async () => {
 });
 
 describe("settings and scores", () => {
+  it("migrates language safely and saves a quick swap without changing other preferences", () => {
+    data.set(
+      "tetromino_v2_settings",
+      JSON.stringify({ theme: "lcd", controlScale: 1.5 }),
+    );
+    const old = storage.loadSettings();
+    expect(old.language).toBe("en");
+    expect(storage.saveSettings({ ...old, language: "tr" })).toBe(true);
+    expect(storage.loadSettings()).toEqual({ ...old, language: "tr" });
+    data.set(
+      "tetromino_v2_settings",
+      JSON.stringify({ ...old, language: "xx" }),
+    );
+    expect(storage.loadSettings().language).toBe("en");
+  });
   it("counts a Story victory without replacing Sprint, Ultra or Marathon records", () => {
     const run = createInitialState("story", 47, { storyLevelId: 1 });
     Object.assign(run, {

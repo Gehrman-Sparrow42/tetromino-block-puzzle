@@ -6,6 +6,8 @@ An offline, ad-free falling-tetromino game for Android and the browser. This And
 
 Optional rewarded-continue preparation is available for a future Android build, with live ads disabled. See [Rewarded ads](docs/REWARDED_ADS.md) for the game flow, local test preview, verification backend and remaining SDK integration.
 
+Choose **Settings → Language → Türkçe / English** to switch immediately. The preference is saved without reloading or replacing a run. Turkish covers menus, Story, both playable tutorials, control editing, theme choices, records, help and Online Battle. See [localization notes](docs/LOCALIZATION.md) for maintaining the catalogs.
+
 ## Play
 
 - **Story:** twelve levels with increasing line goals and changing speed phases. Clear a stage to unlock the next, or replay completed stages.

@@ -184,3 +184,66 @@ test("standalone HTML can retry a failed connection and use the same server", as
   await page.locator('[data-action="start-marathon"]').click();
   await expect(page.locator("#game")).toBeVisible();
 });
+
+test("Turkish and English clients share a room without translating names or protocol values", async ({
+  browser,
+}) => {
+  const tr = await browser.newContext({
+      viewport: { width: 360, height: 600 },
+    }),
+    en = await browser.newContext();
+  const a = await tr.newPage(),
+    b = await en.newPage();
+  await a.addInitScript(
+    (settings) =>
+      localStorage.setItem("tetromino_v2_settings", JSON.stringify(settings)),
+    { ...DEFAULT_SETTINGS, language: "tr" },
+  );
+  try {
+    for (const p of [a, b]) {
+      await p.goto("/");
+      await p.locator('#home [data-action="online"]').click();
+      await p.locator('[data-online="connect"]').click();
+      await expect(p.locator('[data-online="create"]')).toBeEnabled();
+    }
+    await a.locator('[name="onlineName"]').fill("Settings");
+    await a.locator('[name="onlineCode"]').fill("AAAAAA");
+    await a.locator('[data-online="join"]').click();
+    await expect(a.locator(".online-error")).toHaveText(
+      "Bu oda kullanılamıyor.",
+    );
+    await a.locator('[data-online="create"]').click();
+    await expect(a.locator(".online-code")).toHaveText(/^[A-HJ-NP-Z2-9]{6}$/);
+    const code = await a.locator(".online-code").innerText();
+    await b.locator('[name="onlineName"]').fill("Records");
+    await b.locator('[name="onlineCode"]').fill(code);
+    await b.locator('[data-online="join"]').click();
+    await expect(a.locator(".online-players")).toContainText("Records");
+    await expect(a.locator(".online-players")).not.toContainText("Rekorlar");
+    await a.locator(".online-balance summary").click();
+    await a.locator("select[data-player]").nth(1).selectOption("2");
+    await expect(a.locator(".online-balance-summary")).toContainText(
+      "Güçlendirme 2",
+    );
+    await expect(b.locator(".online-balance-summary")).toContainText("Buff 2");
+    await a.locator('[data-online="ready"]').click();
+    await b.locator('[data-online="ready"]').click();
+    await expect(a.locator(".online-match-status")).toContainText("Canlı tur", {
+      timeout: 6000,
+    });
+    await expect(b.locator(".online-opponent-name")).toHaveText("Settings");
+    await a.screenshot({ path: "test-results/turkish-online-match.png" });
+    await a.locator('[data-online="exit"]').click();
+    await expect(a.locator(".online-confirm")).not.toContainText(
+      "Forfeit this round?",
+    );
+    await a.locator('[data-online="forfeit"]').click();
+    await expect(a.locator('#home [data-action="settings"]')).toHaveText(
+      "Ayarlar",
+    );
+    await expect(b.locator(".online-match-status")).toContainText("You won");
+  } finally {
+    await tr.close();
+    await en.close();
+  }
+});

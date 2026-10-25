@@ -16,6 +16,7 @@ import {
   measureControlViewport,
   type ControlViewport,
 } from "./control-viewport";
+import { t, getLanguage, getLocale, subscribeLanguage } from "../platform/i18n";
 import "./control-editor.css";
 
 const NAMES: Record<GamepadControlId, string> = {
@@ -74,6 +75,8 @@ export class ControlEditor {
   private destroyed = false;
   private scale = 1;
   private readonly getViewport: () => ControlViewport;
+  private unsubscribeLanguage = () => {};
+  private feedbackSource = "Drag to move. Select to resize.";
 
   constructor(
     root: HTMLElement,
@@ -94,18 +97,18 @@ export class ControlEditor {
     this.wrapper.setAttribute("aria-labelledby", "control-editor-title");
     this.wrapper.innerHTML = `
       <header class="control-editor-header">
-        <button type="button" data-editor-action="cancel">Cancel</button>
-        <h2 id="control-editor-title">Controls</h2>
-        <button type="button" data-editor-action="done">Done</button>
+        <button type="button" data-editor-action="cancel" data-i18n="Cancel">${t("Cancel")}</button>
+        <h2 id="control-editor-title" data-i18n="Controls">${t("Controls")}</h2>
+        <button type="button" data-editor-action="done" data-i18n="Done">${t("Done")}</button>
       </header>
-      <div class="control-editor-hint"><span data-editor-feedback aria-live="polite">Drag to move. Select to resize.</span><span data-editor-orientation></span></div>
-      <div class="control-editor-stage"><div class="control-editor-frame"><button type="button" class="control-editor-board" data-editor-control="board" aria-label="Board"></button><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">Hold<br>Score<br>Lines<br>Level<br>Time</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">Pause<br>Next</div></div></div>
+      <div class="control-editor-hint"><span data-editor-feedback aria-live="polite" data-i18n="Drag to move. Select to resize.">${t("Drag to move. Select to resize.")}</span><span data-editor-orientation></span></div>
+      <div class="control-editor-stage"><div class="control-editor-frame"><button type="button" class="control-editor-board" data-editor-control="board" aria-label="${t("Board")}"></button><div class="control-reference-rail" data-reference-rail="left" aria-hidden="true">${["Hold", "Score", "Lines", "Level", "Time"].map((text) => t(text)).join("<br>")}</div><div class="control-reference-rail" data-reference-rail="right" aria-hidden="true">${["Pause", "Next"].map((text) => t(text)).join("<br>")}</div></div></div>
       <footer class="control-editor-tools">
-        <div class="control-editor-selection"><select name="editorSelection" aria-label="Button">${(["board", ...EDITABLE_CONTROL_IDS] as GamepadControlId[]).map((id) => `<option value="${id}">${NAMES[id]}</option>`).join("")}</select><strong data-editor-selection hidden></strong><button type="button" data-editor-action="reset">Reset layout</button></div>
-        <label><span>Enabled</span><input name="editorControlEnabled" type="checkbox" checked></label>
-        <label><span>Board size</span><input name="editorBoardScale" type="range" min="0.5" max="1" step="0.01" value="${this.settings.boardScale ?? 1}"></label>
-        <label><span>Size</span><input name="editorControlSize" type="range" min="0.75" max="2" step="0.05"></label>
-        <label><span>Opacity</span><input name="editorControlOpacity" type="range" min="0.08" max="0.6" step="0.01"></label>
+        <div class="control-editor-selection"><select name="editorSelection" aria-label="${t("Button")}">${(["board", ...EDITABLE_CONTROL_IDS] as GamepadControlId[]).map((id) => `<option value="${id}">${t(NAMES[id])}</option>`).join("")}</select><strong data-editor-selection hidden></strong><button type="button" data-editor-action="reset" data-i18n="Reset layout">${t("Reset layout")}</button></div>
+        <label><span data-i18n="Enabled">${t("Enabled")}</span><input name="editorControlEnabled" type="checkbox" checked></label>
+        <label><span data-i18n="Board size">${t("Board size")}</span><input name="editorBoardScale" type="range" min="0.5" max="1" step="0.01" value="${this.settings.boardScale ?? 1}"></label>
+        <label><span data-i18n="Size">${t("Size")}</span><input name="editorControlSize" type="range" min="0.75" max="2" step="0.05"></label>
+        <label><span data-i18n="Opacity">${t("Opacity")}</span><input name="editorControlOpacity" type="range" min="0.08" max="0.6" step="0.01"></label>
       </footer>`;
     this.stage = this.wrapper.querySelector<HTMLDivElement>(
       ".control-editor-stage",
@@ -127,7 +130,7 @@ export class ControlEditor {
       target.type = "button";
       target.className = `control-editor-target control-editor-target-${id}`;
       target.dataset.editorControl = id;
-      target.setAttribute("aria-label", NAMES[id]);
+      target.setAttribute("aria-label", t(NAMES[id]));
       target.setAttribute("aria-pressed", String(id === this.selected));
       target.innerHTML = `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">${PATHS[id]}</svg>`;
       this.stage.querySelector(".control-editor-frame")!.append(target);
@@ -220,6 +223,7 @@ export class ControlEditor {
             event.target as HTMLInputElement
           ).valueAsNumber;
           this.render();
+          this.updateFields();
         },
         { signal: this.abort.signal },
       );
@@ -280,6 +284,11 @@ export class ControlEditor {
     this.observer.observe(this.stage);
     this.render();
     this.updateFields();
+    this.unsubscribeLanguage = subscribeLanguage(() => {
+      this.settings.language = getLanguage();
+      this.localize();
+      this.updateFields();
+    });
     this.targets.get("left")!.focus({ preventScroll: true });
   }
 
@@ -293,6 +302,7 @@ export class ControlEditor {
     if (this.destroyed) return;
     this.destroyed = true;
     this.drag = null;
+    this.unsubscribeLanguage();
     this.abort.abort();
     this.observer.disconnect();
     this.wrapper.remove();
@@ -367,16 +377,70 @@ export class ControlEditor {
     )!.checked = !placement.hidden;
     this.selectionLabel.textContent =
       this.selected === "pad" && this.settings.padMode === "dynamic"
-        ? "Movement buttons home"
-        : NAMES[this.selected];
-    this.orientationLabel.textContent =
-      this.orientation === "portrait" ? "Portrait" : "Landscape";
+        ? t("Movement buttons home")
+        : t(NAMES[this.selected]);
+    this.orientationLabel.textContent = t(
+      this.orientation === "portrait" ? "Portrait" : "Landscape",
+    );
     this.sizeInput.value = String(placement.size);
     this.opacityInput.value = String(placement.opacity);
-    this.sizeInput.setAttribute("aria-label", `${NAMES[this.selected]} size`);
+    this.sizeInput.setAttribute(
+      "aria-label",
+      t("{control} size", { control: t(NAMES[this.selected]) }),
+    );
     this.opacityInput.setAttribute(
       "aria-label",
-      `${NAMES[this.selected]} opacity`,
+      t("{control} opacity", { control: t(NAMES[this.selected]) }),
+    );
+    this.sizeInput.setAttribute(
+      "aria-valuetext",
+      `${placement.size.toLocaleString(getLocale())}×`,
+    );
+    this.opacityInput.setAttribute(
+      "aria-valuetext",
+      t("{percent}%", {
+        percent: Math.round(placement.opacity * 100).toLocaleString(
+          getLocale(),
+        ),
+      }),
+    );
+    this.wrapper
+      .querySelector<HTMLInputElement>('[name="editorBoardScale"]')!
+      .setAttribute(
+        "aria-valuetext",
+        t("{percent}%", {
+          percent: Math.round(
+            (this.settings.boardScale ?? 1) * 100,
+          ).toLocaleString(getLocale()),
+        }),
+      );
+  }
+
+  private localize(): void {
+    for (const element of this.wrapper.querySelectorAll<HTMLElement>(
+      "[data-i18n]",
+    )) {
+      element.textContent = t(element.dataset.i18n!);
+    }
+    for (const option of this.wrapper.querySelectorAll<HTMLOptionElement>(
+      "[name=editorSelection] option",
+    )) {
+      option.textContent = t(NAMES[option.value as GamepadControlId]);
+    }
+    this.wrapper
+      .querySelector("[name=editorSelection]")!
+      .setAttribute("aria-label", t("Button"));
+    for (const [id, target] of this.targets)
+      target.setAttribute("aria-label", t(NAMES[id]));
+    for (const [side, labels] of [
+      ["left", ["Hold", "Score", "Lines", "Level", "Time"]],
+      ["right", ["Pause", "Next"]],
+    ] as const) {
+      this.wrapper.querySelector(`[data-reference-rail="${side}"]`)!.innerHTML =
+        labels.map((label) => t(label)).join("<br>");
+    }
+    this.wrapper.querySelector("[data-editor-feedback]")!.textContent = t(
+      this.feedbackSource,
     );
   }
 
@@ -613,11 +677,12 @@ export class ControlEditor {
       else delete map[id];
     }
     this.targets.get(id)!.toggleAttribute("data-blocked", !valid);
-    this.wrapper.querySelector<HTMLElement>(
-      "[data-editor-feedback]",
-    )!.textContent = valid
+    this.feedbackSource = valid
       ? "Drag to move. Select to resize."
       : "No space here. Keep controls clear.";
+    this.wrapper.querySelector<HTMLElement>(
+      "[data-editor-feedback]",
+    )!.textContent = t(this.feedbackSource);
     this.render();
     return valid;
   }

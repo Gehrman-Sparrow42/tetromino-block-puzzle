@@ -123,6 +123,7 @@ export type GamepadLayouts = Record<
   Partial<Record<GamepadControlId, GamepadControlPlacement>>
 >;
 export interface UserSettings {
+  language: "en" | "tr";
   soundEnabled: boolean;
   soundVolume: number;
   hapticsEnabled: boolean;

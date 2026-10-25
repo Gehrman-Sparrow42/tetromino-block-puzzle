@@ -3,6 +3,7 @@ import {
   isStarterTheme,
   type ThemeId,
 } from "../contracts/theme-catalog";
+import { t } from "./i18n";
 export interface RewardedAdDriver {
   /** Resolves only after the fullscreen ad closes. true requires the SDK earned-reward event. */
   show(options: { customData: string; signal: AbortSignal }): Promise<boolean>;
@@ -34,19 +35,19 @@ function testReward(signal: AbortSignal): Promise<{ earned: boolean }> {
   return new Promise((resolve) => {
     const panel = document.createElement("dialog");
     panel.className = "sheet";
-    panel.setAttribute("aria-label", "Test ad");
+    panel.setAttribute("aria-label", t("Test ad"));
     panel.style.cssText =
       "position:fixed;inset:8px auto auto 8px;margin:0;z-index:1000;max-width:340px;width:calc(100vw - 16px);color:var(--text);background:var(--surface);";
     const title = document.createElement("h2");
-    title.textContent = "Test ad";
+    title.textContent = t("Test ad");
     const note = document.createElement("p");
-    note.textContent = "Preview only. No real ad is loaded.";
+    note.textContent = t("Preview only. No real ad is loaded.");
     const complete = document.createElement("button");
     complete.className = "primary-button";
-    complete.textContent = "Complete test ad";
+    complete.textContent = t("Complete test ad");
     const cancel = document.createElement("button");
     cancel.className = "secondary-button";
-    cancel.textContent = "Cancel test ad";
+    cancel.textContent = t("Cancel test ad");
     let settled = false;
     const finish = (earned: boolean) => {
       if (settled) return;

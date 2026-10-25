@@ -2,6 +2,7 @@ import type {
   GameStateSnapshot,
   TetrominoType,
 } from "../contracts/game-contract";
+import { t } from "../platform/i18n";
 import { SHAPES, HIDDEN_ROWS } from "../engine/constants";
 import { THEMES, type ThemePalette } from "./themes";
 
@@ -22,7 +23,8 @@ function fit(
     canvas.height = Math.round(h * dpr);
   }
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Your browser does not support the game canvas.");
+  if (!ctx)
+    throw new Error(t("Your browser does not support the game canvas."));
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
   return [ctx, w, h];

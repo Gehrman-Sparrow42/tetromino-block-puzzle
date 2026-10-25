@@ -12,6 +12,7 @@ import {
 } from "../contracts/game-contract";
 
 export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
+  language: "en",
   soundEnabled: true,
   soundVolume: 0.45,
   hapticsEnabled: true,
@@ -174,6 +175,7 @@ function settingsFrom(value: Record<string, unknown>): UserSettings {
   );
   profiles[key] = { layouts, boardScale };
   return {
+    language: value.language === "tr" ? "tr" : "en",
     soundEnabled: bool("soundEnabled"),
     soundVolume: bounded(value.soundVolume, defaults.soundVolume, 0, 1),
     hapticsEnabled: bool("hapticsEnabled"),
