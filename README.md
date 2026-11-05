@@ -8,6 +8,20 @@ Optional rewarded-continue preparation is available for a future Android build, 
 
 Choose **Settings → Language → Türkçe / English** to switch immediately. The preference is saved without reloading or replacing a run. Turkish covers menus, Story, both playable tutorials, control editing, theme choices, records, help and Online Battle. See [localization notes](docs/LOCALIZATION.md) for maintaining the catalogs.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Touch, keyboard or gamepad] --> B[UI and controls]
+    B --> C[Deterministic game engine]
+    C --> D[Canvas and screens]
+    C --> E[(Local saves and records)]
+    B --> F[Optional Online Battle]
+    F --> G[Room and battle server]
+    H[Capacitor Android shell] --> B
+```
+
+The browser UI and Android shell share the game engine. Optional Online Battle uses the separate server and leaves the solo save intact. See [engine](src/engine/), [UI](src/ui/), [platform adapters](src/platform/), [server](server/), and [Android shell](android/).
 ## Play
 
 - **Story:** twelve levels with increasing line goals and changing speed phases. Clear a stage to unlock the next, or replay completed stages.
@@ -64,16 +78,6 @@ npm run test:e2e
 ```
 
 For browser tests, first run `npx playwright install chromium` (or `--with-deps chromium` on Linux). Playwright starts its own development server. `dist/index.html` is a bundled single-file browser build; the Android package embeds this game locally. `npm run build:clean` is a compatibility alias for the same build, with no source rewriting.
-
-### Local project folders
-
-Keep the source checkout and its supporting files in one project directory. On this computer, that is `C:\Tools\tetromino-block-puzzle`:
-
-- `artifacts/` contains local screenshots, build logs and previous delivery artifacts.
-- `.worktrees/` contains preserved temporary Git checkouts for parallel work. Create future worktrees here rather than beside the project in `C:\Tools`.
-- `test-results/` contains generated browser-test outputs, separated by test and browser project.
-
-These local folders are excluded from Git. Branch history remains in Git; separate checkouts are only needed while working on branches in parallel. Windows launchers live in `C:\Tools\LAUNCHERS` and point to this main checkout.
 
 ## Android APK
 
