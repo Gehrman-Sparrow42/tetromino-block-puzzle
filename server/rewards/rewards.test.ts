@@ -343,3 +343,111 @@ it("creates theme attempts through HTTP and ignores forged claim target bodies",
     ).status,
   ).toBe(201);
 });
+
+it("prunes historical claimed and expired attempts at capacity without bricking or losing grants", () => {
+  const store = new RewardStore(":memory:", {
+    maxAttempts: 4,
+    retentionMs: 1_000_000,
+  });
+  cleanup.push(() => store.close());
+  const baseNow = 10_000_000;
+
+  // Create and claim 3 attempts well within retention, plus 1 expired pending attempt.
+  for (let i = 0; i < 3; i++) {
+    const a = store.create(`claimed-run-${i}`, baseNow + i);
+    store.verify(
+      { attemptId: a.id, transactionId: `tx-${i}`, timestamp: baseNow + i },
+      baseNow + i,
+    );
+    expect(store.read(a.id, a.token, true, baseNow + i)).toMatchObject({
+      status: "claimed",
+    });
+  }
+  store.create("stale-pending", baseNow);
+
+  // At capacity (4 rows), inserting a new run prunes stale/claimed rows instead of failing forever.
+  const next = store.create("fresh-run", baseNow + 10_000);
+  expect(next).toHaveProperty("id");
+  // Permanent grants table still blocks duplicate rewards for pruned runs.
+  expect(() => store.create("claimed-run-0", baseNow + 10_000)).toThrow(
+    /already/,
+  );
+
+  // Active unexpired pending flood still respects the ceiling.
+  const floodStore = new RewardStore(":memory:", { maxAttempts: 2 });
+  cleanup.push(() => floodStore.close());
+  floodStore.create("active-1", baseNow);
+  floodStore.create("active-2", baseNow);
+  expect(() => floodStore.create("active-3", baseNow + 1000)).toThrow(/limit/);
+});
+
+it("honors X-Forwarded-For per-client rate limiting only when trustProxy is enabled and normalizes Content-Type", async () => {
+  const untrusted = await startRewardsServer({
+    port: 0,
+    databasePath: ":memory:",
+    adUnits: [unit],
+    resolveKey: keys,
+  });
+  cleanup.push(untrusted.close);
+  const untrustedBase = `http://127.0.0.1:${untrusted.port}`;
+
+  for (let i = 0; i < 120; i++) {
+    const r = await fetch(`${untrustedBase}/health`, {
+      headers: { "X-Forwarded-For": `203.0.113.${i % 50}` },
+    });
+    expect(r.status).toBe(200);
+  }
+  expect(
+    (
+      await fetch(`${untrustedBase}/health`, {
+        headers: { "X-Forwarded-For": "198.51.100.99" },
+      })
+    ).status,
+  ).toBe(429);
+
+  const trusted = await startRewardsServer({
+    port: 0,
+    databasePath: ":memory:",
+    adUnits: [unit],
+    resolveKey: keys,
+    trustProxy: true,
+  });
+  cleanup.push(trusted.close);
+  const trustedBase = `http://127.0.0.1:${trusted.port}`;
+
+  for (let i = 0; i < 120; i++) {
+    expect(
+      (
+        await fetch(`${trustedBase}/health`, {
+          headers: { "X-Forwarded-For": "198.51.100.1" },
+        })
+      ).status,
+    ).toBe(200);
+  }
+  // Client 1 is rate-limited, while client 2 behind the same proxy still gets 200.
+  expect(
+    (
+      await fetch(`${trustedBase}/health`, {
+        headers: { "X-Forwarded-For": "198.51.100.1" },
+      })
+    ).status,
+  ).toBe(429);
+  expect(
+    (
+      await fetch(`${trustedBase}/health`, {
+        headers: { "X-Forwarded-For": "198.51.100.9, 198.51.100.2" },
+      })
+    ).status,
+  ).toBe(200);
+
+  // Content-Type casing and whitespace parameters should be accepted.
+  const created = await fetch(`${trustedBase}/v1/rewards/attempts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "Application/JSON ; charset=utf-8",
+      "X-Forwarded-For": "198.51.100.3",
+    },
+    body: JSON.stringify({ runId: "ct-normalized" }),
+  });
+  expect(created.status).toBe(201);
+});

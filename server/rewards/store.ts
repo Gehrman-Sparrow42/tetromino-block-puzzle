@@ -20,9 +20,21 @@ interface Attempt {
 }
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
+const DEFAULT_MAX_ATTEMPTS = 10_000;
+const DEFAULT_RETENTION_MS = 30 * 24 * 3_600_000;
+
+export interface RewardStoreOptions {
+  maxAttempts?: number;
+  retentionMs?: number;
+}
+
 export class RewardStore {
   private readonly db: DatabaseSync;
-  constructor(path: string) {
+  private readonly maxAttempts: number;
+  private readonly retentionMs: number;
+  constructor(path: string, options: RewardStoreOptions = {}) {
+    this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    this.retentionMs = options.retentionMs ?? DEFAULT_RETENTION_MS;
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;
       CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY, run_id TEXT NOT NULL, token_hash TEXT NOT NULL, created INTEGER NOT NULL, expires INTEGER NOT NULL, status TEXT NOT NULL);
@@ -69,14 +81,38 @@ export class RewardStore {
     this.db
       .prepare("DELETE FROM attempts WHERE expires < ? AND status = 'pending'")
       .run(now - 3_600_000);
+    this.db
+      .prepare("DELETE FROM attempts WHERE expires < ? AND status = 'claimed'")
+      .run(now - this.retentionMs);
     if (this.db.prepare("SELECT 1 FROM grants WHERE run_id = ?").get(runId))
       throw new Error("This run already received its continue");
-    if (
+    const countAttempts = () =>
       (
         this.db.prepare("SELECT COUNT(*) AS n FROM attempts").get() as {
           n: number;
         }
-      ).n >= 10000 ||
+      ).n;
+    let total = countAttempts();
+    if (total >= this.maxAttempts) {
+      // Prune oldest completed or expired attempts so historical receipts never brick creation.
+      const toRemove =
+        total -
+        this.maxAttempts +
+        Math.max(1, Math.min(100, Math.floor(this.maxAttempts / 10)));
+      this.db
+        .prepare(
+          `DELETE FROM attempts WHERE id IN (
+            SELECT id FROM attempts
+            WHERE status = 'claimed' OR (status IN ('pending', 'verified') AND expires < ?)
+            ORDER BY CASE status WHEN 'claimed' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, created ASC
+            LIMIT ?
+          )`,
+        )
+        .run(now, toRemove);
+      total = countAttempts();
+    }
+    if (
+      total >= this.maxAttempts ||
       (
         this.db
           .prepare("SELECT COUNT(*) AS n FROM attempts WHERE run_id = ?")

@@ -298,7 +298,7 @@ export function startOnline(
     )
       return;
     attempt(() => client!.sendInput(command as OnlineInput));
-    if (command.type === t("HOLD")) controls.pieceChanged();
+    if (command.type === "HOLD") controls.pieceChanged();
   }
   const controls = new TouchControls(
     overlay,

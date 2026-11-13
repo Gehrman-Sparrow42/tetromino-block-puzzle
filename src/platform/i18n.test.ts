@@ -95,4 +95,11 @@ describe("instant English/Turkish language selection", () => {
         seen[key] = value;
       }
   });
+  it("compares protocol command types against canonical HOLD instead of translated label", () => {
+    setLanguage("tr");
+    expect(t("HOLD")).toBe("BEKLET");
+    const source = readFileSync("src/ui/online-screen.ts", "utf8");
+    expect(source).not.toContain('command.type === t("HOLD")');
+    expect(source).toContain('command.type === "HOLD"');
+  });
 });

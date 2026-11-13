@@ -13,6 +13,8 @@ const server = await startRewardsServer({
   port,
   databasePath,
   host: process.env.REWARDS_HOST ?? "127.0.0.1",
+  trustProxy:
+    process.env.TRUST_PROXY === "1" || process.env.REWARDS_TRUST_PROXY === "1",
   adUnits: (process.env.REWARDED_AD_UNITS ?? "")
     .split(",")
     .map((s) => s.trim())

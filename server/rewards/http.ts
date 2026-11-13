@@ -1,5 +1,5 @@
 import { isThemeId, isStarterTheme } from "../../src/contracts/theme-catalog";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { RewardStore } from "./store";
 import {
@@ -15,12 +15,36 @@ export interface RewardsServerOptions {
   adUnits: string[];
   origins?: string[];
   resolveKey?: KeyResolver;
+  trustProxy?: boolean;
+}
+
+export function resolveClientIp(
+  req: IncomingMessage,
+  trustProxy: boolean,
+): string {
+  if (trustProxy) {
+    const forwarded = req.headers["x-forwarded-for"];
+    const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    if (raw) {
+      const parts = raw
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const last = parts.at(-1);
+      if (last) return last;
+    }
+    const realIp = req.headers["x-real-ip"];
+    const single = (Array.isArray(realIp) ? realIp[0] : realIp)?.trim();
+    if (single) return single;
+  }
+  return req.socket.remoteAddress ?? "unknown";
 }
 
 export async function startRewardsServer(options: RewardsServerOptions) {
   const store = new RewardStore(options.databasePath);
   const adUnits = new Set(options.adUnits);
   const resolveKey = options.resolveKey ?? googleKeyResolver();
+  const trustProxy = options.trustProxy ?? process.env.TRUST_PROXY === "1";
   const origins = new Set(
     options.origins ?? [
       "http://127.0.0.1:5173",
@@ -58,7 +82,7 @@ export async function startRewardsServer(options: RewardsServerOptions) {
         return;
       }
       const now = Date.now(),
-        ip = req.socket.remoteAddress ?? "unknown";
+        ip = resolveClientIp(req, trustProxy);
       for (const [key, rate] of rates)
         if (now - rate.at >= 60_000) rates.delete(key);
       const rate = rates.get(ip) ?? { at: now, count: 0 };
@@ -98,7 +122,11 @@ export async function startRewardsServer(options: RewardsServerOptions) {
         return;
       }
       if (req.method === "POST" && url.pathname === "/v1/rewards/attempts") {
-        if (req.headers["content-type"]?.split(";")[0] !== "application/json") {
+        const contentType = req.headers["content-type"]
+          ?.split(";")[0]
+          ?.trim()
+          .toLowerCase();
+        if (contentType !== "application/json") {
           reply(415, { error: "JSON required" });
           return;
         }
@@ -107,6 +135,7 @@ export async function startRewardsServer(options: RewardsServerOptions) {
           raw += chunk.toString();
           if (Buffer.byteLength(raw) > 4096) {
             reply(413, { error: "Request too large" });
+            req.destroy();
             return;
           }
         }
